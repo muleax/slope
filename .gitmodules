@@ -1,0 +1,12 @@
+[submodule "deps/cxxopts/cxxopts"]
+	path = deps/cxxopts/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
+[submodule "deps/glfw/glfw"]
+	path = deps/glfw/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "deps/nlohmann_json/json"]
+	path = deps/nlohmann_json/json
+	url = https://github.com/nlohmann/json.git
+[submodule "deps/stb/stb"]
+	path = deps/stb/stb
+	url = https://github.com/nothings/stb.git
