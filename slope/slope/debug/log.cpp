@@ -1,14 +1,10 @@
 #include "slope/debug/log.hpp"
 #include <cstdio>
 
-namespace slope::log {
+namespace slope::log::details {
 
-void info(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    printf("[INFO] ");
-    printf(format, args);
-    va_end(args);
+void log_impl(const char* prefix, const char* content) {
+    printf("%s: %s\n", prefix, content);
 }
 
-} // namespace slope::log
+} // slope::log::details

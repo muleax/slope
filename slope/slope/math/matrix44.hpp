@@ -7,6 +7,7 @@ namespace slope
 
 class Mat44 {
 public:
+    static Mat44 identity() { return {}; }
     static Mat44 rotation(const Vec3& axis, float angle);
     static Mat44 scale(const Vec3& scale);
     static Mat44 translation(const Vec3& translation);

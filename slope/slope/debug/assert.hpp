@@ -5,15 +5,23 @@ namespace slope::assert_details {
 void assert_handler(const char* expression);
 void assert_handler(const char* expression, const char* format, ...);
 
+inline void raise_impl() {
+#ifdef WIN32
+    __debugbreak();                                                         \
+#else
+    raise(SIGTRAP);
+#endif
+}
+
 } // slope::assert_details
 
-#define SL_VERIFY(expression, ...)                                                  \
-do {                                                                                \
-    if (!(expression)) {                                                            \
-        if (kw::assert_details::assert_handler(#expression, skip, ##__VA_ARGS__)) { \
-            __debugbreak();                                                         \
-        }                                                                           \
-    }                                                                               \
+
+#define SL_VERIFY(expression, ...)                                          \
+do {                                                                        \
+    if (!(expression)) {                                                    \
+        slope::assert_details::assert_handler(#expression, ##__VA_ARGS__);  \
+        slope::assert_details::raise_impl();                                \
+    }                                                                       \
 } while (false)
 
 #ifdef SLOPE_DEBUG

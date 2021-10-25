@@ -1,48 +1,14 @@
-#include "app.hpp"
+#include "app/system/app.hpp"
 #include "slope/math/vector2.hpp"
 #include "slope/math/vector3.hpp"
-//#define GLAD_GL_IMPLEMENTATION
-#include <glad/gl.h>
+#include "slope/debug/log.hpp"
+#include "slope/debug/assert.hpp"
+#include "app/render/shader_program.hpp"
+#include "glad/gl.h"
 #define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
+#include "GLFW/glfw3.h"
 
-#include "GLFW/../../deps/linmath.h"
-
-namespace slope {
-
-typedef struct Vertex
-{
-    slope::Vec2 pos;
-    slope::Vec3 col;
-} Vertex;
-
-static const Vertex vertices[3] =
-        {
-                { { -0.6f, -0.4f }, { 1.f, 0.f, 0.f } },
-                { {  0.6f, -0.4f }, { 0.f, 1.f, 0.f } },
-                { {   0.f,  0.6f }, { 0.f, 0.f, 1.f } }
-        };
-
-static const char* vertex_shader_text =
-        "#version 330\n"
-        "uniform mat4 MVP;\n"
-        "in vec3 vCol;\n"
-        "in vec2 vPos;\n"
-        "out vec3 color;\n"
-        "void main()\n"
-        "{\n"
-        "    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
-        "    color = vCol;\n"
-        "}\n";
-
-static const char* fragment_shader_text =
-        "#version 330\n"
-        "in vec3 color;\n"
-        "out vec4 fragment;\n"
-        "void main()\n"
-        "{\n"
-        "    fragment = vec4(color, 1.0);\n"
-        "}\n";
+namespace slope::app {
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -54,90 +20,72 @@ static void glfw_error_callback(int error, const char* description) {
     //fprintf(stderr, "GLFW error: %s\n", description);
 }
 
-void App::run(int win_width, int win_height, const char* title) {
+App::App(const AppCfg& cfg) {
     glfwSetErrorCallback(glfw_error_callback);
 
-    if (!glfwInit())
-        exit(EXIT_FAILURE);
+    SL_VERIFY(glfwInit());
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    start_time = glfwGetTime();
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_FALSE);
 
-    GLFWwindow* window = glfwCreateWindow(win_width, win_height, title, nullptr, nullptr);
-    if (!window)
-    {
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
+    m_window = glfwCreateWindow(cfg.window_width, cfg.window_height, cfg.title.c_str(), nullptr, nullptr);
+    SL_VERIFY(m_window != nullptr);
 
-    glfwSetKeyCallback(window, key_callback);
+    glfwSetKeyCallback(m_window, key_callback);
 
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(m_window);
     gladLoadGL(glfwGetProcAddress);
-    // glfwSwapInterval(1);
+    glfwSwapInterval(0);
+}
 
-    // TODO: OpenGL error checks
+App::~App() {
+    glfwDestroyWindow(m_window);
+    glfwTerminate();
+}
 
-    GLuint vertex_buffer;
-    glGenBuffers(1, &vertex_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    const GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex_shader, 1, &vertex_shader_text, nullptr);
-    glCompileShader(vertex_shader);
-
-    const GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader, 1, &fragment_shader_text, nullptr);
-    glCompileShader(fragment_shader);
-
-    const GLuint program = glCreateProgram();
-    glAttachShader(program, vertex_shader);
-    glAttachShader(program, fragment_shader);
-    glLinkProgram(program);
-
-    const GLint mvp_location = glGetUniformLocation(program, "MVP");
-    const GLint vpos_location = glGetAttribLocation(program, "vPos");
-    const GLint vcol_location = glGetAttribLocation(program, "vCol");
-
-    GLuint vertex_array;
-    glGenVertexArrays(1, &vertex_array);
-    glBindVertexArray(vertex_array);
-    glEnableVertexAttribArray(vpos_location);
-    glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(Vertex), (void*) offsetof(Vertex, pos));
-    glEnableVertexAttribArray(vcol_location);
-    glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(Vertex), (void*) offsetof(Vertex, col));
-
-    while (!glfwWindowShouldClose(window))
-    {
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        const float ratio = width / (float) height;
+void App::run() {
+    double prev_time = get_time() - 1e-4;
+    while (!glfwWindowShouldClose(m_window)) {
+        int width;
+        int height;
+        get_frame_buffer_size(width, height);
 
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        mat4x4 m, p, mvp;
-        mat4x4_identity(m);
-        mat4x4_rotate_Z(m, m, (float) glfwGetTime());
-        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-        mat4x4_mul(mvp, p, m);
+        double curr_time = get_time();
+        auto dt = static_cast<float>(curr_time - prev_time);
+        prev_time = curr_time;
 
-        glUseProgram(program);
-        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) &mvp);
-        glBindVertexArray(vertex_array);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        update(dt);
 
-        glfwSwapBuffers(window);
+        //glfwSwapBuffers(m_window);
+        glFlush();
         glfwPollEvents();
+
+        static int frames = 0;
+        static float cum_dt = 0;
+        frames++;
+        cum_dt += dt;
+        if (cum_dt >= 1.f) {
+            auto fps = static_cast<float>(frames) / cum_dt;
+            printf("FPS %f\n", fps);
+            frames = 0;
+            cum_dt = 0.f;
+        }
     }
-
-    glfwDestroyWindow(window);
-
-    glfwTerminate();
 }
 
-} // slope
+void App::get_frame_buffer_size(int& out_width, int& out_height) const {
+    glfwGetFramebufferSize(m_window, &out_width, &out_height);
+}
+
+double App::get_time() const {
+    return glfwGetTime() - start_time;
+}
+
+} // slope::app

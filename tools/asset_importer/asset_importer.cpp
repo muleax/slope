@@ -1,17 +1,44 @@
+#include "slope/containers/string.hpp"
+#include "slope/containers/vector.hpp"
+#include "slope/debug/log.hpp"
+#include "slope/math/math.hpp"
 #include "nlohmann/json.hpp"
 #include "cxxopts/include/cxxopts.hpp"
 #include <iostream>
 #include <fstream>
 
-bool convert(const std::string& path) {
+using namespace slope;
+
+struct MeshData {
+    struct Vertex {
+        Vec3 position;
+        Vec3 normal;
+        Vec2 tex_coords;
+    };
+
+    struct Face {
+        uint32_t start_index = 0;
+        uint32_t size = 0;
+    };
+
+    Vector<Vertex>      m_vertices;
+    Vector<uint32_t>    m_indices;
+    Vector<Face>        m_faces;
+};
+
+bool convert(const String& path) {
     std::ifstream src(path);
     if (!src.is_open()) {
-        std::cout << "Error: can't open " << path << std::endl;
+        log::error("Can't open {}");
         return false;
     }
 
-    std::string line;
+    String token;
+    String line;
     while (std::getline(src,line)) {
+        std::istringstream ss(line);
+        ss >> token;
+        if (token == "o")
         std::cout << line << '\n';
     }
     src.close();

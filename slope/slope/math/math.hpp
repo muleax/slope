@@ -1,0 +1,9 @@
+#pragma once
+#include "math_utils.hpp"
+#include "vector2.hpp"
+#include "vector3.hpp"
+#include "vector4.hpp"
+#include "matrix22.hpp"
+#include "matrix33.hpp"
+#include "matrix44.hpp"
+#include "quat.hpp"

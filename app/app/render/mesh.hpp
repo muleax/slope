@@ -1,39 +1,49 @@
 #pragma once
-#include "slope/math/vector3.hpp"
+#include "app/render/config.hpp"
 #include "slope/math/vector2.hpp"
+#include "slope/math/vector3.hpp"
+#include "slope/math/vector4.hpp"
 #include "slope/containers/vector.hpp"
-#include "app/system/resource_manager.hpp"
+#include <memory>
 
-namespace slope {
 
-struct Vertex {
-    slope::Vec3 position;
-    slope::Vec3 normal;
-    slope::Vec2 tex_coords;
-};
+#include "glad/gl.h"
 
-struct Face {
-    uint32_t vertex;
-    uint32_t normal;
-    uint32_t tex_coords;
-};
-
-class MeshResource : public IResource {
-public:
-    bool load(const String& path) override;
-
-    Vector<slope::Vec3> m_vertices;
-    Vector<slope::Vec3> m_normals;
-    Vector<slope::Vec2> m_tex_coords;
-    Vector<Face>        m_faces;
-
-private:
-
-};
+namespace slope::app {
 
 class Mesh {
 public:
+    struct Vertex {
+        Vec3 position;
+        Vec3 normal;
+        Vec4 color;
+        Vec2 tex_coords;
+    };
 
+    Mesh(VectorView<Vertex> vertices, VectorView<uint32_t> indices, RenderHandle instancing_buffer);
+    ~Mesh();
+
+    RenderHandle    vertex_array() const { return m_vao; }
+    RenderHandle    instancing_buffer() const { return m_instancing_buffer; }
+    int             size() const { return m_size; }
+
+    void draw () {
+
+        glBindVertexArray(m_vao);
+
+        glDrawElements(GL_TRIANGLES, m_size, GL_UNSIGNED_INT, 0);
+
+        glBindVertexArray(0);
+    }
+
+private:
+    RenderHandle m_vao;
+    RenderHandle m_vbo;
+    RenderHandle m_ebo;
+    RenderHandle m_instancing_buffer;
+    int          m_size = 0;
 };
 
-} // slope
+using MeshPtr = std::shared_ptr<Mesh>;
+
+} // slope::app
