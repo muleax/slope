@@ -38,7 +38,7 @@ REGISTER_COMPONENT(RenderComponent);
 void RenderSystem::update(float dt) {
     m_time += dt;
 
-    auto& render = w().get_singleton<RenderSingleton>()->render;
+    auto& render = w().get_singleton_for_write<RenderSingleton>()->render;
     auto render_view = view<RenderComponent>();
 
     for (auto e : render_view) {
@@ -53,9 +53,11 @@ void RenderSystem::update(float dt) {
     std::sort(m_queue.begin(), m_queue.end(), [](RenderComponent* a, RenderComponent* b) {
         return a->mesh.get() > b->mesh.get() || a->material.get() > b->material.get(); });
 
+
     RenderComponent* prev = nullptr;
     for (RenderComponent* rc : m_queue) {
-        if (m_mvp.size() > 10 || (prev && (rc->mesh.get() != prev->mesh.get() || rc->material.get() != prev->material.get()))) {
+        // TODO: research performance issues
+        if (m_mvp.size() >= render.max_instance_count() || (prev && (rc->mesh.get() != prev->mesh.get() || rc->material.get() != prev->material.get()))) {
             render.draw_mesh(*prev->mesh, *prev->material, m_mvp);
             m_mvp.clear();
         }

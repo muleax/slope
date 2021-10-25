@@ -63,7 +63,7 @@ public:
     }
 
     template <class T>
-    const T* get_singleton_for_write() const {
+    T* get_singleton_for_write() {
         return get_component_for_write<T>(m_singleton_entity);
     }
 

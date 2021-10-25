@@ -73,7 +73,8 @@ void App::run() {
         cum_dt += dt;
         if (cum_dt >= 1.f) {
             auto fps = static_cast<float>(frames) / cum_dt;
-            printf("FPS %f\n", fps);
+            auto avg_dt = 1000 * cum_dt / frames;
+            printf("%f ms\n", avg_dt);
             frames = 0;
             cum_dt = 0.f;
         }
