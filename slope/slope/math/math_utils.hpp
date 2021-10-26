@@ -3,9 +3,9 @@
 
 namespace slope {
 
-constexpr float PI = M_PI;
-constexpr float SQRT2 = M_SQRT2;
-constexpr float EPSILON = 1e-6f;
+constexpr double    PI = 3.14159265358979323846264338327950288;
+constexpr double    SQRT2 = 1.41421356237309504880168872420969808;
+constexpr float     EPSILON = 1e-6f;
 
 template<class T>
 constexpr T sqr(T value) {

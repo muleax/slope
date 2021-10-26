@@ -37,7 +37,7 @@ static const char* s_fragment_shader_text =
         "    fragment = vec4(v_color, 1.0);\n"
         "}\n";
 
-static const Vector<Mesh::Vertex> s_vertices = {
+static Vector<Mesh::Vertex> s_vertices = {
         { Vec3{ -0.6f, -0.4f, 0.f }, Vec3{ 0.f, 0.f, 1.f }, Vec4{ 1.f, 0.f, 0.f, 0.5f }, Vec2{0.f, 0.f} },
         { Vec3{  0.6f, -0.4f, 0.f }, Vec3{ 0.f, 0.f, 1.f }, Vec4{0.f, 1.f, 0.f, 0.5f}, Vec2{0.f, 0.f}  },
         { Vec3{   0.f,  0.6f, 0.f }, Vec3{ 0.f, 0.f, 1.f }, Vec4{0.f, 0.f, 1.f, 0.5f}, Vec2{0.f, 0.f}  }
@@ -53,21 +53,24 @@ public:
         m_world = std::make_unique<World>();
         m_world->add_system<RenderSystem>();
 
-        auto* render_single = m_world->create_singleton<RenderSingleton>();
+        m_world->create_singleton<RenderSingleton>();
 
-        auto mesh = std::make_shared<Mesh>(s_vertices, s_indices, render_single->render.instancing_buffer());
+        auto mesh = std::make_shared<Mesh>(s_vertices, s_indices);
 
         auto shader = std::make_shared<ShaderProgram>(s_vertex_shader_text, s_fragment_shader_text);
         SL_VERIFY(shader->ready());
 
         auto material = std::make_shared<Material>(shader);
 
-        for (int i = 0; i < 10000; i++) {
+
+
+        for (int i = 0; i < 30000; i++) {
 
             auto e = m_world->create_entity();
             auto* rc = m_world->create_component<RenderComponent>(e);
             rc->mesh = mesh;
-            rc->offs.x = i * 0.0002f;
+            rc->offs.x = i * 0.000f;
+            rc->offs.z = /*10000 * 0.0001f - */i * 0.0001f;
 
             rc->material = material;
         }

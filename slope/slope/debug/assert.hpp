@@ -1,4 +1,5 @@
 #pragma once
+#include <csignal>
 
 namespace slope::assert_details {
 
@@ -7,7 +8,7 @@ void assert_handler(const char* expression, const char* format, ...);
 
 inline void raise_impl() {
 #ifdef WIN32
-    __debugbreak();                                                         \
+    __debugbreak();
 #else
     raise(SIGTRAP);
 #endif

@@ -64,6 +64,8 @@ public:
         }
     }
 
+    bool empty() const { return m_entities.empty(); }
+
 private:
     UnorderedSet<Entity> m_entities;
     ComponentMask m_filter;

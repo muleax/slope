@@ -30,7 +30,7 @@ App::App(const AppCfg& cfg) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_FALSE);
+    glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
 
     m_window = glfwCreateWindow(cfg.window_width, cfg.window_height, cfg.title.c_str(), nullptr, nullptr);
     SL_VERIFY(m_window != nullptr);
@@ -40,6 +40,9 @@ App::App(const AppCfg& cfg) {
     glfwMakeContextCurrent(m_window);
     gladLoadGL(glfwGetProcAddress);
     glfwSwapInterval(0);
+
+    glEnable(GL_DEPTH_TEST);
+    //glEnable(GL_RASTERIZER_DISCARD);
 }
 
 App::~App() {
@@ -49,13 +52,15 @@ App::~App() {
 
 void App::run() {
     double prev_time = get_time() - 1e-4;
+
+
     while (!glfwWindowShouldClose(m_window)) {
         int width;
         int height;
         get_frame_buffer_size(width, height);
-
         glViewport(0, 0, width, height);
-        glClear(GL_COLOR_BUFFER_BIT);
+        
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         double curr_time = get_time();
         auto dt = static_cast<float>(curr_time - prev_time);
@@ -63,8 +68,9 @@ void App::run() {
 
         update(dt);
 
-        //glfwSwapBuffers(m_window);
-        glFlush();
+        glfwSwapBuffers(m_window);
+        //glFinish();
+        //glFlush();
         glfwPollEvents();
 
         static int frames = 0;

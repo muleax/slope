@@ -9,6 +9,7 @@ namespace slope::app {
 
 struct RenderSingleton : public Component<RenderSingleton> {
     Render render;
+    size_t max_instancing_count = 1024;
 };
 
 struct RenderComponent : public Component<RenderComponent> {

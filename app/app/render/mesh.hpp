@@ -20,27 +20,18 @@ public:
         Vec2 tex_coords;
     };
 
-    Mesh(VectorView<Vertex> vertices, VectorView<uint32_t> indices, RenderHandle instancing_buffer);
+    Mesh(VectorView<Vertex> vertices, VectorView<uint32_t> indices);
     ~Mesh();
 
-    RenderHandle    vertex_array() const { return m_vao; }
-    RenderHandle    instancing_buffer() const { return m_instancing_buffer; }
     int             size() const { return m_size; }
 
-    void draw () {
-
-        glBindVertexArray(m_vao);
-
-        glDrawElements(GL_TRIANGLES, m_size, GL_UNSIGNED_INT, 0);
-
-        glBindVertexArray(0);
-    }
+    void            bind(RenderHandle instancing_buffer) const;
+    void            unbind() const;
 
 private:
     RenderHandle m_vao;
     RenderHandle m_vbo;
     RenderHandle m_ebo;
-    RenderHandle m_instancing_buffer;
     int          m_size = 0;
 };
 
