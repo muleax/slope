@@ -48,14 +48,6 @@ static const char* s_fragment_shader_text =
         "   out_color = vec4(result, 1.0);\n"
         "}\n";
 
-static Vector<Mesh::Vertex> s_vertices = {
-        { Vec3{ -0.6f, -0.4f, 0.f }, Vec3{ 0.f, 0.f, 1.f }, Vec4{ 1.f, 0.f, 0.f, 0.5f }, Vec2{0.f, 0.f} },
-        { Vec3{  0.6f, -0.4f, 0.f }, Vec3{ 0.f, 0.f, 1.f }, Vec4{0.f, 1.f, 0.f, 0.5f}, Vec2{0.f, 0.f}  },
-        { Vec3{   0.f,  0.6f, 0.f }, Vec3{ 0.f, 0.f, 1.f }, Vec4{0.f, 0.f, 1.f, 0.5f}, Vec2{0.f, 0.f}  }
-};
-
-static const Vector<uint32_t> s_indices = {0, 1, 2};
-
 class TestApp : public App {
 public:
     ~TestApp() override = default;
@@ -103,27 +95,24 @@ public:
             rc->material = material;
 
             auto* tc = m_world->create_component<TransformComponent>(e);
+            tc->transform = Mat44::translation({0.f, 0.f, 0.f});
         }
 
         auto le = m_world->create_entity();
         m_world->create_component<LightSourceComponent>(le);
         m_world->create_component<TransformComponent>(le)->transform = Mat44::translation({50.f, 100.f, 70.f});
 
-        Vec3 eye = {1.f, 2.f, 1.f};
-        Vec3 cam_dir = normalize(-eye);
+        Vec3 eye = {0.f, 0.f, 2.f};
 
         m_cam_entity = m_world->create_entity();
         m_world->create_component<TransformComponent>(m_cam_entity)->transform = Mat44::translation(eye);
-        auto& cam = m_world->create_component<CameraComponent>(m_cam_entity)->camera;
-        cam.set_view_direction(cam_dir, {0.f, 1.f, 0.f});
+        m_world->create_component<CameraControllerComponent>(m_cam_entity);
+        m_world->create_component<CameraComponent>(m_cam_entity);
+
+        set_background_color({0.1f, 0.6f, 0.7f});
     }
 
     void update(float dt) override {
-        if (m_cam_velocity.length_squared() > 0.f) {
-            auto* cam_tr = m_world->get_component_for_write<TransformComponent>(m_cam_entity);
-            cam_tr->transform = Mat44::translation(cam_tr->transform.translation() + m_cam_velocity * dt);
-        }
-
         m_world->update(dt);
     }
 
@@ -133,34 +122,48 @@ public:
     }
 
     void on_key(Key key, int scancode, KeyAction action, int mods) override {
-        log::info("on_key {} action {} mods {}", key, action, mods);
+        bool is_pressed = action == KeyAction::Press || action == KeyAction::Repeat;
 
-        bool is_press = action == KeyAction::Press || action == KeyAction::Repeat;
+        auto* cam_ctl = m_world->get_component_for_write<CameraControllerComponent>(m_cam_entity);
 
         switch (key) {
-            case Key::Left:
-                m_cam_velocity = is_press ? Vec3{-1.f, 0.f, 0.f} : Vec3{};
+            case Key::A:
+                cam_ctl->move_left = is_pressed;
                 break;
-            case Key::Right:
-                m_cam_velocity = is_press ? Vec3{1.f, 0.f, 0.f} : Vec3{};
+            case Key::D:
+                cam_ctl->move_right = is_pressed;
                 break;
-            case Key::Up:
-                m_cam_velocity = is_press ? Vec3{0.f, 0.f, 1.f} : Vec3{};
+            case Key::W:
+                cam_ctl->move_fwd = is_pressed;
                 break;
-            case Key::Down:
-                m_cam_velocity = is_press ? Vec3{0.f, 0.f, -1.f} : Vec3{};
+            case Key::S:
+                cam_ctl->move_bkwd = is_pressed;
                 break;
             default:
                 break;
         }
     }
 
-    Vec3 m_cam_velocity;
+    void on_cursor_move(double x_delta, double y_delta) override {
+        if (m_cam_move_mode) {
+            auto* cam_ctl = m_world->get_component_for_write<CameraControllerComponent>(m_cam_entity);
+            cam_ctl->rotate(x_delta, -y_delta);
+
+        }
+    }
+
+    void on_mouse_button(MouseButton button, KeyAction action, KeyMod::Raw mods) override {
+        if (button == MouseButton::B_1) {
+            m_cam_move_mode = (action == KeyAction::Press);
+        }
+    }
+
+    bool m_cam_move_mode = false;
     Entity m_cam_entity;
     std::unique_ptr<World> m_world;
 };
 
 int main() {
-    AppManager::run<TestApp>({640, 480, "Hello world"});
+    AppManager::run<TestApp>({1024, 768, "Hello world"});
     return 0;
 }

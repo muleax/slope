@@ -30,8 +30,9 @@ public:
     }
 
     static void on_cursor_pos(GLFWwindow* window, double x_pos, double y_pos) {
-        if (s_app_instance)
-            s_app_instance->on_cursor_pos(x_pos, y_pos);
+        if (s_app_instance) {
+            s_app_instance->move_cursor(x_pos, y_pos);
+        }
     }
 
     static void on_cursor_enter(GLFWwindow* window, int entered) {
@@ -80,6 +81,8 @@ void App::init(const AppCfg& cfg) {
     gladLoadGL(glfwGetProcAddress);
 
     m_start_time = glfwGetTime();
+
+    glfwGetCursorPos(m_window, &m_x_cursor_pos, &m_y_cursor_pos);
 
     on_init();
     update_window_size();
@@ -134,6 +137,26 @@ void App::get_window_size(int& width, int& height) const {
     height = m_win_height;
 }
 
+void App::get_cursor_pos(double& x, double& y) const {
+    x = m_x_cursor_pos;
+    y = m_y_cursor_pos;
+}
+
+void App::set_cursor_pos(double x, double y) {
+    m_x_cursor_pos = x;
+    m_y_cursor_pos = y;
+    glfwSetCursorPos(m_window, x, y);
+}
+
+void App::move_cursor(double x, double y) {
+    double dx = x - m_x_cursor_pos;
+    double dy = y - m_y_cursor_pos;
+    m_x_cursor_pos = x;
+    m_y_cursor_pos = y;
+
+    on_cursor_move(dx, dy);
+}
+
 void App::update_window_size() {
     int width;
     int height;
@@ -148,6 +171,10 @@ void App::update_window_size() {
 
 double App::get_time() const {
     return glfwGetTime() - m_start_time;
+}
+
+void App::set_background_color(const Vec3& rgb) {
+    glClearColor(rgb.x, rgb.y, rgb.z, 0.f);
 }
 
 } // slope::app

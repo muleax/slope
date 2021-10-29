@@ -1,11 +1,28 @@
 #include "app/render/camera.hpp"
 #include "app/scene/transform.hpp"
-
-#include <app/../../deps/glfw/glfw/deps/linmath.h>
+#include "slope/debug/log.hpp"
 
 namespace slope::app {
 
 REGISTER_COMPONENT(CameraComponent);
+REGISTER_COMPONENT(CameraControllerComponent);
+
+// helper
+static Mat44 perspective_rh(float fov_y, float aspect, float z_near, float z_far) {
+    SL_ASSERT(std::isfinite(fov_y));
+    SL_ASSERT(std::isfinite(aspect));
+    SL_ASSERT(std::isfinite(z_near));
+    SL_ASSERT(std::isfinite(z_far));
+    SL_ASSERT(!equal(aspect, 0.f));
+    SL_ASSERT(!equal(fov_y, 0.f));
+    SL_ASSERT(!equal(z_near, z_far));
+
+    float tan_half_fov_y = std::tan(fov_y * 0.5f);
+    return Mat44(1.f / (aspect * tan_half_fov_y), 0.f,                  0.f,                               0.f,
+                 0.f,                             1.f / tan_half_fov_y, 0.f,                               0.f,
+                 0.f,                             0.f,                  z_far / (z_near - z_far),          -1.f,
+                 0.f,                             0.f,                  z_far * z_near / (z_near - z_far), 0.f);
+}
 
 Camera::Camera() {
     rebuild();
@@ -13,11 +30,6 @@ Camera::Camera() {
 
 void Camera::set_transform(const Mat44& value) {
     m_transform = value;
-}
-
-void Camera::set_view_direction(const Vec3& dir, const Vec3& up) {
-    m_view_direction = dir;
-    m_view_up = up;
 }
 
 void Camera::set_fov(float value) {
@@ -37,29 +49,40 @@ void Camera::set_aspect_ratio(float value) {
 }
 
 void Camera::rebuild() {
-    const Vec3& pos = m_transform.translation();
-    Vec3 at = pos + m_view_direction;
-
-    mat4x4 v;
-    vec3 eye = {pos.x, pos.y, pos.z};
-    vec3 center = {at.x, at.y, at.z};
-    vec3 up = {m_view_up.x, m_view_up.y, m_view_up.z};
-    mat4x4_look_at(v, eye, center, up);
-
-    mat4x4 p;
-    mat4x4_perspective(p, m_fov, m_aspect_ratio, m_near_plane, m_far_plane);
-
-    auto* pvp = reinterpret_cast<mat4x4*>(&m_view_proj);
-    mat4x4_mul(*pvp, p, v);
+    auto p = perspective_rh(m_fov, m_aspect_ratio, m_near_plane, m_far_plane);
+    m_view_proj = m_transform.inverted() * p;
 }
 
 void CameraSystem::update(float dt) {
-    for (auto e : view<CameraComponent, TransformComponent>()) {
-        auto& matrix = w().get_component<TransformComponent>(e)->transform;
+    for (auto e : view<CameraComponent, CameraControllerComponent, TransformComponent>()) {
+        auto* tc = w().get_component_for_write<TransformComponent>(e);
+        auto* cam = w().get_component_for_write<CameraComponent>(e);
+        auto* ctl = w().get_component_for_write<CameraControllerComponent>(e);
 
-        auto& camera = w().get_component_for_write<CameraComponent>(e)->camera;
-        camera.set_transform(matrix);
-        camera.rebuild();
+        Vec3 vel_dir;
+        if (ctl->move_fwd && !ctl->move_bkwd) {
+            vel_dir.z = -1.f;
+        } else if (!ctl->move_fwd && ctl->move_bkwd) {
+            vel_dir.z = 1.f;
+        }
+
+        if (ctl->move_left && !ctl->move_right) {
+            vel_dir.x = -1.f;
+        } else if (!ctl->move_left && ctl->move_right) {
+            vel_dir.x = 1.f;
+        }
+
+        // TODO: optimize
+        auto pitch_rot = Mat44::rotation({1.f, 0.f, 0.f}, ctl->pitch);
+        auto yaw_rot = Mat44::rotation({0.f, 1.f, 0.f}, -ctl->yaw);
+        auto rot = pitch_rot * yaw_rot;
+
+        Vec3 new_pos = tc->transform.translation() + rot.apply_normal(vel_dir) * (ctl->velocity * dt);
+
+        tc->transform = rot * Mat44::translation(new_pos);
+
+        cam->camera.set_transform(tc->transform);
+        cam->camera.rebuild();
     }
 }
 

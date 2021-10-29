@@ -9,7 +9,6 @@ public:
     Camera();
 
     void set_transform(const Mat44& value);
-    void set_view_direction(const Vec3& dir, const Vec3& up);
     void set_fov(float value);
     void set_near_plane(float value);
     void set_far_plane(float value);
@@ -21,19 +20,36 @@ public:
 
 private:
     Mat44 m_transform;
-    Vec3 m_view_direction = {0.f, 0.f, 1.f};
-    Vec3 m_view_up = {0.f, 1.f, 0.f};
     float m_fov = 1.57f;
-    float m_near_plane = 1.f;
+    float m_near_plane = 0.01f;
     float m_far_plane = 1000.f;
     float m_aspect_ratio = 1.f;
 
     Mat44 m_view_proj;
 };
 
-class CameraComponent : public Component<CameraComponent> {
-public:
+struct CameraComponent : public Component<CameraComponent> {
     Camera camera;
+};
+
+struct CameraControllerComponent : public Component<CameraControllerComponent> {
+    float velocity = 1.f;
+
+    bool move_fwd = false;
+    bool move_bkwd = false;
+    bool move_left = false;
+    bool move_right = false;
+
+    float yaw_sensivity = 0.01f;
+    float pitch_sensivity = 0.01f;
+
+    float yaw = 0.f;
+    float pitch = 0.f;
+
+    void rotate(float yaw_delta, float pitch_delta) {
+        yaw = fmodf(PI + yaw + yaw_delta * yaw_sensivity, 2.f * PI) - PI;
+        pitch = fmodf(PI + pitch + pitch_delta * pitch_sensivity, 2.f * PI) - PI;
+    }
 };
 
 class CameraSystem : public System {

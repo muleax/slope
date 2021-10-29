@@ -203,14 +203,17 @@ public:
     }
 
     [[nodiscard]] constexpr Vec3 apply_normal(const Vec3& normal) const {
-        return *this * normal;
+        return {
+                normal.x * _11 + normal.y * _21 + normal.z * _31,
+                normal.x * _12 + normal.y * _22 + normal.z * _32,
+                normal.x * _13 + normal.y * _23 + normal.z * _33 };
     }
 
     [[nodiscard]] const Vec3& translation() const {
         return *reinterpret_cast<const Vec3*>(rows + 3);
     }
 
-    [[nodiscard]] constexpr Mat44 inverted() const;
+    [[nodiscard]] Mat44 inverted() const;
 
     [[nodiscard]] constexpr bool equal(const Mat44& rhs, float epsilon = EPSILON) const {
         return  slope::equal(_11, rhs._11, epsilon) &&

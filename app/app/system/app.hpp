@@ -1,6 +1,7 @@
 #pragma once
 #include "app/system/input.hpp"
 #include "slope/containers/string.hpp"
+#include "slope/math/vector3.hpp"
 
 struct GLFWwindow;
 
@@ -22,13 +23,16 @@ public:
 
     virtual void on_key(Key key, int scancode, KeyAction action, KeyMod::Raw mods) {}
     virtual void on_mouse_button(MouseButton button, KeyAction action, KeyMod::Raw mods) {}
-    virtual void on_cursor_pos(double x_pos, double y_pos) {}
+    virtual void on_cursor_move(double x_delta, double y_delta) {}
     virtual void on_cursor_enter(bool entered) {}
     virtual void on_scroll(double x_offset, double y_offset) {}
     virtual void on_window_resize(int width, int height) {}
 
     void    get_window_size(int& width, int& height) const;
+    void    get_cursor_pos(double& x, double& y) const;
+    void    set_cursor_pos(double x, double y);
     double  get_time() const;
+    void    set_background_color(const Vec3& rgb);
 
     void    stop();
 
@@ -37,6 +41,10 @@ private:
     void run();
 
     void update_window_size();
+    void move_cursor(double x, double y);
+
+    double m_x_cursor_pos = 0.0;
+    double m_y_cursor_pos = 0.0;
 
     int m_win_width = 0;
     int m_win_height = 0;
@@ -44,6 +52,7 @@ private:
     GLFWwindow* m_window = nullptr;
 
     friend class AppManager;
+    friend class AppCallbacks;
 };
 
 class AppManager {

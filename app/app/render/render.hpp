@@ -29,7 +29,7 @@ struct RenderComponent : public Component<RenderComponent> {
     MaterialPtr material;
 };
 
-class LightSourceComponent : public Component<LightSourceComponent> {
+struct LightSourceComponent : public Component<LightSourceComponent> {
 };
 
 class RenderSystem : public System {
