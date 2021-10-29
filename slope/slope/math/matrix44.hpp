@@ -206,6 +206,10 @@ public:
         return *this * normal;
     }
 
+    [[nodiscard]] const Vec3& translation() const {
+        return *reinterpret_cast<const Vec3*>(rows + 3);
+    }
+
     [[nodiscard]] constexpr Mat44 inverted() const;
 
     [[nodiscard]] constexpr bool equal(const Mat44& rhs, float epsilon = EPSILON) const {

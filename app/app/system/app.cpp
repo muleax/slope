@@ -1,31 +1,64 @@
 #include "app/system/app.hpp"
-#include "slope/math/vector2.hpp"
-#include "slope/math/vector3.hpp"
 #include "slope/debug/log.hpp"
 #include "slope/debug/assert.hpp"
-#include "app/render/shader_program.hpp"
 #include "glad/gl.h"
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 
 namespace slope::app {
 
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-}
+class AppCallbacks {
+    static_assert(std::is_same_v<std::underlying_type_t<Key>, int>);
+    static_assert(std::is_same_v<std::underlying_type_t<MouseButton>, int>);
+    static_assert(std::is_same_v<std::underlying_type_t<KeyAction>, int>);
+    static_assert(std::is_same_v<KeyMod::Raw, int>);
 
-static void glfw_error_callback(int error, const char* description) {
-    //fprintf(stderr, "GLFW error: %s\n", description);
-}
+public:
+    static void set_instance(App* app_instance) {
+        SL_VERIFY(s_app_instance == nullptr || app_instance == nullptr);
+        s_app_instance = app_instance;
+    }
 
-App::App(const AppCfg& cfg) {
-    glfwSetErrorCallback(glfw_error_callback);
+    static void on_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
+        if (s_app_instance)
+            s_app_instance->on_key(static_cast<Key>(key), scancode, static_cast<KeyAction>(action), mods);
+    }
 
+    static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
+        if (s_app_instance)
+            s_app_instance->on_mouse_button(static_cast<MouseButton>(button), static_cast<KeyAction>(action), mods);
+    }
+
+    static void on_cursor_pos(GLFWwindow* window, double x_pos, double y_pos) {
+        if (s_app_instance)
+            s_app_instance->on_cursor_pos(x_pos, y_pos);
+    }
+
+    static void on_cursor_enter(GLFWwindow* window, int entered) {
+        if (s_app_instance)
+            s_app_instance->on_cursor_enter(entered == GLFW_TRUE);
+    }
+
+    static void on_scroll(GLFWwindow* window, double x_offset, double y_offset) {
+        if (s_app_instance)
+            s_app_instance->on_scroll(x_offset, y_offset);
+    }
+
+    static void on_glfw_error(int error, const char* description) {
+        log::error("GLFW error: {}", description);
+    }
+
+private:
+    static App* s_app_instance;
+};
+
+App* AppCallbacks::s_app_instance = nullptr;
+
+void App::init(const AppCfg& cfg) {
     SL_VERIFY(glfwInit());
 
-    start_time = glfwGetTime();
+    AppCallbacks::set_instance(this);
+    glfwSetErrorCallback(AppCallbacks::on_glfw_error);
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
@@ -35,31 +68,39 @@ App::App(const AppCfg& cfg) {
     m_window = glfwCreateWindow(cfg.window_width, cfg.window_height, cfg.title.c_str(), nullptr, nullptr);
     SL_VERIFY(m_window != nullptr);
 
-    glfwSetKeyCallback(m_window, key_callback);
+    glfwSetKeyCallback(m_window, AppCallbacks::on_key);
+    glfwSetMouseButtonCallback(m_window, AppCallbacks::on_mouse_button);
+    glfwSetCursorPosCallback(m_window, AppCallbacks::on_cursor_pos);
+    glfwSetCursorEnterCallback(m_window, AppCallbacks::on_cursor_enter);
+    glfwSetScrollCallback(m_window, AppCallbacks::on_scroll);
 
     glfwMakeContextCurrent(m_window);
-    gladLoadGL(glfwGetProcAddress);
     glfwSwapInterval(0);
 
-    glEnable(GL_DEPTH_TEST);
-    //glEnable(GL_RASTERIZER_DISCARD);
+    gladLoadGL(glfwGetProcAddress);
+
+    m_start_time = glfwGetTime();
+
+    on_init();
+    update_window_size();
 }
 
 App::~App() {
-    glfwDestroyWindow(m_window);
-    glfwTerminate();
+    if (m_window != nullptr) {
+        glfwDestroyWindow(m_window);
+        glfwTerminate();
+    }
+
+    AppCallbacks::set_instance(nullptr);
 }
 
 void App::run() {
     double prev_time = get_time() - 1e-4;
 
-
     while (!glfwWindowShouldClose(m_window)) {
-        int width;
-        int height;
-        get_frame_buffer_size(width, height);
-        glViewport(0, 0, width, height);
-        
+        update_window_size();
+
+        glViewport(0, 0, m_win_width, m_win_height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         double curr_time = get_time();
@@ -69,8 +110,6 @@ void App::run() {
         update(dt);
 
         glfwSwapBuffers(m_window);
-        //glFinish();
-        //glFlush();
         glfwPollEvents();
 
         static int frames = 0;
@@ -78,21 +117,37 @@ void App::run() {
         frames++;
         cum_dt += dt;
         if (cum_dt >= 1.f) {
-            auto fps = static_cast<float>(frames) / cum_dt;
             auto avg_dt = 1000 * cum_dt / frames;
-            printf("%f ms\n", avg_dt);
+            slope::log::info("{} ms", avg_dt);
             frames = 0;
             cum_dt = 0.f;
         }
     }
 }
 
-void App::get_frame_buffer_size(int& out_width, int& out_height) const {
-    glfwGetFramebufferSize(m_window, &out_width, &out_height);
+void App::stop() {
+    glfwSetWindowShouldClose(m_window, true);
+}
+
+void App::get_window_size(int& width, int& height) const {
+    width = m_win_width;
+    height = m_win_height;
+}
+
+void App::update_window_size() {
+    int width;
+    int height;
+    glfwGetFramebufferSize(m_window, &width, &height);
+
+    if (width != m_win_width || height != m_win_height) {
+        m_win_width = width;
+        m_win_height = height;
+        on_window_resize(width, height);
+    }
 }
 
 double App::get_time() const {
-    return glfwGetTime() - start_time;
+    return glfwGetTime() - m_start_time;
 }
 
 } // slope::app

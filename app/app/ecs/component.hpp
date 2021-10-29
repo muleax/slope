@@ -49,18 +49,11 @@ public:
 template<class T>
 class Component {
 public:
-    static ComponentType::Id    type_id() { return s_type_id; }
+    static void                 set_type_id(ComponentType::Id type_id);
+
+    static ComponentType::Id    type_id();
     static const ComponentType& type();
-
-private:
-    static ComponentType::Id s_type_id;
-
-    friend class ComponentRegistry;
 };
-
-// TODO: support so/dll
-template <typename T>
-ComponentType::Id Component<T>::s_type_id = ComponentType::INVALID_ID;
 
 class ComponentRegistry {
 public:
@@ -68,8 +61,11 @@ public:
     ComponentType::Id register_component(String name) {
         auto type_id = m_type_id_counter++;
         SL_VERIFY(type_id < ComponentType::LIMIT_ID);
+        SL_VERIFY(type_id != ComponentType::INVALID_ID);
 
         auto& type = m_types[type_id];
+        SL_VERIFY(type.m_id == ComponentType::INVALID_ID);
+
         type.m_id = type_id;
         type.m_name = std::move(name);
         type.m_size = sizeof(T);
@@ -82,7 +78,7 @@ public:
             static_cast<T*>(buffer)->~T();
         };
 
-        Component<T>::s_type_id = type_id;
+        Component<T>::set_type_id(type_id);
 
         return type_id;
     }
@@ -106,7 +102,15 @@ public:
     }
 };
 
-#define REGISTER_COMPONENT(COMPONENT) ComponentRegistrator<COMPONENT> __registrator_##COMPONENT(#COMPONENT)
+#define REGISTER_COMPONENT(COMPONENT) \
+static ComponentType::Id  __type_id_##COMPONENT = ComponentType::INVALID_ID; \
+template<> ComponentType::Id Component<COMPONENT>::type_id()  { return __type_id_##COMPONENT; } \
+template<> void Component<COMPONENT>::set_type_id(ComponentType::Id type_id) { \
+    SL_VERIFY(type_id != ComponentType::INVALID_ID); \
+    SL_VERIFY(__type_id_##COMPONENT == ComponentType::INVALID_ID); \
+    __type_id_##COMPONENT = type_id; \
+} \
+static ComponentRegistrator<COMPONENT> __registrator_##COMPONENT(#COMPONENT)
 
 class ComponentPool {
 public:

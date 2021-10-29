@@ -26,18 +26,20 @@ void TrimeshFactory::clear() {
     m_result.m_triangles.clear();
 }
 
-void TrimeshFactory::from_polyhedron(ConvexPolyhedron& poly) {
+void TrimeshFactory::from_polyhedron(const ConvexPolyhedron& poly) {
     clear();
 
     m_result.m_vertices = poly.vertices();
 
     for (auto& face : poly.faces()) {
+        auto normal_id = static_cast<uint32_t>(m_result.m_normals.size());
+        m_result.m_normals.push_back(poly.face_normal(face));
+
         for (uint32_t i = 2; i < face.vertex_count; i++) {
             auto& tri = m_result.m_triangles.emplace_back();
-            tri.vert_ids = { face.vertex(i - 2), face.vertex(i - 1), face.vertex(i) };
-            tri.normal_id = static_cast<uint32_t>(m_result.m_normals.size());
+            tri.vert_ids = {poly.vertex_index(face, 0), poly.vertex_index(face, i-1), poly.vertex_index(face, i)};
+            tri.normal_id = normal_id;
         }
-        m_result.m_normals.push_back(poly.face_normal(face));
     }
 }
 

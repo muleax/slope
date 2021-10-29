@@ -1,4 +1,4 @@
-#include "app/render/shader_program.hpp"
+#include "app/render/shader.hpp"
 #include "slope/debug/assert.hpp"
 #include "slope/debug/log.hpp"
 #include "slope/containers/array.hpp"
@@ -8,12 +8,12 @@
 namespace slope::app {
 
 static_assert(std::is_same_v<RenderHandle, GLuint>);
-static_assert(std::is_same_v<ShaderProgram::Location, GLint>);
+static_assert(std::is_same_v<Shader::Location, GLint>);
 
-class Shader {
+class ShaderStage {
 public:
-    Shader(GLenum shader_type, const char* source);
-    ~Shader();
+    ShaderStage(GLenum shader_type, const char* source);
+    ~ShaderStage();
 
     bool    ready() const { return m_id != 0; }
     GLuint  id() const { return m_id; }
@@ -26,7 +26,7 @@ private:
     GLuint  m_id = 0;
 };
 
-Shader::Shader(GLenum shader_type, const char* source) : m_shader_type(shader_type) {
+ShaderStage::ShaderStage(GLenum shader_type, const char* source) : m_shader_type(shader_type) {
     m_id = glCreateShader(shader_type);
     glShaderSource(m_id, 1, &source, nullptr);
     glCompileShader(m_id);
@@ -36,13 +36,13 @@ Shader::Shader(GLenum shader_type, const char* source) : m_shader_type(shader_ty
     }
 }
 
-Shader::~Shader() {
+ShaderStage::~ShaderStage() {
     if (m_id != 0) {
         glDeleteShader(m_id);
     }
 }
 
-const char* Shader::type_name() const {
+const char* ShaderStage::type_name() const {
     if (m_shader_type == GL_VERTEX_SHADER) {
         return "vertex";
     } else if (m_shader_type == GL_FRAGMENT_SHADER) {
@@ -52,7 +52,7 @@ const char* Shader::type_name() const {
     }
 }
 
-bool Shader::check_compile_errors() const {
+bool ShaderStage::check_compile_errors() const {
     GLint success;
     Array<GLchar, 1024> msg;
     glGetShaderiv(m_id, GL_COMPILE_STATUS, &success);
@@ -64,12 +64,12 @@ bool Shader::check_compile_errors() const {
     return success;
 }
 
-ShaderProgram::ShaderProgram(const char* vertex_shader_src, const char* fragment_shader_src)
+Shader::Shader(const char* vertex_shader_src, const char* fragment_shader_src)
 {
-    Shader vertex_shader(GL_VERTEX_SHADER, vertex_shader_src);
+    ShaderStage vertex_shader(GL_VERTEX_SHADER, vertex_shader_src);
     SL_VERIFY(vertex_shader.ready());
 
-    Shader fragment_shader(GL_FRAGMENT_SHADER, fragment_shader_src);
+    ShaderStage fragment_shader(GL_FRAGMENT_SHADER, fragment_shader_src);
     SL_VERIFY(fragment_shader.ready());
 
     m_id = glCreateProgram();
@@ -81,15 +81,20 @@ ShaderProgram::ShaderProgram(const char* vertex_shader_src, const char* fragment
         glDeleteProgram(m_id);
         m_id = 0;
     }
+
+    if (m_id != 0) {
+        m_view_proj_loc = location(ShaderUniformLayout::VIEW_PROJECTION);
+        m_light_pos_loc = location(ShaderUniformLayout::LIGHT_POSITION);
+    }
 }
 
-ShaderProgram::~ShaderProgram() {
+Shader::~Shader() {
     if (m_id != 0) {
         glDeleteProgram(m_id);
     }
 }
 
-bool ShaderProgram::check_link_errors() const {
+bool Shader::check_link_errors() const {
     GLint success;
     Array<GLchar, 1024> msg;
     glGetProgramiv(m_id, GL_LINK_STATUS, &success);
@@ -101,60 +106,60 @@ bool ShaderProgram::check_link_errors() const {
     return success;
 }
 
-void ShaderProgram::use() const {
+void Shader::use() const {
     SL_ASSERT(ready());
     glUseProgram(m_id);
 }
 
-ShaderProgram::Location ShaderProgram::location(const char* name) const {
+Shader::Location Shader::location(const char* name) const {
     return glGetUniformLocation(m_id, name);
 }
 
-ShaderProgram::Location ShaderProgram::attribute_location(const char* name) const {
+Shader::Location Shader::attribute_location(const char* name) const {
     return glGetAttribLocation(m_id, name);
 }
 
-void ShaderProgram::set(Location loc, bool value) const
+void Shader::set(Location loc, bool value) const
 {
     glUniform1i(loc, static_cast<int>(value));
 }
 
-void ShaderProgram::set(Location loc, int value) const
+void Shader::set(Location loc, int value) const
 {
     glUniform1i(loc, value);
 }
 
-void ShaderProgram::set(Location loc, float value) const
+void Shader::set(Location loc, float value) const
 {
     glUniform1f(loc, value);
 }
 
-void ShaderProgram::set(Location loc, const Vec2& value) const
+void Shader::set(Location loc, const Vec2& value) const
 {
     glUniform2fv(loc, 1, value.data);
 }
 
-void ShaderProgram::set(Location loc, const Vec3& value) const
+void Shader::set(Location loc, const Vec3& value) const
 {
     glUniform3fv(loc, 1, value.data);
 }
 
-void ShaderProgram::set(Location loc, const Vec4& value) const
+void Shader::set(Location loc, const Vec4& value) const
 {
     glUniform4fv(loc, 1, value.data);
 }
 
-void ShaderProgram::set(Location loc, const Mat22& mat) const
+void Shader::set(Location loc, const Mat22& mat) const
 {
     glUniformMatrix2fv(loc, 1, GL_FALSE, mat.data);
 }
 
-void ShaderProgram::set(Location loc, const Mat33& mat) const
+void Shader::set(Location loc, const Mat33& mat) const
 {
     glUniformMatrix3fv(loc, 1, GL_FALSE, mat.data);
 }
 
-void ShaderProgram::set(Location loc, const Mat44& mat) const
+void Shader::set(Location loc, const Mat44& mat) const
 {
     glUniformMatrix4fv(loc, 1, GL_FALSE, mat.data);
 }

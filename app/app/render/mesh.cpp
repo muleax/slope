@@ -21,27 +21,27 @@ Mesh::Mesh(VectorView<Vertex> vertices, VectorView<uint32_t> indices)
 
     auto stride = static_cast<GLsizei>(sizeof(Vertex));
 
-    glEnableVertexAttribArray(ShaderLayout::ATTR_POSITION);
-    glVertexAttribPointer(ShaderLayout::ATTR_POSITION, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(ShaderAttributeLayout::POSITION);
+    glVertexAttribPointer(ShaderAttributeLayout::POSITION, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(0));
 
-    glEnableVertexAttribArray(ShaderLayout::ATTR_NORMAL);
-    glVertexAttribPointer(ShaderLayout::ATTR_NORMAL, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(sizeof(Vec3)));
+    glEnableVertexAttribArray(ShaderAttributeLayout::NORMAL);
+    glVertexAttribPointer(ShaderAttributeLayout::NORMAL, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(sizeof(Vec3)));
 
-    glEnableVertexAttribArray(ShaderLayout::ATTR_COLOR);
-    glVertexAttribPointer(ShaderLayout::ATTR_COLOR, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec3)));
+    glEnableVertexAttribArray(ShaderAttributeLayout::COLOR);
+    glVertexAttribPointer(ShaderAttributeLayout::COLOR, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec3)));
 
-    glEnableVertexAttribArray(ShaderLayout::ATTR_TEX_COORDS);
-    glVertexAttribPointer(ShaderLayout::ATTR_TEX_COORDS, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec3) + sizeof(Vec4)));
+    glEnableVertexAttribArray(ShaderAttributeLayout::TEX_COORDS);
+    glVertexAttribPointer(ShaderAttributeLayout::TEX_COORDS, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec3) + sizeof(Vec4)));
 
-    glEnableVertexAttribArray(ShaderLayout::ATTR_MVP_0);
-    glEnableVertexAttribArray(ShaderLayout::ATTR_MVP_1);
-    glEnableVertexAttribArray(ShaderLayout::ATTR_MVP_2);
-    glEnableVertexAttribArray(ShaderLayout::ATTR_MVP_3);
+    glEnableVertexAttribArray(ShaderAttributeLayout::MODEL_0);
+    glEnableVertexAttribArray(ShaderAttributeLayout::MODEL_1);
+    glEnableVertexAttribArray(ShaderAttributeLayout::MODEL_2);
+    glEnableVertexAttribArray(ShaderAttributeLayout::MODEL_3);
 
-    glVertexAttribDivisor(ShaderLayout::ATTR_MVP_0, 1);
-    glVertexAttribDivisor(ShaderLayout::ATTR_MVP_1, 1);
-    glVertexAttribDivisor(ShaderLayout::ATTR_MVP_2, 1);
-    glVertexAttribDivisor(ShaderLayout::ATTR_MVP_3, 1);
+    glVertexAttribDivisor(ShaderAttributeLayout::MODEL_0, 1);
+    glVertexAttribDivisor(ShaderAttributeLayout::MODEL_1, 1);
+    glVertexAttribDivisor(ShaderAttributeLayout::MODEL_2, 1);
+    glVertexAttribDivisor(ShaderAttributeLayout::MODEL_3, 1);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -54,10 +54,10 @@ void Mesh::bind(RenderHandle instancing_buffer) const {
     auto stride = static_cast<GLsizei>(4 * sizeof(Vec4));
 
     glBindBuffer(GL_ARRAY_BUFFER, instancing_buffer);
-    glVertexAttribPointer(ShaderLayout::ATTR_MVP_0, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(0));
-    glVertexAttribPointer(ShaderLayout::ATTR_MVP_1, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(sizeof(Vec4)));
-    glVertexAttribPointer(ShaderLayout::ATTR_MVP_2, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec4)));
-    glVertexAttribPointer(ShaderLayout::ATTR_MVP_3, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(3 * sizeof(Vec4)));
+    glVertexAttribPointer(ShaderAttributeLayout::MODEL_0, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(0));
+    glVertexAttribPointer(ShaderAttributeLayout::MODEL_1, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(sizeof(Vec4)));
+    glVertexAttribPointer(ShaderAttributeLayout::MODEL_2, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec4)));
+    glVertexAttribPointer(ShaderAttributeLayout::MODEL_3, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(3 * sizeof(Vec4)));
 }
 
 void Mesh::unbind() const {

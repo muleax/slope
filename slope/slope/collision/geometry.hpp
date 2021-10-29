@@ -35,7 +35,7 @@ public:
     uint32_t    add_tri(const Trimesh::Triangle& tri);
     void        clear();
 
-    void        from_polyhedron(ConvexPolyhedron& poly);
+    void        from_polyhedron(const ConvexPolyhedron& poly);
 
     const Trimesh& result() const { return m_result; }
 
@@ -50,13 +50,13 @@ public:
         uint32_t    vertex_count;
         uint32_t    normal;
         float       normal_direction;
-
-        uint32_t    vertex(uint32_t vert_id) const { return first_vertex + vert_id; }
     };
 
     const Vector<Vec3>& vertices() const { return m_vertices; }
     const Vector<Face>& faces() const { return m_faces; }
     Vec3                face_normal(const Face& face) const;
+
+    uint32_t            vertex_index(const Face& face, uint32_t vert_id) const { return m_face_indices[face.first_vertex + vert_id]; }
 
 private:
     Vector<Vec3>        m_vertices;
