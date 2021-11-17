@@ -3,7 +3,6 @@
 #include "slope/math/vector3.hpp"
 #include "slope/containers/vector.hpp"
 #include "slope/containers/array.hpp"
-#include "nlohmann/json_fwd.hpp"
 
 namespace slope {
 
@@ -30,14 +29,16 @@ private:
 
 class TrimeshFactory {
 public:
+    using GeomPtr = std::shared_ptr<Trimesh>;
+
+    void        clear();
     uint32_t    add_vertex(const Vec3& vertex);
     uint32_t    add_normal(const Vec3& normal);
     uint32_t    add_tri(const Trimesh::Triangle& tri);
-    void        clear();
 
-    void        from_polyhedron(const ConvexPolyhedron& poly);
+    GeomPtr     build() const { return std::make_shared<Trimesh>(m_result); }
 
-    const Trimesh& result() const { return m_result; }
+    GeomPtr     from_polyhedron(const ConvexPolyhedron& poly);
 
 private:
     Trimesh m_result;
@@ -55,8 +56,9 @@ public:
     const Vector<Vec3>& vertices() const { return m_vertices; }
     const Vector<Face>& faces() const { return m_faces; }
     Vec3                face_normal(const Face& face) const;
-
-    uint32_t            vertex_index(const Face& face, uint32_t vert_id) const { return m_face_indices[face.first_vertex + vert_id]; }
+    const Vector<Vec3>& edge_dirs() const { return m_edge_dirs; }
+    const Vector<Vec3>& face_normals() const { return m_face_normals; }
+    uint32_t            vertex_index(const Face& face, uint32_t vert_id) const;
 
 private:
     Vector<Vec3>        m_vertices;
@@ -70,17 +72,16 @@ private:
 
 class ConvexPolyhedronFactory {
 public:
+    using GeomPtr = std::shared_ptr<ConvexPolyhedron>;
+
+    void        clear();
     uint32_t    add_vertex(const Vec3& vertex);
     uint32_t    add_face(VectorView<uint32_t> indices);
-    void        clear();
 
-    bool        convex_hull(const Vector<Vec3>& vertices);
-    void        box(Vec3 dimensions, Vec3 offset = {});
+    GeomPtr     build() { return std::make_shared<ConvexPolyhedron>(m_result); }
 
-    void        save(const nlohmann::json& data) const;
-    bool        load(const nlohmann::json& data);
-
-    const ConvexPolyhedron& result() const { return m_result; }
+    GeomPtr     convex_hull(const Vector<Vec3>& vertices);
+    GeomPtr     box(Vec3 dimensions, Vec3 offset = {});
 
 private:
     ConvexPolyhedron m_result;
@@ -88,6 +89,10 @@ private:
 
 inline Vec3 ConvexPolyhedron::face_normal(const Face& face) const {
     return m_face_normals[face.normal] * face.normal_direction;
+}
+
+inline uint32_t ConvexPolyhedron::vertex_index(const Face& face, uint32_t vert_id) const {
+    return m_face_indices[face.first_vertex + vert_id];
 }
 
 } // slope

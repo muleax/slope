@@ -1,6 +1,5 @@
 #include "slope/collision/geometry.hpp"
 #include "slope/debug/assert.hpp"
-#include "nlohmann/json.hpp"
 
 namespace slope {
 
@@ -26,7 +25,7 @@ void TrimeshFactory::clear() {
     m_result.m_triangles.clear();
 }
 
-void TrimeshFactory::from_polyhedron(const ConvexPolyhedron& poly) {
+TrimeshFactory::GeomPtr TrimeshFactory::from_polyhedron(const ConvexPolyhedron& poly) {
     clear();
 
     m_result.m_vertices = poly.vertices();
@@ -41,14 +40,8 @@ void TrimeshFactory::from_polyhedron(const ConvexPolyhedron& poly) {
             tri.normal_id = normal_id;
         }
     }
-}
 
-void ConvexPolyhedronFactory::save(const nlohmann::json& data) const {
-
-}
-
-bool ConvexPolyhedronFactory::load(const nlohmann::json& data) {
-    return false;
+    return build();
 }
 
 uint32_t ConvexPolyhedronFactory::add_vertex(const Vec3& vertex) {
@@ -111,13 +104,12 @@ void ConvexPolyhedronFactory::clear() {
     m_result.m_faces.clear();
 }
 
-bool ConvexPolyhedronFactory::convex_hull(const Vector<Vec3>& vertices) {
-    clear();
+ConvexPolyhedronFactory::GeomPtr ConvexPolyhedronFactory::convex_hull(const Vector<Vec3>& vertices) {
     // TODO: quickhull
-    return false;
+    return nullptr;
 }
 
-void ConvexPolyhedronFactory::box(Vec3 dimensions, Vec3 offset) {
+ConvexPolyhedronFactory::GeomPtr ConvexPolyhedronFactory::box(Vec3 dimensions, Vec3 offset) {
     clear();
 
     float extent[] = {-0.5f, 0.5f};
@@ -136,7 +128,7 @@ void ConvexPolyhedronFactory::box(Vec3 dimensions, Vec3 offset) {
     }
 
     m_result.m_face_normals.reserve(3);
-    m_result.m_face_normals.reserve(3);
+    m_result.m_edge_dirs.reserve(3);
 
     for (int i = 0; i < 3; i++) {
         m_result.m_face_normals.emplace_back().data[i] = 1.f;
@@ -152,14 +144,16 @@ void ConvexPolyhedronFactory::box(Vec3 dimensions, Vec3 offset) {
         m_result.m_faces.push_back({first_vertex, 4, normal, normal_dir});
     };
 
-    _add_face(0, 1.f, {7, 5, 4, 6});
-    _add_face(0, -1.f, {2, 0, 1, 3});
+    _add_face(0, 1.f, {7, 6, 4, 5});
+    _add_face(0, -1.f, {2, 3, 1, 0});
 
-    _add_face(1, 1.f, {7, 6, 2, 3});
-    _add_face(1, -1.f, {1, 0, 4, 5});
+    _add_face(1, 1.f, {7, 3, 2, 6});
+    _add_face(1, -1.f, {1, 5, 4, 0});
 
-    _add_face(2, 1.f, {3, 1, 5, 7});
-    _add_face(2, -1.f, {6, 4, 0, 2});
+    _add_face(2, 1.f, {3, 7, 5, 1});
+    _add_face(2, -1.f, {6, 2, 0, 4});
+
+    return build();
 }
 
 } // slope

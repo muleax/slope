@@ -18,6 +18,11 @@ void info(const char* format, Ts&&... args) {
 }
 
 template <class... Ts>
+void warning(const char* format, Ts&&... args) {
+    details::log_impl("WARNING", fmt::format(format, std::forward<Ts>(args)...).c_str());
+}
+
+template <class... Ts>
 void error(const char* format, Ts&&... args) {
     details::log_impl("ERROR", fmt::format(format, std::forward<Ts>(args)...).c_str());
 }

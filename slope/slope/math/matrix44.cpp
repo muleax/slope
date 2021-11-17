@@ -30,7 +30,7 @@ Mat44 Mat44::scale(const Vec3& scale) {
         0.f,    0.f,    0.f,  1.f };
 }
 
-Mat44 Mat44::translation(const Vec3& translation) {
+Mat44 Mat44::translate(const Vec3& translation) {
     SL_ASSERT(translation.isfinite());
 
     return {
@@ -71,7 +71,42 @@ Mat44::Mat44(const Quat& q) {
     _44 = 1.f;
 }
 
+Mat44 Mat44::inverted_rot_pos() const {
+
+    float det = determinant();
+
+    if (slope::equal(det, 0.f)) {
+        return {};
+    }
+
+    float rcp = 1.f / det;
+
+    Mat44 res;
+
+    res.__00 = (__11 * __22 - __12 * __21) * rcp;
+    res.__01 = (__02 * __21 - __01 * __22) * rcp;
+    res.__02 = (__01 * __12 - __02 * __11) * rcp;
+    res.__10 = (__12 * __20 - __10 * __22) * rcp;
+    res.__11 = (__00 * __22 - __02 * __20) * rcp;
+    res.__12 = (__02 * __10 - __00 * __12) * rcp;
+    res.__20 = (__10 * __21 - __11 * __20) * rcp;
+    res.__21 = (__01 * __20 - __00 * __21) * rcp;
+    res.__22 = (__00 * __11 - __01 * __10) * rcp;
+
+    res.__30 = -(__30 * res.__00 + __31 * res.__10 + __32 * res.__20);
+    res.__31 = -(__30 * res.__01 + __31 * res.__11 + __32 * res.__21);
+    res.__32 = -(__30 * res.__02 + __31 * res.__12 + __32 * res.__22);
+
+    res.__03 = 0.f;
+    res.__13 = 0.f;
+    res.__23 = 0.f;
+    res.__33 = 1.f;
+
+    return res;
+}
+
 Mat44 Mat44::inverted() const {
+
     float c1 = _33 * _44;
     float c2 = _43 * _34;
     float c3 = _23 * _44;

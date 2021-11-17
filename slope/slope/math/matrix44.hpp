@@ -10,7 +10,7 @@ public:
     static Mat44 identity() { return {}; }
     static Mat44 rotation(const Vec3& axis, float angle);
     static Mat44 scale(const Vec3& scale);
-    static Mat44 translation(const Vec3& translation);
+    static Mat44 translate(const Vec3& translation);
 
     constexpr Mat44()
         : _11(1.f), _12(0.f), _13(0.f), _14(0.f)
@@ -156,6 +156,10 @@ public:
         return rows[index];
     }
 
+    Vec3& as_vec3(size_t index) {
+        return *reinterpret_cast<Vec3*>(rows + index);
+    }
+
     constexpr const Vec4& operator[](size_t index) const {
         return rows[index];
     }
@@ -213,6 +217,18 @@ public:
         return *reinterpret_cast<const Vec3*>(rows + 3);
     }
 
+    [[nodiscard]] const Vec3& apply_to_unit_axis(uint32_t axis) const {
+        return *reinterpret_cast<const Vec3*>(rows + axis);
+    }
+
+    void set_translation(const Vec3& translation) {
+        rows[3].x = translation.x;
+        rows[3].y = translation.y;
+        rows[3].z = translation.z;
+    }
+
+    [[nodiscard]] Mat44 inverted_rot_pos() const;
+
     [[nodiscard]] Mat44 inverted() const;
 
     [[nodiscard]] constexpr bool equal(const Mat44& rhs, float epsilon = EPSILON) const {
@@ -241,12 +257,26 @@ public:
                std::isfinite(_41) && std::isfinite(_42) && std::isfinite(_43) && std::isfinite(_44);
     }
 
+    float determinant() const {
+        float   det  = _11 * (_22 * _33 - _23 * _32);
+                det -= _12 * (_21 * _33 - _23 * _31);
+                det += _13 * (_21 * _32 - _22 * _31);
+        return det;
+    }
+
     union {
         struct {
             float _11, _12, _13, _14;
             float _21, _22, _23, _24;
             float _31, _32, _33, _34;
             float _41, _42, _43, _44;
+        };
+
+        struct {
+            float __00, __01, __02, __03;
+            float __10, __11, __12, __13;
+            float __20, __21, __22, __23;
+            float __30, __31, __32, __33;
         };
 
         Vec4 rows[4];

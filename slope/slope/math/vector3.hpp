@@ -20,7 +20,7 @@ public:
     }
 
     constexpr Vec3 operator*(const Vec3& rhs) const {
-        return { x * rhs.x, y * rhs.y, z * rhs.z };
+        return cross(rhs);
     }
 
     constexpr Vec3 operator/(const Vec3& rhs) const {
@@ -39,14 +39,6 @@ public:
         x -= value.x;
         y -= value.y;
         z -= value.z;
-
-        return *this;
-    }
-
-    constexpr Vec3& operator*=(const Vec3& value) {
-        x *= value.x;
-        y *= value.y;
-        z *= value.z;
 
         return *this;
     }
@@ -176,6 +168,12 @@ public:
     void min(const Vec3& lhs, const Vec3& rhs);
 
     void max(const Vec3& lhs, const Vec3& rhs);
+
+    void set_zero() {
+        x = 0.f;
+        y = 0.f;
+        z = 0.f;
+    }
 
     union {
         struct {
