@@ -3,7 +3,7 @@
 
 namespace slope {
 
-struct ContactInfo {
+struct ContactGeom {
     Vec3 p1;
     Vec3 p2;
     Vec3 normal;

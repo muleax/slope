@@ -12,7 +12,7 @@ public:
             const ConvexPolyhedronShape* shape1, const ConvexPolyhedronShape* shape2);
 
     bool collide(
-            Vector<ContactInfo>& out_contacts,
+            Vector<ContactGeom>& out_contacts,
             const ConvexPolyhedronShape* shape1, const ConvexPolyhedronShape* shape2);
 
 private:

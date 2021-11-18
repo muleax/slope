@@ -48,7 +48,7 @@ void ConvexPolyhedronCollider::clip_convex_face_by_halfspace(
             }
         }
 
-        if(delta_dot > -BLOAT_EPSILON)
+        if (delta_dot > -BLOAT_EPSILON)
             out_clipped_face.push_back(pt);
 
         prev_dot = dot;
@@ -70,7 +70,7 @@ void ConvexPolyhedronCollider::clip_convex_face_by_convex_prism(
 
     const Vec3* prev_base_pt = &prism_base.back();
 
-    for(auto& base_pt : prism_base) {
+    for (auto& base_pt : prism_base) {
         auto base_edge = base_pt - *prev_base_pt;
         auto hs_normal = base_edge.cross(prism_dir).normalized();
 
@@ -106,17 +106,17 @@ bool ConvexPolyhedronCollider::get_penetration_axis(
         return true;
     };
 
-    for(auto& normal : shape1->unique_world_face_normals()) {
+    for (auto& normal : shape1->unique_world_face_normals()) {
         if (!sat_test(normal))
             return false;
     }
 
-    for(auto& normal : shape2->unique_world_face_normals()) {
+    for (auto& normal : shape2->unique_world_face_normals()) {
         if (!sat_test(normal))
             return false;
     }
 
-    for(auto& edge1 : shape1->unique_world_edge_dirs()) {
+    for (auto& edge1 : shape1->unique_world_edge_dirs()) {
         for(auto& edge2 : shape2->unique_world_edge_dirs()) {
             auto axis = edge1.cross(edge2);
             float axis_sqr_len = axis.length_squared();
@@ -135,7 +135,7 @@ bool ConvexPolyhedronCollider::get_penetration_axis(
 }
 
 bool ConvexPolyhedronCollider::collide(
-        Vector<ContactInfo>& out_contacts,
+        Vector<ContactGeom>& out_contacts,
         const ConvexPolyhedronShape* shape1, const ConvexPolyhedronShape* shape2 ) {
 
     Vec3 pen_axis;
