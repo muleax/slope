@@ -5,6 +5,8 @@ namespace slope {
 
 class Vec3 {
 public:
+    static Vec3 zero() { return {}; }
+
     constexpr Vec3() : x(0.f), y(0.f), z(0.f) {}
 
     explicit constexpr Vec3(float all) : x(all), y(all), z(all) {}
@@ -215,22 +217,6 @@ constexpr Vec3 lerp(const Vec3& from, const Vec3& to, float factor) {
 
 constexpr void Vec3::lerp(const Vec3& from, const Vec3& to, float t) {
     *this = slope::lerp(from, to, t);
-}
-
-constexpr Vec3 clamp(const Vec3& value, float min, float max) {
-    return { clamp(value.x, min, max), clamp(value.y, min, max), clamp(value.z, min, max) };
-}
-
-constexpr void Vec3::clamp(const Vec3& value, float min, float max) {
-    *this = slope::clamp(value, min, max);
-}
-
-constexpr Vec3 clamp(const Vec3& value, const Vec3& min, const Vec3& max) {
-    return { clamp(value.x, min.x, max.x), clamp(value.y, min.y, max.y), clamp(value.z, min.z, max.z) };
-}
-
-constexpr void Vec3::clamp(const Vec3& value, const Vec3& min, const Vec3& max) {
-    *this = slope::clamp(value, min, max);
 }
 
 inline Vec3 min(const Vec3& lhs, const Vec3& rhs) {

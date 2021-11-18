@@ -58,9 +58,9 @@ constexpr T lerp(T from, T to, T factor) {
 }
 
 template<class T>
-constexpr T clamp(T value, T min, T max) {
+constexpr T clamp(T min, T value, T max) {
     static_assert(std::is_floating_point_v<T>);
-    return value < min ? min : (max < value ? max : value);
+    return value < min ? min : (value > max ? max : value);
 }
 
 template<class T>

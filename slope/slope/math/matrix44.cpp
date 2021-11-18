@@ -71,7 +71,7 @@ Mat44::Mat44(const Quat& q) {
     _44 = 1.f;
 }
 
-Mat44 Mat44::inverted_rot_pos() const {
+Mat44 Mat44::inverted_orthonormal() const {
 
     float det = determinant();
 

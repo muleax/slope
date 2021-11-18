@@ -79,7 +79,7 @@ void CameraSystem::update(float dt) {
 
         Vec3 new_pos = tc->transform.translation() + rot.apply_normal(vel_dir) * (ctl->velocity * dt);
 
-        tc->transform = rot * Mat44::translation(new_pos);
+        tc->transform = rot * Mat44::translate(new_pos);
 
         cam->camera.set_transform(tc->transform);
         cam->camera.rebuild();

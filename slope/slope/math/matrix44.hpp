@@ -227,7 +227,7 @@ public:
         rows[3].z = translation.z;
     }
 
-    [[nodiscard]] Mat44 inverted_rot_pos() const;
+    [[nodiscard]] Mat44 inverted_orthonormal() const;
 
     [[nodiscard]] Mat44 inverted() const;
 

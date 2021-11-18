@@ -207,22 +207,6 @@ constexpr void Vec2::lerp(const Vec2& from, const Vec2& to, float t) {
     *this = slope::lerp(from, to, t);
 }
 
-constexpr Vec2 clamp(const Vec2& value, float min, float max) {
-    return { clamp(value.x, min, max), clamp(value.y, min, max) };
-}
-
-constexpr void Vec2::clamp(const Vec2& value, float min, float max) {
-    *this = slope::clamp(value, min, max);
-}
-
-constexpr Vec2 clamp(const Vec2& value, const Vec2& min, const Vec2& max) {
-    return { clamp(value.x, min.x, max.x), clamp(value.y, min.y, max.y) };
-}
-
-constexpr void Vec2::clamp(const Vec2& value, const Vec2& min, const Vec2& max) {
-    *this = slope::clamp(value, min, max);
-}
-
 inline Vec2 min(const Vec2& lhs, const Vec2& rhs) {
     return { std::fmin(lhs.x, rhs.x), std::fmin(lhs.y, rhs.y) };
 }
