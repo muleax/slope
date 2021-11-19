@@ -62,9 +62,9 @@ void ContactManifold::end_update() {
             pt.friction2_lambda = 0.f;
         }
 
-        pt.normal_constr_idx = -1;
-        pt.friction1_constr_idx = -1;
-        pt.friction2_constr_idx = -1;
+        pt.normal_constr_id = -1;
+        pt.friction1_constr_id = -1;
+        pt.friction2_constr_id = -1;
     }
 }
 

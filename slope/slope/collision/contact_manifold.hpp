@@ -8,9 +8,9 @@ namespace slope {
 struct ManifoldPoint {
     ContactGeom geom;
 
-    int normal_constr_idx = -1;
-    int friction1_constr_idx = -1;
-    int friction2_constr_idx = -1;
+    int normal_constr_id = -1;
+    int friction1_constr_id = -1;
+    int friction2_constr_id = -1;
 
     float normal_lambda = 0.f;
     float friction1_lambda = 0.f;
