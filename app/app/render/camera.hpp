@@ -33,15 +33,15 @@ struct CameraComponent : public Component<CameraComponent> {
 };
 
 struct CameraControllerComponent : public Component<CameraControllerComponent> {
-    float velocity = 1.f;
+    float velocity = 8.f;
 
     bool move_fwd = false;
     bool move_bkwd = false;
     bool move_left = false;
     bool move_right = false;
 
-    float yaw_sensivity = 0.01f;
-    float pitch_sensivity = 0.01f;
+    float yaw_sensivity = 0.003f;
+    float pitch_sensivity = 0.003f;
 
     float yaw = 0.f;
     float pitch = 0.f;

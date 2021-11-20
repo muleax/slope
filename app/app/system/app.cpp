@@ -121,7 +121,7 @@ void App::run() {
         cum_dt += dt;
         if (cum_dt >= 1.f) {
             auto avg_dt = 1000 * cum_dt / frames;
-            slope::log::info("{} ms", avg_dt);
+            //slope::log::info("{} ms", avg_dt);
             frames = 0;
             cum_dt = 0.f;
         }

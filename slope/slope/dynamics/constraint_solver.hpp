@@ -1,5 +1,5 @@
 #pragma once
-#include "slope/simulation/rigid_body.hpp"
+#include "slope/dynamics/rigid_body.hpp"
 #include "slope/containers/vector.hpp"
 #include "slope/containers/array.hpp"
 
@@ -141,32 +141,6 @@ private:
 inline void ConstraintSolver::set_time_interval(float value) {
     m_dt = value;
     m_inv_dt = 1.f / value;
-}
-
-inline Constraint Constraint::generic(
-        RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom,
-        float pos_error, float min_bound, float max_bound) {
-
-    Constraint c;
-    c.body1 = body1;
-
-    Vec3 r1 = geom.p1 - body1->transform().translation();
-    c.jacobian1[0] = -geom.axis;
-    c.jacobian1[1] = -r1.cross(geom.axis);
-
-    if (body2) {
-        c.body2 = body2;
-
-        Vec3 r2 = geom.p2 - body2->transform().translation();
-        c.jacobian2[0] = geom.axis;
-        c.jacobian2[1] = r2.cross(geom.axis);
-    }
-
-    c.pos_error = pos_error;
-    c.min_bound = min_bound;
-    c.max_bound = max_bound;
-
-    return c;
 }
 
 inline Constraint Constraint::bilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom) {

@@ -1,7 +1,33 @@
-#include "slope/simulation/constraint_solver.hpp"
+#include "slope/dynamics/constraint_solver.hpp"
 #include "slope/debug/assert.hpp"
 
 namespace slope {
+
+Constraint Constraint::generic(
+        RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom,
+        float pos_error, float min_bound, float max_bound) {
+
+    Constraint c;
+    c.body1 = body1;
+
+    Vec3 r1 = geom.p1 - body1->transform().translation();
+    c.jacobian1[0] = -geom.axis;
+    c.jacobian1[1] = -r1.cross(geom.axis);
+
+    if (body2) {
+        c.body2 = body2;
+
+        Vec3 r2 = geom.p2 - body2->transform().translation();
+        c.jacobian2[0] = geom.axis;
+        c.jacobian2[1] = r2.cross(geom.axis);
+    }
+
+    c.pos_error = pos_error;
+    c.min_bound = min_bound;
+    c.max_bound = max_bound;
+
+    return c;
+}
 
 void ConstraintSolver::register_body(RigidBody* body) {
     body->set_in_solver_index(static_cast<int>(m_bodies.size()));
@@ -89,7 +115,7 @@ void ConstraintSolver::solve_constraint(ConstraintData& c, float min_bound, floa
 
         float delta = (c.rhs - dot) * c.inv_diag;
         c.lambda = clamp(min_bound, cur_lambda + delta, max_bound);
-        delta = c.lambda- cur_lambda;
+        delta = c.lambda - cur_lambda;
 
         b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
         b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
@@ -106,7 +132,7 @@ void ConstraintSolver::solve_constraint(ConstraintData& c, float min_bound, floa
 
         float delta = (c.rhs - dot) * c.inv_diag;
         c.lambda = clamp(min_bound, cur_lambda + delta, max_bound);
-        delta = c.lambda- cur_lambda;
+        delta = c.lambda - cur_lambda;
 
         b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
         b1.inv_m_f[1] += c.inv_m_j1[1] * delta;

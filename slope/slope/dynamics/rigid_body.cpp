@@ -1,4 +1,4 @@
-#include "slope/simulation/rigid_body.hpp"
+#include "slope/dynamics/rigid_body.hpp"
 
 namespace slope {
 
