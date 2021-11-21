@@ -4,6 +4,9 @@
 #include "glad/gl.h"
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
+#include "imgui/imgui.h"
+#include "imgui_backends/glfw.hpp"
+#include "imgui_backends/opengl3.hpp"
 
 namespace slope::app {
 
@@ -25,7 +28,7 @@ public:
     }
 
     static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
-        if (s_app_instance)
+        if (s_app_instance && !ImGui::GetIO().WantCaptureMouse)
             s_app_instance->on_mouse_button(static_cast<MouseButton>(button), static_cast<KeyAction>(action), mods);
     }
 
@@ -80,6 +83,13 @@ void App::init(const AppCfg& cfg) {
 
     gladLoadGL(glfwGetProcAddress);
 
+    // setup Dear ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(m_window, true);
+    ImGui_ImplOpenGL3_Init();
+
     m_start_time = glfwGetTime();
 
     glfwGetCursorPos(m_window, &m_x_cursor_pos, &m_y_cursor_pos);
@@ -106,11 +116,18 @@ void App::run() {
         glViewport(0, 0, m_win_width, m_win_height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
         double curr_time = get_time();
         auto dt = static_cast<float>(curr_time - prev_time);
         prev_time = curr_time;
 
         update(dt);
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(m_window);
         glfwPollEvents();

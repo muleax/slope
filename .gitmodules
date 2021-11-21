@@ -16,3 +16,6 @@
 [submodule "deps/fmt/fmt"]
 	path = deps/fmt/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "deps/imgui/imgui"]
+	path = deps/imgui/imgui
+	url = https://github.com/ocornut/imgui.git
