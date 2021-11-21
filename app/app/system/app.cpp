@@ -1,4 +1,5 @@
 #include "app/system/app.hpp"
+#include "app/system/utils.hpp"
 #include "slope/debug/log.hpp"
 #include "slope/debug/assert.hpp"
 #include "glad/gl.h"
@@ -131,17 +132,6 @@ void App::run() {
 
         glfwSwapBuffers(m_window);
         glfwPollEvents();
-
-        static int frames = 0;
-        static float cum_dt = 0;
-        frames++;
-        cum_dt += dt;
-        if (cum_dt >= 1.f) {
-            auto avg_dt = 1000 * cum_dt / frames;
-            //slope::log::info("{} ms", avg_dt);
-            frames = 0;
-            cum_dt = 0.f;
-        }
     }
 }
 
@@ -184,10 +174,6 @@ void App::update_window_size() {
         m_win_height = height;
         on_window_resize(width, height);
     }
-}
-
-double App::get_time() const {
-    return glfwGetTime() - m_start_time;
 }
 
 void App::set_background_color(const Vec3& rgb) {
