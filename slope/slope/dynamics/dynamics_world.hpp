@@ -26,28 +26,37 @@ namespace slope {
 
 class DynamicsWorld {
 public:
-    void add_actor(BaseActor* actor);
-    void remove_actor(BaseActor* actor);
+    struct Stats {
+        uint32_t static_actor_count = 0;
+        uint32_t dynamic_actor_count = 0;
+        uint32_t collision_count = 0;
+        uint32_t contact_count = 0;
+        float simulation_time = 0.f;
+    };
 
-    void update(float dt);
+    struct Config {
+        int iteration_count = 30;
+        bool randomize_order = true;
+        float warmstarting_normal = 0.83f;
+        float warmstarting_friction = 0.75f;
+        float sor = 1.f;
+        Vec3 gravity = {0.f, -9.81f, 0.f};
+    };
 
-    void set_gravity(const Vec3& value) { m_gravity = value; }
-    const Vec3& gravity() const { return m_gravity; }
+    void                    add_actor(BaseActor* actor);
+    void                    remove_actor(BaseActor* actor);
 
-    void set_warstarting_normal(float value) { m_warstarting_normal = value; }
-    float warstarting_normal() const { return m_warstarting_normal; }
+    void                    update(float dt);
 
-    void set_warstarting_friction(float value) { m_warstarting_friction = value; }
-    float warstarting_friction() const { return m_warstarting_friction; }
-
-    void randomize_order(bool value) { m_randomize_order = value; }
-    bool randomize_order() const { return m_randomize_order; }
-
-    ConstraintSolver& solver() { return m_solver; }
+    ConstraintSolver&       solver() { return m_solver; }
     const ConstraintSolver& solver() const { return m_solver; }
 
-    uint32_t frame_id() const { return m_frame_id; }
-    float simulation_time() const { return m_simulation_time; }
+    Config&                 config() { return m_config; }
+    const Config&           config() const { return m_config; }
+
+    const Stats&            stats() const { return m_stats; }
+
+    uint32_t                frame_id() const { return m_frame_id; }
 
 private:
     struct ManifoldCache {
@@ -83,13 +92,10 @@ private:
 
     UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
 
-    bool m_randomize_order = true;
-    float m_warstarting_normal = 0.83f;
-    float m_warstarting_friction = 0.83f;
-    Vec3 m_gravity = {0.f, -9.81f, 0.f};
+    Config m_config;
+    Stats m_stats;
 
     uint32_t m_frame_id = 0;
-    float m_simulation_time = 0.f;
 };
 
 } // slope

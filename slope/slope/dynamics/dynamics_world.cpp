@@ -65,7 +65,7 @@ void DynamicsWorld::remove_actor_impl(Vector<T>& container, BaseActor* actor) {
 
 void DynamicsWorld::apply_gravity() {
     for (auto& actor: m_dynamic_actors) {
-        actor->body().apply_force_to_com(m_gravity * actor->body().mass());
+        actor->body().apply_force_to_com(m_config.gravity * actor->body().mass());
     }
 }
 
@@ -77,6 +77,8 @@ void DynamicsWorld::collide(BaseActor& actor1, BaseActor& actor2) {
     auto* shape2 = static_cast<const ConvexPolyhedronShape*>(&actor2.shape());
 
     if (m_collider.collide(m_geom_buffer, shape1, shape2)) {
+        m_stats.collision_count++;
+
         auto& cache = m_manifolds[{ shape1, shape2 }];
         cache.actor1 = &actor1;
         cache.actor2 = &actor2;
@@ -95,6 +97,8 @@ void DynamicsWorld::collide(BaseActor& actor1, BaseActor& actor2) {
 }
 
 void DynamicsWorld::perform_collision_detection() {
+    m_stats.collision_count = 0;
+
     for (auto actor1 = m_dynamic_actors.begin(); actor1 != m_dynamic_actors.end(); ++actor1)
         for (auto actor2 = actor1 + 1; actor2 != m_dynamic_actors.end(); ++actor2)
             collide(**actor1, **actor2);
@@ -105,7 +109,9 @@ void DynamicsWorld::perform_collision_detection() {
 }
 
 void DynamicsWorld::apply_contacts() {
-    if (m_randomize_order) {
+    m_stats.contact_count = m_pending_contacts.size();
+
+    if (m_config.randomize_order) {
         for (auto& c: m_pending_contacts) {
             auto r = rand() % m_pending_contacts.size();
             std::swap(c, m_pending_contacts[r]);
@@ -130,9 +136,9 @@ void DynamicsWorld::apply_contacts() {
         // TODO: implement policies
         float friction_ratio = actor1->friction() * actor2->friction();
 
-        nc.init_lambda  = p->normal_lambda * m_warstarting_normal;
-        fc1.init_lambda = p->friction1_lambda * m_warstarting_friction;
-        fc2.init_lambda = p->friction2_lambda * m_warstarting_friction;
+        nc.init_lambda  = p->normal_lambda * m_config.warmstarting_normal;
+        fc1.init_lambda = p->friction1_lambda * m_config.warmstarting_friction;
+        fc2.init_lambda = p->friction2_lambda * m_config.warmstarting_friction;
 
         p->normal_constr_id    = m_solver.add_constraint(nc);
         p->friction1_constr_id = m_solver.join_friction(fc1, friction_ratio, p->normal_constr_id);
@@ -170,6 +176,8 @@ void DynamicsWorld::refresh_manifolds() {
 
 void DynamicsWorld::update(float dt) {
     m_solver.set_time_interval(dt);
+    m_solver.set_iteration_count(m_config.iteration_count);
+    m_solver.set_sor(m_config.sor);
 
     apply_gravity();
 
@@ -187,8 +195,10 @@ void DynamicsWorld::update(float dt) {
 
     refresh_manifolds();
 
+    m_stats.static_actor_count = m_static_actors.size();
+    m_stats.dynamic_actor_count = m_dynamic_actors.size();
+    m_stats.simulation_time += dt;
     m_frame_id++;
-    m_simulation_time += dt;
 }
 
 } // slope

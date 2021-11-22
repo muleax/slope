@@ -79,9 +79,7 @@ public:
         m_world->add_system<CameraSystem>();
         m_world->add_system<RenderSystem>();
         m_world->create_singleton<RenderSingleton>();
-        auto* physics_single = m_world->create_singleton<PhysicsSingleton>();
-
-        physics_single->m_dynamics_world.solver().set_iteration_count(30);
+        m_world->create_singleton<PhysicsSingleton>();
 
         float bloat = 0.01f;
         ConvexPolyhedronFactory poly_factory;
