@@ -5,6 +5,8 @@
 #include "slope/containers/unordered_map.hpp"
 #include "slope/collision/contact_manifold.hpp"
 #include "slope/collision/convex_polyhedron_collider.hpp"
+#include "slope/debug/debug_drawer.hpp"
+#include <memory>
 
 // TODO: do not use pointers for hashing
 namespace slope {
@@ -41,12 +43,19 @@ public:
         float warmstarting_friction = 0.75f;
         float sor = 1.f;
         Vec3 gravity = {0.f, -9.81f, 0.f};
+
+        // debug draw
+        bool draw_contact_normals = false;
+        bool draw_contact_friction = false;
     };
 
     void                    add_actor(BaseActor* actor);
     void                    remove_actor(BaseActor* actor);
 
     void                    update(float dt);
+
+    void                    set_debug_drawer(std::shared_ptr<DebugDrawer> drawer);
+    DebugDrawer*            debug_drawer() { return m_debug_drawer.get(); }
 
     ConstraintSolver&       solver() { return m_solver; }
     const ConstraintSolver& solver() const { return m_solver; }
@@ -96,6 +105,8 @@ private:
     Stats m_stats;
 
     uint32_t m_frame_id = 0;
+
+    std::shared_ptr<DebugDrawer> m_debug_drawer;
 };
 
 } // slope

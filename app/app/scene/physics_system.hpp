@@ -11,8 +11,9 @@ struct PhysicsSingleton : public Component<PhysicsSingleton> {
     DynamicsWorld dynamics_world;
 
     bool pause = false;
-    bool time_sync = true;
+    bool real_time_sync = true;
     float time_step = 1.f / 60.f;
+    float time_factor = 1.f;
 
     // Stats
     double frame_time = 0.0;
@@ -31,7 +32,6 @@ public:
 
 private:
     void step_simulation(PhysicsSingleton* ps);
-    void process_ui_overlay(PhysicsSingleton* ps);
 
     float m_accum_time = 0.f;
 };

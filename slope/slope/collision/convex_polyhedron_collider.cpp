@@ -81,6 +81,8 @@ void ConvexPolyhedronCollider::clip_convex_face_by_convex_prism(
         prev_base_pt = &base_pt;
         std::swap(out_clipped_face, m_clip_buffer);
     }
+
+    std::swap(out_clipped_face, m_clip_buffer);
 }
 
 bool ConvexPolyhedronCollider::get_penetration_axis(

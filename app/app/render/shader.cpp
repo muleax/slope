@@ -81,11 +81,6 @@ Shader::Shader(const char* vertex_shader_src, const char* fragment_shader_src)
         glDeleteProgram(m_id);
         m_id = 0;
     }
-
-    if (m_id != 0) {
-        m_view_proj_loc = location(ShaderUniformLayout::VIEW_PROJECTION);
-        m_light_pos_loc = location(ShaderUniformLayout::LIGHT_POSITION);
-    }
 }
 
 Shader::~Shader() {
@@ -106,8 +101,14 @@ bool Shader::check_link_errors() const {
     return success;
 }
 
-void Shader::use() const {
+void Shader::use() {
     SL_ASSERT(ready());
+
+    if (m_first_use) {
+        cache_attribute_locations();
+        m_first_use = false;
+    }
+
     glUseProgram(m_id);
 }
 

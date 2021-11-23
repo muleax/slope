@@ -63,6 +63,10 @@ void DynamicsWorld::remove_actor_impl(Vector<T>& container, BaseActor* actor) {
     container.erase(it);
 }
 
+void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer) {
+    m_debug_drawer = std::move(drawer);
+}
+
 void DynamicsWorld::apply_gravity() {
     for (auto& actor: m_dynamic_actors) {
         actor->body().apply_force_to_com(m_config.gravity * actor->body().mass());
@@ -111,6 +115,8 @@ void DynamicsWorld::perform_collision_detection() {
 void DynamicsWorld::apply_contacts() {
     m_stats.contact_count = m_pending_contacts.size();
 
+    auto* debug_drawer = m_debug_drawer.get();
+
     if (m_config.randomize_order) {
         for (auto& c: m_pending_contacts) {
             auto r = rand() % m_pending_contacts.size();
@@ -143,6 +149,17 @@ void DynamicsWorld::apply_contacts() {
         p->normal_constr_id    = m_solver.add_constraint(nc);
         p->friction1_constr_id = m_solver.join_friction(fc1, friction_ratio, p->normal_constr_id);
         p->friction2_constr_id = m_solver.join_friction(fc2, friction_ratio, p->normal_constr_id);
+
+        if (debug_drawer) {
+            if (m_config.draw_contact_normals) {
+                debug_drawer->draw_line(geom.p1, geom.p1 + geom.axis * 0.3f, {0.2f, 1.f, 0.2f});
+            }
+
+            if (m_config.draw_contact_friction) {
+                debug_drawer->draw_line(geom.p1, geom.p1 + fc1.jacobian1[0] * 0.3f, {1.f, 0.1f, 0.2f});
+                debug_drawer->draw_line(geom.p1, geom.p1 + fc2.jacobian1[0] * 0.3f, {1.f, 0.1f, 0.2f});
+            }
+        }
     }
 }
 
@@ -175,6 +192,9 @@ void DynamicsWorld::refresh_manifolds() {
 }
 
 void DynamicsWorld::update(float dt) {
+    if (m_debug_drawer)
+        m_debug_drawer->clear();
+
     m_solver.set_time_interval(dt);
     m_solver.set_iteration_count(m_config.iteration_count);
     m_solver.set_sor(m_config.sor);

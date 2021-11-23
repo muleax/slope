@@ -8,8 +8,8 @@ class MeshManager : public ResourceCache<Mesh> {
 public:
     MeshManager(RenderHandle instancing_buffer);
 
-    MeshPtr load(const String& path);
-    bool    save(const String& path, MeshPtr mesh);
+    std::shared_ptr<Mesh>   load(const String& path);
+    bool                    save(const String& path, std::shared_ptr<Mesh> mesh);
 
 private:
     RenderHandle m_instancing_buffer;

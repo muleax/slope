@@ -1,32 +1,30 @@
 #pragma once
 #include "app/render/config.hpp"
 #include "app/render/mesh.hpp"
+#include "app/render/line.hpp"
 #include "app/render/material.hpp"
+#include "app/render/debug_drawer_impl.hpp"
 #include "app/ecs/system.hpp"
 #include "slope/math/matrix44.hpp"
 #include "slope/containers/vector.hpp"
 
 namespace slope::app {
 
-class Renderer {
-public:
-    Renderer();
-    ~Renderer();
-
-    void draw_mesh(const Mesh& mesh, VectorView<Mat44> instancing_data) const;
-    void draw_mesh(const Mesh& mesh, const Mat44* instancing_data, size_t instance_count) const;
-
-private:
-    RenderHandle m_instancing_buffer = 0;
-};
+class TransformComponent;
+class CameraComponent;
 
 struct RenderSingleton : public Component<RenderSingleton> {
     size_t max_instancing_count = 1024;
+    bool wireframe = false;
 };
 
 struct RenderComponent : public Component<RenderComponent> {
-    MeshPtr mesh;
-    MaterialPtr material;
+    std::shared_ptr<Mesh> mesh;
+    std::shared_ptr<Material> material;
+};
+
+struct DebugDrawComponent : public Component<DebugDrawComponent> {
+    std::shared_ptr<DebugDrawerImpl> drawer;
 };
 
 struct LightSourceComponent : public Component<LightSourceComponent> {
@@ -43,10 +41,17 @@ private:
         RenderComponent* rc;
     };
 
-    Renderer m_renderer;
-    float m_time = 0.f;
+    void scene_draw();
+    void debug_draw();
+    void draw_mesh_instanced(
+            RenderComponent* rc, const CameraComponent* cam, const RenderSingleton* rs, const Vec3& light_pos);
+
+    MeshRenderer m_mesh_renderer;
     Vector<QueueEntry> m_queue;
-    Vector<Mat44> m_model;
+    Vector<Mat44> m_model_matrices;
+
+    LineRenderer m_line_renderer;
+    std::shared_ptr<LineShader> m_line_shader;
 };
 
 } // slope::app

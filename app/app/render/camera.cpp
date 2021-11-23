@@ -55,9 +55,9 @@ void Camera::rebuild() {
 
 void CameraSystem::update(float dt) {
     for (auto e : view<CameraComponent, CameraControllerComponent, TransformComponent>()) {
-        auto* tc = w().get_component_for_write<TransformComponent>(e);
-        auto* cam = w().get_component_for_write<CameraComponent>(e);
-        auto* ctl = w().get_component_for_write<CameraControllerComponent>(e);
+        auto* tc = w().modify<TransformComponent>(e);
+        auto* cam = w().modify<CameraComponent>(e);
+        auto* ctl = w().modify<CameraControllerComponent>(e);
 
         Vec3 vel_dir;
         if (ctl->move_fwd && !ctl->move_bkwd) {

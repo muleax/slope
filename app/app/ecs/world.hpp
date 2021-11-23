@@ -20,7 +20,7 @@ public:
     void destroy_entity(Entity e);
 
     template <class T>
-    T* create_component(Entity e) {
+    T* create(Entity e) {
         auto type_id = T::type_id();
 
         // TODO: concurrency issues
@@ -31,40 +31,40 @@ public:
     }
 
     template <class T>
-    void destroy_component(Entity e) {
+    void destroy(Entity e) {
         auto type_id = T::type_id();
         // TODO: concurrency issues
         m_component_destroy_orders.push_back({e, type_id});
     }
 
     template <class T>
-    const T* get_component(Entity e) const {
+    const T* get(Entity e) const {
         return static_cast<const T*>(m_components[T::type_id()]->manager.get_component(e));
     }
 
     template <class T>
-    T* get_component_for_write(Entity e) {
+    T* modify(Entity e) {
         return static_cast<T*>(m_components[T::type_id()]->manager.get_component(e));
     }
 
     template <class T>
-    bool has_component(Entity e) {
+    bool has(Entity e) {
         return m_entities[e.id()].mask.test(T::type_id());
     }
 
     template <class T>
     T* create_singleton() {
-        return create_component<T>(m_singleton_entity);
+        return create<T>(m_singleton_entity);
     }
 
     template <class T>
     const T* get_singleton() const {
-        return get_component<T>(m_singleton_entity);
+        return get<T>(m_singleton_entity);
     }
 
     template <class T>
-    T* get_singleton_for_write() {
-        return get_component_for_write<T>(m_singleton_entity);
+    T* modify_singleton() {
+        return modify<T>(m_singleton_entity);
     }
 
     const ComponentMask& get_component_mask(Entity e) const { return m_entities[e.id()].mask; }
