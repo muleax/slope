@@ -23,7 +23,7 @@ void PhysicsSystem::step_simulation(PhysicsSingleton* ps) {
 
     ps->dynamics_world.update(ps->time_step);
 
-    ps->frame_time = (1.f - ps->frame_time_mva) * ps->frame_time + ps->frame_time_mva * (get_time() - t1);
+    ps->cpu_time = (1.f - ps->cpu_time_mva) * ps->cpu_time + ps->cpu_time_mva * (get_time() - t1);
 
     for (auto e: actors) {
         auto* pc = w().get<PhysicsComponent>(e);

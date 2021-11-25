@@ -9,6 +9,7 @@ void MeshShader::cache_attribute_locations() {
     m_view_proj_loc = location(UniformLayout::VIEW_PROJECTION);
     m_light_pos_loc = location(UniformLayout::LIGHT_POSITION);
     m_ambient_strength_loc = location(UniformLayout::AMBIENT_STRENGTH);
+    m_color_loc = location(UniformLayout::COLOR);
 }
 
 Mesh::Mesh(VectorView<Vertex> vertices, VectorView<uint32_t> indices)

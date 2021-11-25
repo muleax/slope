@@ -12,6 +12,7 @@ public:
 
     void                set_transform(const Mat44& value) override;
 
+    Vec3                support_point(const Vec3& axis) const;
     float               get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const;
     Interval            project(const Vec3& axis) const;
     const Vector<Vec3>& unique_world_face_normals() const { return m_world_face_normals; };

@@ -1,6 +1,7 @@
 #include "app/scene/ui_overlay_system.hpp"
 #include "app/scene/physics_system.hpp"
 #include "app/render/render_system.hpp"
+#include "app/system/utils.hpp"
 #include "imgui/imgui.h"
 
 namespace slope::app {
@@ -14,8 +15,9 @@ void UIOverlaySystem::update(float dt) {
         auto& world_config = ps->dynamics_world.config();
 
         ImGui::Begin("Simulation");
-        ImGui::Text("Frame Time: %.1f ms", ps->frame_time * 1000);
         ImGui::Text("Simulation Time: %.1f s", world_stats.simulation_time);
+        ImGui::Text("CPU Frame Time: %.1f ms", ps->cpu_time * 1000);
+
         ImGui::Text("Static Actors: %d", world_stats.static_actor_count);
         ImGui::Text("Dynamic Actors: %d", world_stats.dynamic_actor_count);
         ImGui::Text("Collisions: %d", world_stats.collision_count);

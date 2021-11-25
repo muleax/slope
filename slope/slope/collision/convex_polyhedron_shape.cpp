@@ -38,6 +38,20 @@ void ConvexPolyhedronShape::set_transform(const Mat44& value) {
     }
 }
 
+Vec3 ConvexPolyhedronShape::support_point(const Vec3& axis) const {
+    float max_dot = -FLOAT_MAX;
+    const Vec3* best_point = nullptr;
+    for (auto& p : m_world_vertices) {
+        float dot = axis.dot(p);
+        if (dot > max_dot) {
+            max_dot = dot;
+            best_point = &p;
+        }
+    }
+
+    return *best_point;
+}
+
 float ConvexPolyhedronShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const {
     auto& geom = *m_geometry;
 

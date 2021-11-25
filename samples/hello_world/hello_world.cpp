@@ -9,10 +9,13 @@
 #include "app/ecs/world.hpp"
 #include "slope/debug/log.hpp"
 #include "slope/collision/geometry.hpp"
+#include "slope/collision/gjk.hpp"
 #include <memory>
 
 using namespace slope;
 using namespace slope::app;
+
+static constexpr float BLOAT = 0.01f;
 
 auto create_mesh_from_poly(const std::shared_ptr<ConvexPolyhedron>& geom) {
     TrimeshFactory tri_factory;
@@ -52,9 +55,8 @@ public:
 
         physics_single->dynamics_world.set_debug_drawer(debug_draw->drawer);
 
-        float bloat = 0.01f;
         ConvexPolyhedronFactory poly_factory;
-        m_unit_box = poly_factory.box(Vec3{1.f + bloat, 1.f + bloat, 1.f + bloat}, Vec3{0.f, 0.f, 0.f});
+        m_unit_box = poly_factory.box(Vec3{1.f + BLOAT, 1.f + BLOAT, 1.f + BLOAT}, Vec3{0.f, 0.f, 0.f});
 
         {
             auto visual_geom = poly_factory.box(Vec3{1.f, 1.f, 1.f}, Vec3{0.f, 0.f, 0.f});
@@ -66,6 +68,7 @@ public:
 
         m_unit_box_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
         m_unit_box_material->set_ambient_strength(0.2f);
+        m_unit_box_material->set_color({0.9, 0.75, 0.0});
 
         int mode = 2;
         if (mode == 0) {
@@ -103,7 +106,7 @@ public:
 
         } else if (mode == 2) {
             auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
-            int h = 35;
+            int h = 3;
             float spacing = 0.f;
             for (int j = 0; j < h; j++) {
                 for (int i = 0; i < h - j; i++) {
@@ -165,13 +168,67 @@ public:
             m_world->create<CameraComponent>(m_cam_entity);
         }
 
+        init_gjk_shape();
+
         set_background_color({0.2f, 0.2, 0.2f});
 
         m_world->modify_singleton<PhysicsSingleton>()->pause = true;
     }
 
+    void init_gjk_shape() {
+        ConvexPolyhedronFactory poly_factory;
+
+        auto gjk_visual_box = poly_factory.box(Vec3{1.f + BLOAT, 1.f + BLOAT, 1.f + BLOAT}, Vec3{0.f, 0.f, 0.f});
+
+        auto gjk_box = poly_factory.box(Vec3{1.f + BLOAT, 1.f + BLOAT, 1.f + BLOAT}, Vec3{0.f, 0.f, 0.f});
+        m_gjk_shape = std::make_unique<ConvexPolyhedronShape>(gjk_box);
+
+        m_gjk_entity = m_world->create_entity();
+        auto* tc = m_world->create<TransformComponent>(m_gjk_entity);
+        tc->transform.set_translation({10.f, 5.f, 10.f});
+
+        m_gjk_shape->set_transform(tc->transform);
+
+        auto* rc = m_world->create<RenderComponent>(m_gjk_entity);
+        rc->mesh = create_mesh_from_poly(gjk_visual_box);
+        rc->material = std::make_shared<Material>(DefaultShaders::mesh_shader());
+        rc->material->set_ambient_strength(0.5f);
+        rc->material->set_color({0.4, 0.8, 0.4});
+    }
+
+    void collide_gjk() {
+
+        if (m_bind_gjk_to_camera) {
+            auto* cam_tc = m_world->get<TransformComponent>(m_cam_entity);
+            auto* gjk_tc = m_world->modify<TransformComponent>(m_gjk_entity);
+            gjk_tc->transform = Mat44::translate({0.f, 0.f, -0.4f}) * cam_tc->transform;
+            m_gjk_shape->set_transform(gjk_tc->transform);
+        }
+
+        bool has_collision = false;
+
+        GJKCollider collider;
+
+        for (auto e : m_world->view<PhysicsComponent>()) {
+            auto* pc = m_world->get<PhysicsComponent>(e);
+            auto* shape2 = static_cast<ConvexPolyhedronShape*>(&pc->actor->shape());
+            if (collider.collide(&*m_gjk_shape, shape2)) {
+                has_collision = true;
+                break;
+            }
+        }
+
+        auto* gjk_rc = m_world->get<RenderComponent>(m_gjk_entity);
+
+        if (has_collision)
+            gjk_rc->material->set_color({0.8, 0.4, 0.4});
+        else
+            gjk_rc->material->set_color({0.4, 0.8, 0.4});
+    }
+
     void update(float dt) override {
         m_world->update(dt);
+        collide_gjk();
     }
 
     void on_window_resize(int width, int height) override {
@@ -197,7 +254,25 @@ public:
             case Key::S:
                 cam_ctl->move_bkwd = is_pressed;
                 break;
-            case Key::F:
+
+            case Key::C:
+                if (action == KeyAction::Press) {
+                    m_bind_gjk_to_camera = !m_bind_gjk_to_camera;
+                    if (m_bind_gjk_to_camera) {
+                        auto* cam_tc = m_world->modify<TransformComponent>(m_cam_entity);
+                        auto* gjk_tc = m_world->get<TransformComponent>(m_gjk_entity);
+                        cam_tc->transform = gjk_tc->transform;
+                    }
+                    break;
+                }
+
+            case Key::LeftShift: {
+                auto* cam = m_world->modify<CameraControllerComponent>(m_cam_entity);
+                cam->velocity = is_pressed ? 0.1f : 8.f;
+                break;
+            }
+
+        case Key::F:
                 if (is_pressed)
                     fire_cube();
                 break;
@@ -263,6 +338,12 @@ public:
     std::shared_ptr<Material> m_unit_box_material;
     std::shared_ptr<Mesh> m_unit_box_mesh;
     std::shared_ptr<ConvexPolyhedron> m_unit_box;
+
+
+    Entity m_gjk_entity;
+    std::shared_ptr<Mesh> m_gjk_mesh;
+    std::unique_ptr<ConvexPolyhedronShape> m_gjk_shape;
+    bool m_bind_gjk_to_camera = false;
 
     bool m_cam_move_mode = false;
     Entity m_cam_entity;

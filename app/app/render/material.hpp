@@ -16,14 +16,17 @@ public:
     void use() const {
         m_shader->use();
         m_shader->set_ambient_strength(m_ambient_strength);
+        m_shader->set_color(m_color);
     }
 
     void set_ambient_strength(float value) { m_ambient_strength = value; }
+    void set_color(const Vec3& value) { m_color = value; }
 
 private:
     std::shared_ptr<MeshShader> m_shader;
 
     float m_ambient_strength = 0.25f;
+    Vec3 m_color = {1.f, 1.f, 1.f};
 };
 
 } // slope::app

@@ -43,6 +43,7 @@ static const char* s_vertex_shader_text =
 static const char* s_fragment_shader_text =
         "#version 410\n"
         "uniform vec3 light_position;\n"
+        "uniform vec3 uniform_color;\n"
         "uniform float ambient_strength;\n"
         "in vec3 f_position;\n"
         "in vec3 f_normal;\n"
@@ -50,7 +51,7 @@ static const char* s_fragment_shader_text =
         "void main()\n"
         "{\n"
         "   vec3 light_color = vec3(1.0, 1.0, 1.0);\n"
-        "   vec3 object_color = vec3(0.9, 0.8, 0.0);\n"
+        "   vec3 object_color = uniform_color;\n"
         "   vec3 ambient = ambient_strength * light_color;\n"
         "   vec3 normal = normalize(f_normal);\n"
         "   vec3 light_dir = normalize(light_position - f_position);\n"

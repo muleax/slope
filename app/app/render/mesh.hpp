@@ -51,13 +51,16 @@ public:
         static constexpr char VIEW_PROJECTION[] = "view_projection";
         static constexpr char LIGHT_POSITION[] = "light_position";
         static constexpr char AMBIENT_STRENGTH[] = "ambient_strength";
+        static constexpr char COLOR[] = "uniform_color";
     };
 
     using Shader::Shader;
 
     void set_view_projection(const Mat44& value) const { set(m_view_proj_loc, value); }
     void set_ligh_position(const Vec3& value) const { set(m_light_pos_loc, value); }
+
     void set_ambient_strength(float value) const { set(m_ambient_strength_loc, value); }
+    void set_color(const Vec3& value) const { set(m_color_loc, value); }
 
 private:
     void cache_attribute_locations() override;
@@ -65,6 +68,7 @@ private:
     Location m_view_proj_loc = 0;
     Location m_light_pos_loc = 0;
     Location m_ambient_strength_loc = 0;
+    Location m_color_loc = 0;
 };
 
 class MeshRenderer {
