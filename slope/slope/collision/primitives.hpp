@@ -17,6 +17,8 @@ struct Plane {
     Plane(const Vec3& normal, const Vec3& point) : normal(normal), dot(normal.dot(point)) {}
 
     bool intersect_ray(float& out_t, const Vec3& ray_beg, const Vec3& ray_dir) const;
+
+    float distance(const Vec3& p) const { return normal.dot(p) - dot; }
 };
 
 Vec3 find_orthogonal(const Vec3& normal);
