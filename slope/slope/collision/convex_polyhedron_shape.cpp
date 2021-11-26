@@ -13,8 +13,9 @@ ConvexPolyhedronShape::ConvexPolyhedronShape(std::shared_ptr<ConvexPolyhedron> g
     m_world_edge_dirs.reserve(geom.edge_dirs().size());
 }
 
-void ConvexPolyhedronShape::set_transform(const Mat44& value) {
-    m_transform = value;
+void ConvexPolyhedronShape::set_transform(const Mat44& matrix)
+{
+    m_transform = matrix;
     auto& geom = *m_geometry;
 
     m_world_vertices.clear();
@@ -38,7 +39,8 @@ void ConvexPolyhedronShape::set_transform(const Mat44& value) {
     }
 }
 
-Vec3 ConvexPolyhedronShape::support_point(const Vec3& axis) const {
+Vec3 ConvexPolyhedronShape::support_point(const Vec3& axis) const
+{
     float max_dot = -FLOAT_MAX;
     const Vec3* best_point = nullptr;
     for (auto& p : m_world_vertices) {
@@ -52,7 +54,8 @@ Vec3 ConvexPolyhedronShape::support_point(const Vec3& axis) const {
     return *best_point;
 }
 
-float ConvexPolyhedronShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const {
+float ConvexPolyhedronShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const
+{
     auto& geom = *m_geometry;
 
     float max_dot = -FLOAT_MAX;

@@ -97,16 +97,16 @@ public:
         }
         else if (mode == 1) {
             int h = 2;
-            float skew = 0.01f;
+            float skew = 0.1f;
             for (int j = 0; j < h; j++) {
                         Mat44 tr = Mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
-                        tr.set_translation({skew * j, -0.011f + j * 0.991f, skew * j});
+                        tr.set_translation({skew * j, 0.5f + j * 0.8f, skew * j});
                         spawn_cube(tr, {}, 1.f);
             }
 
         } else if (mode == 2) {
             auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
-            int h = 3;
+            int h = 35;
             float spacing = 0.f;
             for (int j = 0; j < h; j++) {
                 for (int i = 0; i < h - j; i++) {
@@ -136,13 +136,17 @@ public:
         }
 
         {
-            auto floor_geom = poly_factory.box(Vec3{500.f, 1.f, 500.f}, Vec3{0.f, 0.f, 0.f});
+            float floor_size = 500.f;
+            auto floor_geom = poly_factory.box(Vec3{floor_size, 1.f, floor_size}, Vec3{0.f, 0.f, 0.f});
             auto ground_mesh = create_mesh_from_poly(floor_geom);
 
             auto e = m_world->create_entity();
             auto* rc = m_world->create<RenderComponent>(e);
             rc->mesh = ground_mesh;
-            rc->material = m_unit_box_material;
+
+            rc->material = std::make_shared<Material>(DefaultShaders::mesh_shader());
+            rc->material->set_ambient_strength(0.1f);
+            rc->material->set_color({0.8, 0.8, 0.9});
 
             auto* tc = m_world->create<TransformComponent>(e);
             tc->transform = Mat44::translate({0.f, -1.f, 0.f});
@@ -185,7 +189,7 @@ public:
 
         m_gjk_entity = m_world->create_entity();
         auto* tc = m_world->create<TransformComponent>(m_gjk_entity);
-        tc->transform.set_translation({10.f, 5.f, 10.f});
+        tc->transform.set_translation({10.f, -15.f, 10.f});
 
         m_gjk_shape->set_transform(tc->transform);
 
@@ -207,12 +211,12 @@ public:
 
         bool has_collision = false;
 
-        GJKCollider collider;
+
 
         for (auto e : m_world->view<PhysicsComponent>()) {
             auto* pc = m_world->get<PhysicsComponent>(e);
             auto* shape2 = static_cast<ConvexPolyhedronShape*>(&pc->actor->shape());
-            if (collider.collide(&*m_gjk_shape, shape2)) {
+            if (m_gjk_solver.intersect(&*m_gjk_shape, shape2)) {
                 has_collision = true;
                 break;
             }
@@ -228,7 +232,7 @@ public:
 
     void update(float dt) override {
         m_world->update(dt);
-        collide_gjk();
+        //collide_gjk();
     }
 
     void on_window_resize(int width, int height) override {
@@ -268,7 +272,7 @@ public:
 
             case Key::LeftShift: {
                 auto* cam = m_world->modify<CameraControllerComponent>(m_cam_entity);
-                cam->velocity = is_pressed ? 0.1f : 8.f;
+                cam->velocity = is_pressed ? 1.f : 8.f;
                 break;
             }
 
@@ -339,7 +343,7 @@ public:
     std::shared_ptr<Mesh> m_unit_box_mesh;
     std::shared_ptr<ConvexPolyhedron> m_unit_box;
 
-
+    GJKSolver m_gjk_solver;
     Entity m_gjk_entity;
     std::shared_ptr<Mesh> m_gjk_mesh;
     std::unique_ptr<ConvexPolyhedronShape> m_gjk_shape;

@@ -28,6 +28,13 @@ void UIOverlaySystem::update(float dt) {
         ImGui::Checkbox("Real Time Sync", &ps->real_time_sync);
         ImGui::Checkbox("Initial Randomization", &world_config.randomize_order);
 
+        bool use_gjk = ps->dynamics_world.narrowphase().preferred_backend() == Narrowphase::Backend::GJK_EPA;
+        if (ImGui::RadioButton("SAT", !use_gjk))
+            ps->dynamics_world.narrowphase().set_preferred_backend(Narrowphase::Backend::SAT);
+        ImGui::SameLine();
+        if (ImGui::RadioButton("GJK+EPA", use_gjk))
+            ps->dynamics_world.narrowphase().set_preferred_backend(Narrowphase::Backend::GJK_EPA);
+
         ImGui::DragFloat("Time Factor", &ps->time_factor, 0.01f, 0.001f, 100.f);
         float time_step_ms = ps->time_step * 1000.f;
         ImGui::DragFloat("Time Step", &time_step_ms, 0.1f, 0.1f, 1000.f);

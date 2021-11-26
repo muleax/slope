@@ -4,7 +4,7 @@
 #include "slope/containers/vector.hpp"
 #include "slope/containers/unordered_map.hpp"
 #include "slope/collision/contact_manifold.hpp"
-#include "slope/collision/convex_polyhedron_collider.hpp"
+#include "slope/collision/narrowphase.hpp"
 #include "slope/debug/debug_drawer.hpp"
 #include <memory>
 
@@ -67,6 +67,8 @@ public:
 
     uint32_t                frame_id() const { return m_frame_id; }
 
+    Narrowphase&            narrowphase() { return m_narrowphase; }
+
 private:
     struct ManifoldCache {
         ContactManifold manifold;
@@ -95,9 +97,8 @@ private:
     Vector<DynamicActor*> m_dynamic_actors;
     Vector<StaticActor*> m_static_actors;
 
-    Vector<ContactGeom> m_geom_buffer;
     Vector<PendingContact> m_pending_contacts;
-    ConvexPolyhedronCollider m_collider;
+    Narrowphase m_narrowphase;
 
     UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
 

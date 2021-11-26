@@ -74,24 +74,24 @@ void DynamicsWorld::apply_gravity() {
 }
 
 void DynamicsWorld::collide(BaseActor& actor1, BaseActor& actor2) {
-    if (!actor1.shape().aabb().intersects(actor2.shape().aabb()))
+    auto& shape1 = actor1.shape();
+    auto& shape2 = actor2.shape();
+
+    if (!shape1.aabb().intersects(shape2.aabb()))
         return;
 
-    auto* shape1 = static_cast<const ConvexPolyhedronShape*>(&actor1.shape());
-    auto* shape2 = static_cast<const ConvexPolyhedronShape*>(&actor2.shape());
-
-    if (m_collider.collide(m_geom_buffer, shape1, shape2)) {
+    auto pen_axis = m_narrowphase.find_penetration_axis(&shape1, &shape2);
+    if (pen_axis) {
         m_stats.collision_count++;
 
-        auto& cache = m_manifolds[{ shape1, shape2 }];
+        auto& cache = m_manifolds[{ &shape1, &shape2 }];
         cache.actor1 = &actor1;
         cache.actor2 = &actor2;
 
         auto& manifold = cache.manifold;
         manifold.begin_update(m_frame_id, actor1.inv_transform());
 
-        for (auto& geom: m_geom_buffer)
-            manifold.add_contact(geom);
+        m_narrowphase.generate_contacts(manifold, *pen_axis, &shape1, &shape2);
 
         manifold.end_update();
 
@@ -177,8 +177,9 @@ void DynamicsWorld::integrate_bodies() {
     float dt = m_solver.time_interval();
 
     for (auto& actor: m_dynamic_actors) {
-        actor->body().integrate(dt);
-        actor->shape().set_transform(actor->body().transform());
+        auto& body = actor->body();
+        body.integrate(dt);
+        actor->shape().set_transform(body.transform());
     }
 }
 
