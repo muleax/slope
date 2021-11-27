@@ -29,28 +29,51 @@ enum class NpBackendHint : int {
     Count
 };
 
-struct NotImplemented {};
-
-// Implement specialization in order to support collision pair
+// Derive specialization in order to support collision pair
 template <class A, class B, NpBackendHint Hint = NpBackendHint::GJK_EPA>
-struct NpBackend : NotImplemented {
+struct NpBackend {
+    using Shape1 = A;
+    using Shape2 = B;
+    static constexpr NpBackendHint Hint_ = Hint;
 
-    static bool intersect(NpContext& ctx, const A* shape1, const B* shape2);
-    static void generate_contacts(NpContext& ctx, ContactManifold& manifold, const A* shape1, const B* shape2);
+    // Expected interface:
+    // static bool intersect(NpContext& ctx, const A* shape1, const B* shape2);
+    // static void generate_contacts(NpContext& ctx, ContactManifold& manifold, const A* shape1, const B* shape2);
 };
 
-template <class A, class B, NpBackendHint Hint>
-struct NpBackendWrapper {
+struct NullBackend {
+    static bool intersect(NpContext& ctx, const CollisionShape* shape1, const CollisionShape* shape2) { return false; }
+    static void generate_contacts(NpContext& ctx, ContactManifold& manifold, const CollisionShape* shape1, const CollisionShape* shape2) {}
+};
 
-    static bool intersect(NpContext& ctx, const CollisionShape* shape1, const CollisionShape* shape2);
+template <class Backend, bool Inverted = false>
+struct NpBackendWrapper {
+    using Shape1 = typename Backend::Shape1;
+    using Shape2 = typename Backend::Shape2;
+
+    static bool intersect(NpContext& ctx, const CollisionShape* shape1, const CollisionShape* shape2)
+    {
+        if constexpr (Inverted)
+            return Backend::intersect(ctx, (const Shape1*)shape2, (const Shape2*)shape1);
+        else
+            return Backend::intersect(ctx, (const Shape1*)shape1, (const Shape2*)shape2);
+    }
 
     static void generate_contacts(
         NpContext& ctx, ContactManifold& manifold,
-        const CollisionShape* shape1, const CollisionShape* shape2);
+        const CollisionShape* shape1, const CollisionShape* shape2)
+    {
+        if constexpr (Inverted) {
+            manifold.invert_input_order();
+            Backend::generate_contacts(ctx, manifold, (const Shape1*)shape2, (const Shape2*)shape1);
+        } else {
+            Backend::generate_contacts(ctx, manifold, (const Shape1*)shape1, (const Shape2*)shape2);
+        }
+    }
 };
 
-template<NpBackendHint Hint>
-struct NpBackend<ConvexPolyhedronShape, ConvexPolyhedronShape, Hint> {
+template <NpBackendHint Hint>
+struct ConvexPolyhedronBackend : NpBackend<ConvexPolyhedronShape, ConvexPolyhedronShape, Hint> {
 
     static bool intersect(NpContext& ctx, const ConvexPolyhedronShape* shape1, const ConvexPolyhedronShape* shape2)
     {
@@ -60,7 +83,6 @@ struct NpBackend<ConvexPolyhedronShape, ConvexPolyhedronShape, Hint> {
             ctx.min_pen_axis = ctx.sat_solver.find_penetration_axis(shape1, shape2);
             return ctx.min_pen_axis.has_value();
         }
-
     }
 
     static void generate_contacts(
@@ -112,8 +134,7 @@ struct NpBackend<ConvexPolyhedronShape, ConvexPolyhedronShape, Hint> {
     }
 };
 
-template<>
-struct NpBackend<ConvexPolyhedronShape, SphereShape> {
+struct ConvexPolyhedronSphereBackend : NpBackend<ConvexPolyhedronShape, SphereShape> {
 
     static bool intersect(NpContext& ctx, const ConvexPolyhedronShape* shape1, const SphereShape* shape2)
     {
@@ -139,8 +160,7 @@ struct NpBackend<ConvexPolyhedronShape, SphereShape> {
     }
 };
 
-template<>
-struct NpBackend<SphereShape, SphereShape> {
+struct SphereBackend : NpBackend<SphereShape, SphereShape> {
 
     static bool intersect(NpContext& ctx, const SphereShape* shape1, const SphereShape* shape2)
     {
@@ -170,7 +190,7 @@ struct NpBackend<SphereShape, SphereShape> {
         manifold.add_contact({p1 + pen_axis * shape1->radius(), p2 - pen_axis * shape2->radius(), pen_axis});
     }
 };
-
+/*
 template <class A, class B, NpBackendHint Hint>
 bool NpBackend<A, B, Hint>::intersect(NpContext& ctx, const A* shape1, const B* shape2)
 {
@@ -213,18 +233,6 @@ void NpBackend<A, B, Hint>::generate_contacts(NpContext& ctx, ContactManifold& m
     }
 }
 
-template <class A, class B, NpBackendHint Hint>
-bool NpBackendWrapper<A, B, Hint>::intersect(NpContext& ctx, const CollisionShape* shape1, const CollisionShape* shape2)
-{
-    return NpBackend<A, B, Hint>::intersect(ctx, (const A*)shape1, (const B*)shape2);
-}
-
-template <class A, class B, NpBackendHint Hint>
-void NpBackendWrapper<A, B, Hint>::generate_contacts(
-    NpContext& ctx, ContactManifold& manifold,
-    const CollisionShape* shape1, const CollisionShape* shape2)
-{
-    return NpBackend<A, B, Hint>::generate_contacts(ctx, manifold, (const A*)shape1, (const B*)shape2);
-}
+*/
 
 } // slope

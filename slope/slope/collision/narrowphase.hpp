@@ -5,7 +5,7 @@
 
 namespace slope {
 
-template <class... Shapes>
+template <class... Backends>
 class NarrowphaseImpl {
 public:
     NarrowphaseImpl();
@@ -18,12 +18,20 @@ public:
 
 private:
     struct BackendRoutines {
-        bool (*intersect)(NpContext& ctx, const CollisionShape*, const CollisionShape*) = nullptr;
-        void (*generate_contacts)(NpContext& ctx, ContactManifold& manifold, const CollisionShape*, const CollisionShape*) = nullptr;
-    };
+        using IntersectFn = bool (NpContext& ctx, const CollisionShape*, const CollisionShape*);
+        using GenerateFn = void (NpContext& ctx, ContactManifold& manifold, const CollisionShape*, const CollisionShape*);
 
-    template <class Shape1, NpBackendHint Hint>
-    void init_backends();
+        IntersectFn*    intersect = NullBackend::intersect;
+        GenerateFn*     generate_contacts = NullBackend::generate_contacts;
+        bool            initialized = false;
+
+        template <class Backend>
+        void initialize() {
+            intersect = Backend::intersect;
+            generate_contacts = Backend::generate_contacts;
+            initialized = true;
+        }
+    };
 
     NpContext m_context;
     NpBackendHint m_backend_hint = NpBackendHint::GJK_EPA;
@@ -32,11 +40,11 @@ private:
     const CollisionShape* m_shape2 = nullptr;
     BackendRoutines* m_current_backend = nullptr;
 
-    BackendRoutines m_backends[(int)ShapeType::Count][(int)ShapeType::Count][(int)NpBackendHint::Count];
+    Array<Array<Array<BackendRoutines, (int)NpBackendHint::Count>, (int)ShapeType::Count>, (int)ShapeType::Count> m_backends;
 };
 
-template <class... Shapes>
-bool NarrowphaseImpl<Shapes...>::intersect(const CollisionShape* shape1, const CollisionShape* shape2)
+template <class... Backends>
+bool NarrowphaseImpl<Backends...>::intersect(const CollisionShape* shape1, const CollisionShape* shape2)
 {
     m_shape1 = shape1;
     m_shape2 = shape2;
@@ -44,27 +52,31 @@ bool NarrowphaseImpl<Shapes...>::intersect(const CollisionShape* shape1, const C
     return m_current_backend->intersect(m_context, shape1, shape2);
 }
 
-template <class... Shapes>
-void NarrowphaseImpl<Shapes...>::generate_contacts(ContactManifold& manifold)
+template <class... Backends>
+void NarrowphaseImpl<Backends...>::generate_contacts(ContactManifold& manifold)
 {
     return m_current_backend->generate_contacts(m_context, manifold, m_shape1, m_shape2);
 }
 
-template <class... Shapes>
-template <class Shape1, NpBackendHint Hint>
-void NarrowphaseImpl<Shapes...>::init_backends()
+template <class... Backends>
+NarrowphaseImpl<Backends...>::NarrowphaseImpl()
 {
-    ((m_backends[(int)Shape1::Type][(int)(Shapes::Type)][(int)Hint].intersect = NpBackendWrapper<Shape1, Shapes, Hint>::intersect), ...);
-    ((m_backends[(int)Shape1::Type][(int)(Shapes::Type)][(int)Hint].generate_contacts = NpBackendWrapper<Shape1, Shapes, Hint>::generate_contacts), ...);
+    ((m_backends[(int)Backends::Shape2::Type][(int)Backends::Shape1::Type][(int)Backends::Hint_]. template initialize<NpBackendWrapper<Backends, true>>()), ...);
+    ((m_backends[(int)Backends::Shape1::Type][(int)Backends::Shape2::Type][(int)Backends::Hint_]. template initialize<NpBackendWrapper<Backends, false>>()), ...);
+
+    // fallback to GJK/EPA
+    for (auto& per_shape1 : m_backends)
+        for (auto& per_shape2 : per_shape1)
+            for (auto& backend : per_shape2)
+                if (!backend.initialized)
+                    backend = per_shape2[(int)NpBackendHint::GJK_EPA];
+
 }
 
-template <class... Shapes>
-NarrowphaseImpl<Shapes...>::NarrowphaseImpl()
-{
-    (init_backends<Shapes, NpBackendHint::GJK_EPA>(), ...);
-    (init_backends<Shapes, NpBackendHint::SAT>(), ...);
-}
-
-using Narrowphase = NarrowphaseImpl<ConvexPolyhedronShape, SphereShape>;
+using Narrowphase = NarrowphaseImpl<
+    ConvexPolyhedronBackend<NpBackendHint::GJK_EPA>,
+    ConvexPolyhedronBackend<NpBackendHint::SAT>,
+    ConvexPolyhedronSphereBackend,
+    SphereBackend>;
 
 } // slope
