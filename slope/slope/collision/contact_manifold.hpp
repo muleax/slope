@@ -28,8 +28,10 @@ public:
     auto end() { return m_points.begin() + m_points_size; }
 
     void begin_update(uint32_t frame_id, const Mat44& shape1_inv_transform);
-    void add_contact(const ContactGeom& new_geom);
+    void add_contact(ContactGeom new_geom);
     void end_update();
+
+    void invert_input_order() { m_inverted_input_order = !m_inverted_input_order; };
 
     bool is_active(uint32_t frame_id) const { return m_points_size > 0 && m_touch_frame_id == frame_id; }
 
@@ -51,6 +53,8 @@ private:
 
     uint32_t m_touch_frame_id = 0;
     Mat44 m_shape1_inv_transform;
+
+    bool m_inverted_input_order = false;
 };
 
 } // slope

@@ -80,8 +80,8 @@ void DynamicsWorld::collide(BaseActor& actor1, BaseActor& actor2) {
     if (!shape1.aabb().intersects(shape2.aabb()))
         return;
 
-    auto pen_axis = m_narrowphase.find_penetration_axis(&shape1, &shape2);
-    if (pen_axis) {
+    //auto pen_axis = m_narrowphase.find_penetration_axis(&shape1, &shape2);
+    if (m_narrowphase.intersect(&shape1, &shape2)) {
         m_stats.collision_count++;
 
         auto& cache = m_manifolds[{ &shape1, &shape2 }];
@@ -91,7 +91,8 @@ void DynamicsWorld::collide(BaseActor& actor1, BaseActor& actor2) {
         auto& manifold = cache.manifold;
         manifold.begin_update(m_frame_id, actor1.inv_transform());
 
-        m_narrowphase.generate_contacts(manifold, *pen_axis, &shape1, &shape2);
+        //m_narrowphase.generate_contacts(manifold, *pen_axis, &shape1, &shape2);
+        m_narrowphase.generate_contacts(manifold);
 
         manifold.end_update();
 

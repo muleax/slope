@@ -4,9 +4,8 @@
 namespace slope {
 
 ConvexPolyhedronShape::ConvexPolyhedronShape(std::shared_ptr<ConvexPolyhedron> geometry)
-        : CollisionShape(ShapeType::ConvexPolyhedron)
-        , m_geometry(std::move(geometry)) {
-
+    : m_geometry(std::move(geometry))
+{
     auto& geom = *m_geometry;
     m_world_vertices.reserve(geom.vertices().size());
     m_world_face_normals.reserve(geom.face_normals().size());

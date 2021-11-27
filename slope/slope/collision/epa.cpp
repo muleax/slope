@@ -52,7 +52,7 @@ void EPASolver::add_face(uint32_t a_idx, uint32_t b_idx, uint32_t c_idx)
 Vec3 EPASolver::find_penetration_axis(
     const CollisionShape* shape1, const CollisionShape* shape2, const GJKSolver::Simplex& simplex)
 {
-    constexpr float PROXIMITY_EPSILON = 1e-5f;
+    constexpr float PROXIMITY_EPSILON = 1e-6f;
 
     //records.clear();
 

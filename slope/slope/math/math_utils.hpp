@@ -5,7 +5,7 @@
 
 namespace slope {
 
-constexpr double    PI = 3.14159265358979323846264338327950288;
+constexpr float     PI = 3.14159265358979323846264338327950288;
 constexpr float     EPSILON = 1e-6f;
 
 constexpr float     FLOAT_MAX = std::numeric_limits<float>::max();
