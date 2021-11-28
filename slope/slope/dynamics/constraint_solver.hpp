@@ -13,23 +13,22 @@ struct ConstraintGeom {
     float pos_error() const { return axis.dot(p1 - p2); }
 };
 
-struct ConstraintGroup {
-    enum {
-        Normal = 0,
-        Friction = 1
-    };
+enum class ConstraintGroup : int {
+    Normal = 0,
+    Friction = 1,
+    Count
 };
 
 class ConstraintId {
 public:
     ConstraintId() = default;
     ConstraintId(int raw) : m_raw(raw) {}
-    ConstraintId(int group, int index) : m_raw(group | index << 1) {}
+    ConstraintId(ConstraintGroup group, int index) : m_raw((int)group | index << 1) {}
 
-    bool is_valid() const { return m_raw >= 0; }
-    int group() const { return m_raw & 1; }
-    int index() const { return m_raw >> 1; }
-    int raw() const { return m_raw; }
+    bool            is_valid() const { return m_raw >= 0; }
+    ConstraintGroup group() const { return ConstraintGroup(m_raw & 1); }
+    int             index() const { return m_raw >> 1; }
+    int             raw() const { return m_raw; }
 
     operator int() const { return m_raw; }
 
@@ -74,15 +73,19 @@ struct Constraint {
 class ConstraintSolver
 {
 public:
+    struct Config {
+        // Successive over-relaxation
+        float       sor = 1.f;
+        int         iteration_count = 10;
+    };
+
+    virtual ~ConstraintSolver() = default;
+
+    Config&         config() { return m_config; }
+    const Config&   config() const { return m_config; }
+
     void            set_time_interval(float value);
     float           time_interval() const { return m_dt; }
-
-    // Successive over-relaxation
-    void            set_sor(float value) { m_sor = value; }
-    float           sor() const { return m_sor; }
-
-    void            set_iteration_count(uint32_t value) { m_iteration_count = value; }
-    uint32_t        iteration_count() const { return m_iteration_count; }
 
     ConstraintId    add_constraint(Constraint& c);
     ConstraintId    join_friction(Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
@@ -92,7 +95,10 @@ public:
 
     float           get_lambda(ConstraintId constr_id) const;
 
-private:
+    float           max_error() const;
+    float           avg_error() const;
+
+protected:
     struct ConstraintData {
         int     body1_idx = -1;
         int     body2_idx = -1;
@@ -106,6 +112,7 @@ private:
         float   min_bound;
         float   max_bound;
         float   lambda;
+        float   delta_lambda;
 
         float   bg_error;
         float   cfm_inv_dt;
@@ -123,19 +130,19 @@ private:
         Vec3        inv_m_f[2];
     };
 
-    void register_body(RigidBody* body);
-    auto create_constraint(Constraint& c, int group) -> std::pair<ConstraintId, ConstraintData*>;
-    void prepare_data();
-    void solve_constraint(ConstraintData& c, float min_bound, float max_bound);
-    void apply_impulses();
+    void            register_body(RigidBody* body);
+    auto            create_constraint(Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
+    void            prepare_data();
+    void            apply_impulses();
 
-    float       m_dt = 1.f;
-    float       m_inv_dt = 1.f;
-    float       m_sor = 1.f;
-    uint32_t    m_iteration_count = 10;
+    virtual void    solve_impl() = 0;
 
-    Vector<BodyData>                    m_bodies;
-    Array<Vector<ConstraintData>, 2>    m_constraints;
+    float   m_dt = 1.f;
+    float   m_inv_dt = 1.f;
+    Config  m_config;
+
+    Vector<BodyData> m_bodies;
+    Array<Vector<ConstraintData>, (int)ConstraintGroup::Count> m_constraints;
 };
 
 inline void ConstraintSolver::set_time_interval(float value) {
@@ -176,7 +183,7 @@ inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, const Cons
 }
 
 inline float ConstraintSolver::get_lambda(ConstraintId constr_id) const {
-    return m_constraints[constr_id.group()][constr_id.index()].lambda;
+    return m_constraints[(int)constr_id.group()][constr_id.index()].lambda;
 }
 
 } // slope

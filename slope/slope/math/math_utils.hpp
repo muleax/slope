@@ -45,6 +45,26 @@ struct Interval {
     }
 };
 
+template <class T>
+class MovingAverage {
+public:
+    explicit MovingAverage (T ratio = 0.1f) : m_ratio(ratio) {}
+
+    void set_ratio(T ratio) { m_ratio = ratio; }
+    void update(T value) {
+        m_instantaneous = value;
+        m_smoothed = value * m_ratio + (1.f - m_ratio) * m_smoothed;
+    }
+
+    T instantaneous() const { return m_instantaneous; }
+    T smoothed() const { return m_smoothed; }
+
+private:
+    T m_ratio;
+    T m_instantaneous = 0.f;
+    T m_smoothed = 0.f;
+};
+
 template<class T>
 constexpr T sqr(T value) {
     static_assert(std::is_floating_point_v<T>);

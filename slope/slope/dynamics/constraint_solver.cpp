@@ -34,11 +34,11 @@ void ConstraintSolver::register_body(RigidBody* body) {
     m_bodies.push_back({body});
 }
 
-std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(Constraint& c, int group) {
+std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(Constraint& c, ConstraintGroup group) {
     if (c.body1->in_solver_index() == -1)
         register_body(c.body1);
 
-    auto& data = m_constraints[group].emplace_back();
+    auto& data = m_constraints[(int)group].emplace_back();
 
     data.body1_idx = c.body1->in_solver_index();
     data.jacobian1[0] = c.jacobian1[0];
@@ -55,7 +55,7 @@ std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::cre
 
     data.lambda = c.init_lambda;
 
-    return { { group, static_cast<int>(m_constraints[group].size() - 1) }, &data };
+    return { { group, static_cast<int>(m_constraints[(int)group].size() - 1) }, &data };
 }
 
 ConstraintId ConstraintSolver::add_constraint(Constraint& c) {
@@ -100,43 +100,6 @@ void ConstraintSolver::clear() {
 
     for (auto& container : m_constraints)
         container.clear();
-}
-
-void ConstraintSolver::solve_constraint(ConstraintData& c, float min_bound, float max_bound) {
-    if (c.body2_idx >= 0) {
-        auto& b1 = m_bodies[c.body1_idx];
-        auto& b2 = m_bodies[c.body2_idx];
-
-        float cur_lambda = c.lambda;
-
-        float dot = c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
-        dot += c.jacobian2[0].dot(b2.inv_m_f[0]) + c.jacobian2[1].dot(b2.inv_m_f[1]);
-        dot += cur_lambda * c.cfm_inv_dt;
-
-        float delta = (c.rhs - dot) * c.inv_diag;
-        c.lambda = clamp(min_bound, cur_lambda + delta, max_bound);
-        delta = c.lambda - cur_lambda;
-
-        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
-        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
-        b2.inv_m_f[0] += c.inv_m_j2[0] * delta;
-        b2.inv_m_f[1] += c.inv_m_j2[1] * delta;
-
-    } else {
-        auto& b1 = m_bodies[c.body1_idx];
-
-        float cur_lambda = c.lambda;
-
-        float dot = c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
-        dot += cur_lambda * c.cfm_inv_dt;
-
-        float delta = (c.rhs - dot) * c.inv_diag;
-        c.lambda = clamp(min_bound, cur_lambda + delta, max_bound);
-        delta = c.lambda - cur_lambda;
-
-        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
-        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
-    }
 }
 
 void ConstraintSolver::prepare_data() {
@@ -185,31 +148,17 @@ void ConstraintSolver::prepare_data() {
             c.rhs = m_inv_dt * m_inv_dt * c.bg_error - j_v_delta;
 
             float rcp = c.cfm_inv_dt + j_inv_m_j;
-            c.inv_diag = rcp * rcp > INV_DIAG_EPSILON ? m_sor / rcp : 0.f;
+            c.inv_diag = rcp * rcp > INV_DIAG_EPSILON ? m_config.sor / rcp : 0.f;
         }
     }
 }
 
 void ConstraintSolver::solve() {
-    if (m_constraints.empty())
-        return;
-
-    prepare_data();
-
-    // Projected Gauss-Seidel
-    for(uint32_t iter = 0; iter < m_iteration_count; ++iter) {
-        for (auto& c : m_constraints[ConstraintGroup::Normal]) {
-            solve_constraint(c, c.min_bound, c.max_bound);
-        }
-
-        for (auto& c : m_constraints[ConstraintGroup::Friction]) {
-            float normal_lambda = m_constraints[ConstraintGroup::Normal][c.normal_constr_idx].lambda;
-            float bound = c.friction_ratio * fabsf(normal_lambda);
-            solve_constraint(c, -bound, bound);
-        }
+    if (!m_constraints.empty()) {
+        prepare_data();
+        solve_impl();
+        apply_impulses();
     }
-
-    apply_impulses();
 }
 
 void ConstraintSolver::apply_impulses() {
@@ -218,6 +167,27 @@ void ConstraintSolver::apply_impulses() {
         body->set_velocity(body->velocity() + b.inv_m_f[0] * m_dt);
         body->set_ang_velocity(body->ang_velocity() + b.inv_m_f[1] * m_dt);
     }
+}
+
+float ConstraintSolver::max_error() const {
+    float err = -FLOAT_MAX;
+    for (auto& group : m_constraints)
+        for (auto& c : group)
+            err = std::fmax(err, fabs(c.delta_lambda));
+
+    return err;
+}
+
+float ConstraintSolver::avg_error() const {
+    float err = 0.f;
+    size_t constraint_count = 0;
+    for (auto& group : m_constraints) {
+        constraint_count += group.size();
+        for (auto& c: group)
+            err += fabs(c.delta_lambda);
+    }
+
+    return err / static_cast<float>(constraint_count);
 }
 
 } // slope

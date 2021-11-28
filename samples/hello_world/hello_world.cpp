@@ -129,6 +129,7 @@ public:
         debug_draw->drawer = std::make_shared<DebugDrawerImpl>();
 
         physics_single->dynamics_world.set_debug_drawer(debug_draw->drawer);
+        physics_single->dynamics_world.config().solver_config.iteration_count = 30;
 
         ConvexPolyhedronFactory poly_factory;
         m_unit_box = poly_factory.box(Vec3{1.f + BLOAT, 1.f + BLOAT, 1.f + BLOAT}, Vec3{0.f, 0.f, 0.f});

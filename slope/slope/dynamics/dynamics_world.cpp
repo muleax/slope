@@ -1,4 +1,6 @@
 #include "slope/dynamics/dynamics_world.hpp"
+#include "slope/dynamics/pgs_constraint_solver.hpp"
+#include "slope/dynamics/pj_constraint_solver.hpp"
 #include "slope/debug/log.hpp"
 #include <tuple>
 
@@ -33,6 +35,24 @@ std::pair<Constraint, Constraint> default_contact_friction(RigidBody* body1, Rig
 }
 
 } // unnamed
+
+DynamicsWorld::DynamicsWorld() {
+    set_solver(m_solver_type);
+}
+
+void DynamicsWorld::set_solver(DynamicsWorld::SolverType type) {
+    if (!m_solver || type != m_solver_type) {
+        m_solver_type = type;
+        switch (type) {
+        case SolverType::PGS:
+            m_solver = std::make_unique<PGSConstraintSolver>();
+            break;
+        case SolverType::PJ:
+            m_solver = std::make_unique<PJConstraintSolver>();
+            break;
+        }
+    }
+}
 
 void DynamicsWorld::add_actor(BaseActor* actor) {
     if (actor->is<DynamicActor>()) {
@@ -147,9 +167,9 @@ void DynamicsWorld::apply_contacts() {
         fc1.init_lambda = p->friction1_lambda * m_config.warmstarting_friction;
         fc2.init_lambda = p->friction2_lambda * m_config.warmstarting_friction;
 
-        p->normal_constr_id    = m_solver.add_constraint(nc);
-        p->friction1_constr_id = m_solver.join_friction(fc1, friction_ratio, p->normal_constr_id);
-        p->friction2_constr_id = m_solver.join_friction(fc2, friction_ratio, p->normal_constr_id);
+        p->normal_constr_id    = m_solver->add_constraint(nc);
+        p->friction1_constr_id = m_solver->join_friction(fc1, friction_ratio, p->normal_constr_id);
+        p->friction2_constr_id = m_solver->join_friction(fc2, friction_ratio, p->normal_constr_id);
 
         if (debug_drawer) {
             if (m_config.draw_contact_normals) {
@@ -166,16 +186,16 @@ void DynamicsWorld::apply_contacts() {
 
 void DynamicsWorld::cache_lambdas() {
     for (auto [_, p] : m_pending_contacts) {
-        p->normal_lambda    = m_solver.get_lambda(p->normal_constr_id);
-        p->friction1_lambda = m_solver.get_lambda(p->friction1_constr_id);
-        p->friction2_lambda = m_solver.get_lambda(p->friction2_constr_id);
+        p->normal_lambda    = m_solver->get_lambda(p->normal_constr_id);
+        p->friction1_lambda = m_solver->get_lambda(p->friction1_constr_id);
+        p->friction2_lambda = m_solver->get_lambda(p->friction2_constr_id);
     }
 
     m_pending_contacts.clear();
 }
 
 void DynamicsWorld::integrate_bodies() {
-    float dt = m_solver.time_interval();
+    float dt = m_solver->time_interval();
 
     for (auto& actor: m_dynamic_actors) {
         auto& body = actor->body();
@@ -197,9 +217,8 @@ void DynamicsWorld::update(float dt) {
     if (m_debug_drawer)
         m_debug_drawer->clear();
 
-    m_solver.set_time_interval(dt);
-    m_solver.set_iteration_count(m_config.iteration_count);
-    m_solver.set_sor(m_config.sor);
+    m_solver->set_time_interval(dt);
+    m_solver->config() = m_config.solver_config;
 
     apply_gravity();
 
@@ -207,19 +226,22 @@ void DynamicsWorld::update(float dt) {
 
     apply_contacts();
 
-    m_solver.solve();
+    m_solver->solve();
+
+    m_stats.max_constraint_solver_error.update(m_solver->max_error());
+    m_stats.avg_constraint_solver_error.update(m_solver->avg_error());
+    m_stats.static_actor_count = m_static_actors.size();
+    m_stats.dynamic_actor_count = m_dynamic_actors.size();
+    m_stats.simulation_time += dt;
 
     cache_lambdas();
 
-    m_solver.clear();
+    m_solver->clear();
 
     integrate_bodies();
 
     refresh_manifolds();
 
-    m_stats.static_actor_count = m_static_actors.size();
-    m_stats.dynamic_actor_count = m_dynamic_actors.size();
-    m_stats.simulation_time += dt;
     m_frame_id++;
 }
 

@@ -16,8 +16,7 @@ struct PhysicsSingleton : public Component<PhysicsSingleton> {
     float time_factor = 1.f;
 
     // Stats
-    double cpu_time = 0.0;
-    double cpu_time_mva = 0.1;
+    MovingAverage<double> cpu_time;
 };
 
 struct PhysicsComponent : public Component<PhysicsComponent> {

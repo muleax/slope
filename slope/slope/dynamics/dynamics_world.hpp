@@ -28,26 +28,41 @@ namespace slope {
 
 class DynamicsWorld {
 public:
+    enum SolverType {
+        PGS,
+        PJ
+    };
+
     struct Stats {
         uint32_t static_actor_count = 0;
         uint32_t dynamic_actor_count = 0;
         uint32_t collision_count = 0;
         uint32_t contact_count = 0;
         float simulation_time = 0.f;
+
+        MovingAverage<float> max_constraint_solver_error;
+        MovingAverage<float> avg_constraint_solver_error;
     };
 
     struct Config {
-        int iteration_count = 30;
         bool randomize_order = true;
         float warmstarting_normal = 0.83f;
         float warmstarting_friction = 0.75f;
-        float sor = 1.f;
         Vec3 gravity = {0.f, -9.81f, 0.f};
+
+        ConstraintSolver::Config solver_config;
 
         // debug draw
         bool draw_contact_normals = false;
         bool draw_contact_friction = false;
     };
+
+    DynamicsWorld();
+
+    void                    set_solver(SolverType type);
+    SolverType              solver_type() const { return m_solver_type; }
+    ConstraintSolver*       solver() { return m_solver.get(); }
+    const ConstraintSolver* solver() const { return m_solver.get(); }
 
     void                    add_actor(BaseActor* actor);
     void                    remove_actor(BaseActor* actor);
@@ -56,9 +71,6 @@ public:
 
     void                    set_debug_drawer(std::shared_ptr<DebugDrawer> drawer);
     DebugDrawer*            debug_drawer() { return m_debug_drawer.get(); }
-
-    ConstraintSolver&       solver() { return m_solver; }
-    const ConstraintSolver& solver() const { return m_solver; }
 
     Config&                 config() { return m_config; }
     const Config&           config() const { return m_config; }
@@ -92,7 +104,7 @@ private:
     void integrate_bodies();
     void refresh_manifolds();
 
-    ConstraintSolver m_solver;
+    std::unique_ptr<ConstraintSolver> m_solver;
 
     Vector<DynamicActor*> m_dynamic_actors;
     Vector<StaticActor*> m_static_actors;
@@ -102,6 +114,7 @@ private:
 
     UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
 
+    SolverType m_solver_type = SolverType::PGS;
     Config m_config;
     Stats m_stats;
 
