@@ -2,12 +2,13 @@
 #include "slope/collision/shape/collision_shape.hpp"
 #include "slope/collision/gjk.hpp"
 #include "slope/containers/vector.hpp"
+#include <optional>
 
 namespace slope {
 
 class EPASolver {
 public:
-    Vec3 find_penetration_axis(
+    std::optional<Vec3> find_penetration_axis(
         const CollisionShape* shape1, const CollisionShape* shape2, const GJKSolver::Simplex& simplex);
 
 private:

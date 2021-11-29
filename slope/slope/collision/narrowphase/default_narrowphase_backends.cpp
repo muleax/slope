@@ -52,30 +52,33 @@ void SATConvexPolyhedronBackend::generate_contacts(ContactManifold& manifold)
 void GJKConvexPolyhedronBackend::generate_contacts(ContactManifold& manifold)
 {
     auto* ctx = context();
-    Vec3 pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
-    generate_polyhedra_contacts(ctx, manifold, shape1(), shape2(), pen_axis);
+    auto pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+    if (pen_axis)
+        generate_polyhedra_contacts(ctx, manifold, shape1(), shape2(), *pen_axis);
 }
 
 void ConvexPolyhedronCapsuleBackend::generate_contacts(ContactManifold& manifold)
 {
     auto* ctx = context();
-    Vec3 pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+    auto pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+    if (!pen_axis)
+        return;
 
     auto& support_face = ctx->support_face[0];
     support_face.clear();
 
     Vec3 support_normal;
-    shape1()->get_support_face(pen_axis, support_face, support_normal);
+    shape1()->get_support_face(*pen_axis, support_face, support_normal);
 
     auto segment = ctx->face_clipper.clip_segment_by_convex_prism(
-        shape2()->segment(), support_face, pen_axis);
+        shape2()->segment(), support_face, *pen_axis);
 
     for (int i = 0; i < 2; i++) {
-        auto clipped_pt = segment[i] - pen_axis * shape2()->radius();
+        auto clipped_pt = segment[i] - *pen_axis * shape2()->radius();
         float t;
-        if (Plane(support_normal, support_face[0]).intersect_ray(t, clipped_pt, pen_axis)) {
-            auto p1 = clipped_pt + t * pen_axis;
-            manifold.add_contact({p1, clipped_pt, pen_axis});
+        if (Plane(support_normal, support_face[0]).intersect_ray(t, clipped_pt, *pen_axis)) {
+            auto p1 = clipped_pt + t * *pen_axis;
+            manifold.add_contact({p1, clipped_pt, *pen_axis});
         }
     }
 }
@@ -84,17 +87,19 @@ void ConvexPolyhedronSphereBackend::generate_contacts(ContactManifold& manifold)
 {
     auto* ctx = context();
     auto pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+    if (!pen_axis)
+        return;
 
     // TODO: optimize
     Vec3 face_normal;
     ctx->support_face[0].clear();
-    shape1()->get_support_face(pen_axis, ctx->support_face[0], face_normal);
+    shape1()->get_support_face(*pen_axis, ctx->support_face[0], face_normal);
 
-    auto p2 = shape2()->support_point(-pen_axis);
+    auto p2 = shape2()->support_point(-*pen_axis);
     float t;
-    Plane(face_normal, ctx->support_face[0][0]).intersect_ray(t, p2, pen_axis);
-    auto p1 = p2 + t * pen_axis;
-    manifold.add_contact({p1, p2, pen_axis});
+    Plane(face_normal, ctx->support_face[0][0]).intersect_ray(t, p2, *pen_axis);
+    auto p1 = p2 + t * *pen_axis;
+    manifold.add_contact({p1, p2, *pen_axis});
 }
 
 

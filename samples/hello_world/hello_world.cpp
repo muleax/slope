@@ -319,7 +319,7 @@ public:
 
         } else if (mode == 2) {
             auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
-            int h = 15;
+            int h = 25;
             float spacing = 0.f;
             for (int j = 0; j < h; j++) {
                 for (int i = 0; i < h - j; i++) {

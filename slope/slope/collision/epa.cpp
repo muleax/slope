@@ -49,7 +49,7 @@ void EPASolver::add_face(uint32_t a_idx, uint32_t b_idx, uint32_t c_idx)
     // records.back().push_back({a, b, c, normal, Status::New});
 }
 
-Vec3 EPASolver::find_penetration_axis(
+std::optional<Vec3> EPASolver::find_penetration_axis(
     const CollisionShape* shape1, const CollisionShape* shape2, const GJKSolver::Simplex& simplex)
 {
     constexpr float PROXIMITY_EPSILON = 1e-6f;
@@ -60,7 +60,7 @@ Vec3 EPASolver::find_penetration_axis(
     m_heap.clear();
     m_edges.clear();
 
-    Vec3 best_axis;
+    // Vec3 best_axis;
 
     m_inner_point.set_zero();
 
@@ -78,7 +78,7 @@ Vec3 EPASolver::find_penetration_axis(
     add_face(0, 2, 3);
     add_face(1, 2, 3);
 
-    for (int iter = 0; iter < 50; iter++) {
+    for (int iter = 0; iter < 30; iter++) {
         SL_VERIFY(!m_heap.empty());
 
         //records.push_back({});
@@ -92,13 +92,13 @@ Vec3 EPASolver::find_penetration_axis(
         std::pop_heap(m_heap.begin(), m_heap.end());
         m_heap.pop_back();
 
-        best_axis = face.normal;
+        // best_axis = face.normal;
 
         auto new_pt = shape1->support_diff(shape2, face.normal);
 
         float dot = face.normal.dot(new_pt - m_points[face.a]);
         if (dot < PROXIMITY_EPSILON) {
-            break;
+            return face.normal;
         }
 
         int idx = static_cast<int>(m_points.size());
@@ -137,7 +137,7 @@ Vec3 EPASolver::find_penetration_axis(
         }
     }
 
-    return best_axis;
+    return std::nullopt;
 }
 
 /*
