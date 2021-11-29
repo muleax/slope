@@ -28,6 +28,11 @@ namespace slope {
 
 class DynamicsWorld {
 public:
+    enum class NpBackendHint {
+        GJK_EPA,
+        SAT
+    };
+
     enum SolverType {
         PGS,
         PJ
@@ -50,6 +55,9 @@ public:
         float warmstarting_friction = 0.75f;
         Vec3 gravity = {0.f, -9.81f, 0.f};
 
+        NpBackendHint np_backend_hint = NpBackendHint::GJK_EPA;
+
+        SolverType solver_type = SolverType::PGS;
         ConstraintSolver::Config solver_config;
 
         // debug draw
@@ -57,12 +65,7 @@ public:
         bool draw_contact_friction = false;
     };
 
-    DynamicsWorld();
-
-    void                    set_solver(SolverType type);
-    SolverType              solver_type() const { return m_solver_type; }
-    ConstraintSolver*       solver() { return m_solver.get(); }
-    const ConstraintSolver* solver() const { return m_solver.get(); }
+    explicit DynamicsWorld(std::optional<Config> init_config = std::nullopt);
 
     void                    add_actor(BaseActor* actor);
     void                    remove_actor(BaseActor* actor);
@@ -80,6 +83,10 @@ public:
     uint32_t                frame_id() const { return m_frame_id; }
 
     Narrowphase&            narrowphase() { return m_narrowphase; }
+    const Narrowphase&      narrowphase() const { return m_narrowphase; }
+
+    ConstraintSolver&       solver() { return *m_solver; }
+    const ConstraintSolver& solver() const { return *m_solver; }
 
 private:
     struct ManifoldCache {
@@ -104,6 +111,9 @@ private:
     void integrate_bodies();
     void refresh_manifolds();
 
+    void setup_solver(SolverType type);
+    void setup_narrowphase(NpBackendHint hint);
+
     std::unique_ptr<ConstraintSolver> m_solver;
 
     Vector<DynamicActor*> m_dynamic_actors;
@@ -114,7 +124,8 @@ private:
 
     UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
 
-    SolverType m_solver_type = SolverType::PGS;
+    std::optional<NpBackendHint> m_np_backend_hint;
+    std::optional<SolverType> m_solver_type;
     Config m_config;
     Stats m_stats;
 

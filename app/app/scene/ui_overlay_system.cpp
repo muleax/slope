@@ -31,23 +31,21 @@ void UIOverlaySystem::update(float dt) {
         ImGui::Checkbox("Real Time Sync", &ps->real_time_sync);
         ImGui::Checkbox("Initial Randomization", &world_config.randomize_order);
 
-        auto solver_type = ps->dynamics_world.solver_type();
-        bool use_pgs = (solver_type == DynamicsWorld::SolverType::PGS);
+        bool use_pgs = (world_config.solver_type == DynamicsWorld::SolverType::PGS);
         if (ImGui::RadioButton("PGS", use_pgs))
-            ps->dynamics_world.set_solver(DynamicsWorld::SolverType::PGS);
+            world_config.solver_type = DynamicsWorld::SolverType::PGS;
         ImGui::SameLine();
-        bool use_pj = (solver_type == DynamicsWorld::SolverType::PJ);
+        bool use_pj = (world_config.solver_type == DynamicsWorld::SolverType::PJ);
         if (ImGui::RadioButton("Projected Jacobi", use_pj))
-            ps->dynamics_world.set_solver(DynamicsWorld::SolverType::PJ);
+            world_config.solver_type = DynamicsWorld::SolverType::PJ;
 
-        auto np_hint = ps->dynamics_world.narrowphase().backend_hint();
-        bool use_gjk = (np_hint == NpBackendHint::GJK_EPA);
+        bool use_gjk = (world_config.np_backend_hint == DynamicsWorld::NpBackendHint::GJK_EPA);
         if (ImGui::RadioButton("GJK/EPA", use_gjk))
-            ps->dynamics_world.narrowphase().set_backend_hint(NpBackendHint::GJK_EPA);
+            world_config.np_backend_hint = DynamicsWorld::NpBackendHint::GJK_EPA;
         ImGui::SameLine();
-        bool use_sat = (np_hint == NpBackendHint::SAT);
+        bool use_sat = (world_config.np_backend_hint == DynamicsWorld::NpBackendHint::SAT);
         if (ImGui::RadioButton("SAT", use_sat))
-            ps->dynamics_world.narrowphase().set_backend_hint(NpBackendHint::SAT);
+            world_config.np_backend_hint = DynamicsWorld::NpBackendHint::SAT;
 
         ImGui::DragFloat("Time Factor", &ps->time_factor, 0.01f, 0.001f, 100.f);
         float time_step_ms = ps->time_step * 1000.f;

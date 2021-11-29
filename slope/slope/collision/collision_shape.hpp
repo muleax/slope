@@ -6,8 +6,8 @@ namespace slope {
 
 enum class ShapeType : int {
     Undefined = 0,
-    Box,
     ConvexPolyhedron,
+    Box,
     Sphere,
     Capsule,
     Count

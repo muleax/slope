@@ -1,6 +1,7 @@
 #include "slope/dynamics/dynamics_world.hpp"
 #include "slope/dynamics/pgs_constraint_solver.hpp"
 #include "slope/dynamics/pj_constraint_solver.hpp"
+#include "slope/collision/default_narrowphase_backends.hpp"
 #include "slope/debug/log.hpp"
 #include <tuple>
 
@@ -36,13 +37,20 @@ std::pair<Constraint, Constraint> default_contact_friction(RigidBody* body1, Rig
 
 } // unnamed
 
-DynamicsWorld::DynamicsWorld() {
-    set_solver(m_solver_type);
+DynamicsWorld::DynamicsWorld(std::optional<Config> init_config)
+{
+    if (init_config)
+        m_config = *init_config;
+
+    setup_narrowphase(m_config.np_backend_hint);
+    setup_solver(m_config.solver_type);
 }
 
-void DynamicsWorld::set_solver(DynamicsWorld::SolverType type) {
-    if (!m_solver || type != m_solver_type) {
+void DynamicsWorld::setup_solver(SolverType type)
+{
+    if (m_solver_type != type) {
         m_solver_type = type;
+
         switch (type) {
         case SolverType::PGS:
             m_solver = std::make_unique<PGSConstraintSolver>();
@@ -51,6 +59,24 @@ void DynamicsWorld::set_solver(DynamicsWorld::SolverType type) {
             m_solver = std::make_unique<PJConstraintSolver>();
             break;
         }
+    }
+}
+
+void DynamicsWorld::setup_narrowphase(NpBackendHint hint)
+{
+    if (m_np_backend_hint != hint) {
+        m_np_backend_hint = hint;
+
+        m_narrowphase.reset_all_backends();
+
+        if (hint == NpBackendHint::GJK_EPA) {
+            m_narrowphase.add_backend<GJKConvexPolyhedronBackend>();
+        } else {
+            m_narrowphase.add_backend<SATConvexPolyhedronBackend>();
+        }
+
+        m_narrowphase.add_backend<ConvexPolyhedronSphereBackend>();
+        m_narrowphase.add_backend<SphereBackend>();
     }
 }
 
@@ -216,6 +242,9 @@ void DynamicsWorld::refresh_manifolds() {
 void DynamicsWorld::update(float dt) {
     if (m_debug_drawer)
         m_debug_drawer->clear();
+
+    setup_narrowphase(m_config.np_backend_hint);
+    setup_solver(m_config.solver_type);
 
     m_solver->set_time_interval(dt);
     m_solver->config() = m_config.solver_config;

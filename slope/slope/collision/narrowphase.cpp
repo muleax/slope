@@ -1,66 +1,33 @@
 #include "slope/collision/narrowphase.hpp"
-#include "slope/collision/primitives.hpp"
 
 namespace slope {
-/*
-bool NarrowphaseImpl<>::intersect(const CollisionShape* shape1, const CollisionShape* shape2) {
 
-}
-*/
-
-/*
-void Narrowphase::generate_contacts(
-    ContactManifold& manifold, const Vec3& pen_axis,
-    const CollisionShape* shape1, const CollisionShape* shape2)
+Narrowphase::Narrowphase()
 {
-    switch (shape1->type()) {
+    reset_all_backends();
+}
 
-    case ShapeType::ConvexPolyhedron:
+void Narrowphase::reset_all_backends()
+{
+    for (auto& container : m_backend_map)
+        container.fill(&m_null_backend);
+}
 
-        switch (shape2->type()) {
+void Narrowphase::remove_backend(int type1, int type2)
+{
+    INpBackendWrapper* backend = m_backend_map[type1][type2];
+    if (backend == &m_null_backend)
+        return;
 
-        case ShapeType::ConvexPolyhedron:
-            generate_contacts_impl(
-                manifold, pen_axis,
-                static_cast<const ConvexPolyhedronShape*>(shape1), static_cast<const ConvexPolyhedronShape*>(shape2));
-            break;
+    m_backends.erase(std::find_if(m_backends.begin(), m_backends.end(),
+                                  [&backend](auto& v) { return v.get() == backend; }));
+    m_backend_map[type1][type2] = &m_null_backend;
 
-        case ShapeType::Sphere:
-            generate_contacts_impl(
-                manifold, pen_axis,
-                static_cast<const ConvexPolyhedronShape*>(shape1), static_cast<const SphereShape*>(shape2));
-            break;
-
-        default:
-            SL_VERIFY(false);
-        }
-        break;
-
-    case ShapeType::Sphere:
-
-        switch (shape2->type()) {
-
-        case ShapeType::ConvexPolyhedron:
-            manifold.invert_input_order();
-            generate_contacts_impl(
-                manifold, -pen_axis,
-                static_cast<const ConvexPolyhedronShape*>(shape2), static_cast<const SphereShape*>(shape1));
-            break;
-
-        case ShapeType::Sphere:
-            generate_contacts_impl(
-                manifold, pen_axis,
-                static_cast<const SphereShape*>(shape1), static_cast<const SphereShape*>(shape2));
-            break;
-
-        default:
-            SL_VERIFY(false);
-        }
-        break;
-
-    default:
-        SL_VERIFY(false);
+    if (type1 != type2) {
+        INpBackendWrapper* inv_backend = m_backend_map[type2][type1];
+        //m_backends.erase(std::find(m_backends.begin(), m_backends.end(), inv_backend));
+        m_backend_map[type2][type1] = &m_null_backend;
     }
 }
-*/
+
 } // slope

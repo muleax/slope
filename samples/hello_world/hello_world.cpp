@@ -10,6 +10,8 @@
 #include "slope/debug/log.hpp"
 #include "slope/collision/geometry.hpp"
 #include "slope/collision/gjk.hpp"
+#include "slope/collision/sphere_shape.hpp"
+#include "slope/collision/convex_polyhedron_shape.hpp"
 #include <memory>
 
 using namespace slope;
