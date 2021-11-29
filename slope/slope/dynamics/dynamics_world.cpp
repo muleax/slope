@@ -1,7 +1,7 @@
 #include "slope/dynamics/dynamics_world.hpp"
 #include "slope/dynamics/pgs_constraint_solver.hpp"
 #include "slope/dynamics/pj_constraint_solver.hpp"
-#include "slope/collision/default_narrowphase_backends.hpp"
+#include "slope/collision/narrowphase/default_narrowphase_backends.hpp"
 #include "slope/debug/log.hpp"
 #include <tuple>
 
@@ -75,7 +75,12 @@ void DynamicsWorld::setup_narrowphase(NpBackendHint hint)
             m_narrowphase.add_backend<SATConvexPolyhedronBackend>();
         }
 
+        m_narrowphase.add_backend<ConvexPolyhedronCapsuleBackend>();
         m_narrowphase.add_backend<ConvexPolyhedronSphereBackend>();
+
+        m_narrowphase.add_backend<CapsuleSphereBackend>();
+        m_narrowphase.add_backend<CapsuleBackend>();
+
         m_narrowphase.add_backend<SphereBackend>();
     }
 }

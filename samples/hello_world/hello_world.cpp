@@ -10,8 +10,9 @@
 #include "slope/debug/log.hpp"
 #include "slope/collision/geometry.hpp"
 #include "slope/collision/gjk.hpp"
-#include "slope/collision/sphere_shape.hpp"
-#include "slope/collision/convex_polyhedron_shape.hpp"
+#include "slope/collision/shape/sphere_shape.hpp"
+#include "slope/collision/shape/capsule_shape.hpp"
+#include "slope/collision/shape/convex_polyhedron_shape.hpp"
 #include <memory>
 
 using namespace slope;
@@ -22,6 +23,12 @@ static constexpr float BLOAT = 0.01f;
 static constexpr float SPHERE_RADIUS = 1.f;
 static constexpr float SPHERE_MASS = 1.f;
 static constexpr float SPHERE_SPEED = 15.f;
+
+static constexpr float CAPSULE_RADIUS = 1.f;
+static constexpr float CAPSULE_HEIGHT = 2.f;
+static constexpr float CAPSULE_MASS = 1.f;
+static constexpr float CAPSULE_SPEED = 20.f;
+
 
 auto create_mesh_from_poly(const std::shared_ptr<ConvexPolyhedron>& geom) {
     TrimeshFactory tri_factory;
@@ -110,8 +117,128 @@ auto create_sphere_mesh(float radius) {
     }
 
     return std::make_shared<Mesh>(vertices, indices);
+}
 
-    //return create_mesh_from_poly(ConvexPolyhedronFactory().box({1, 1, 1}));
+auto create_capsule_mesh(float radius, float axis_length) {
+    constexpr int YN = 30;
+    constexpr int PN = 16;
+
+    auto up = Vec3{0.f, 1.f, 0.f};
+    auto side = Vec3{1.f, 0.f, 0.f};
+
+    Vector<uint32_t> indices;
+    Vector<Mesh::Vertex> vertices;
+
+    float prev_pitch = -slope::PI * 0.5f;
+
+    for (int j = 1; j <= PN; j++) {
+        float pitch = j * slope::PI / PN - slope::PI * 0.5f;
+
+        Vec3 hemisphere_offset = {0.f, axis_length * (j <= PN / 2 ? 0.5f : -0.5f), 0.f};
+
+        float prev_yaw = 0.f;
+        for (int i = 1; i <= YN; i++) {
+            float yaw = i * 2.f * slope::PI / YN;
+
+            auto ur = static_cast<uint32_t>(vertices.size());
+            auto ul = ur + 1;
+            auto dr = ur + 2;
+            auto dl = ur + 3;
+
+            Vec4 color = (yaw > slope::PI) ? Vec4{0.6, 0.8, 0.2, 0.f} : Vec4{0.8, 0.6, 0.2, 0.f};
+
+            auto& vur = vertices.emplace_back();
+            vur.position = (Mat44::rotation(side, pitch) * Mat44::rotation(up, yaw)).apply_normal({0.f, 0.f, radius});
+            vur.normal = vur.position.normalized();
+            vur.position += hemisphere_offset;
+            vur.color = color;
+            vur.tex_coords = Vec2{0.f, 0.f};
+
+            auto& vul = vertices.emplace_back();
+            vul.position = (Mat44::rotation(side, pitch) * Mat44::rotation(up, prev_yaw)).apply_normal({0.f, 0.f, radius});
+            vul.normal =  vul.position.normalized();
+            vul.position += hemisphere_offset;
+            vul.color = color;
+            vul.tex_coords = Vec2{0.f, 0.f};
+
+            auto& vdr = vertices.emplace_back();
+            vdr.position = (Mat44::rotation(side, prev_pitch) * Mat44::rotation(up, yaw)).apply_normal({0.f, 0.f, radius});
+            vdr.normal =  vdr.position.normalized();
+            vdr.position += hemisphere_offset;
+            vdr.color = color;
+            vdr.tex_coords = Vec2{0.f, 0.f};
+
+            auto& vdl = vertices.emplace_back();
+            vdl.position = (Mat44::rotation(side, prev_pitch) * Mat44::rotation(up, prev_yaw)).apply_normal({0.f, 0.f, radius});
+            vdl.normal =  vdl.position.normalized();
+            vdl.position += hemisphere_offset;
+            vdl.color = color;
+            vdl.tex_coords = Vec2{0.f, 0.f};
+
+            indices.push_back(ur);
+            indices.push_back(dr);
+            indices.push_back(ul);
+
+            indices.push_back(dr);
+            indices.push_back(ul);
+            indices.push_back(dl);
+
+            prev_yaw = yaw;
+        }
+
+        prev_pitch = pitch;
+    }
+
+    float prev_yaw = 0.f;
+    for (int i = 1; i <= YN; i++) {
+        float yaw = i * 2.f * slope::PI / YN;
+
+        Vec3 hemisphere_offset = {0.f, axis_length * 0.5f, 0.f};
+
+        auto ur = static_cast<uint32_t>(vertices.size());
+        auto ul = ur + 1;
+        auto dr = ur + 2;
+        auto dl = ur + 3;
+
+        Vec4 color = (yaw > slope::PI) ? Vec4{0.6, 0.8, 0.2, 0.f} : Vec4{0.8, 0.6, 0.2, 0.f};
+
+        auto& vur = vertices.emplace_back();
+        vur.position = Mat44::rotation(up, yaw).apply_normal({0.f, 0.f, radius}) + hemisphere_offset;
+        vur.normal = Vec3{vur.position.x, 0.f, vur.position.z}.normalized();
+        vur.color = color;
+        vur.tex_coords = Vec2{0.f, 0.f};
+
+        auto& vul = vertices.emplace_back();
+        vul.position = Mat44::rotation(up, prev_yaw).apply_normal({0.f, 0.f, radius}) + hemisphere_offset;
+        vul.normal = Vec3{vul.position.x, 0.f, vul.position.z}.normalized();
+        vul.color = color;
+        vul.tex_coords = Vec2{0.f, 0.f};
+
+        auto& vdr = vertices.emplace_back();
+        vdr.position = Mat44::rotation(up, yaw).apply_normal({0.f, 0.f, radius}) - hemisphere_offset;
+        vdr.normal = Vec3{vdr.position.x, 0.f, vdr.position.z}.normalized();
+        vdr.color = color;
+        vdr.tex_coords = Vec2{0.f, 0.f};
+
+        auto& vdl = vertices.emplace_back();
+        vdl.position = Mat44::rotation(up, prev_yaw).apply_normal({0.f, 0.f, radius}) - hemisphere_offset;
+        vdl.normal = Vec3{vdl.position.x, 0.f, vdl.position.z}.normalized();
+        vdl.color = color;
+        vdl.tex_coords = Vec2{0.f, 0.f};
+
+        indices.push_back(ur);
+        indices.push_back(dr);
+        indices.push_back(ul);
+
+        indices.push_back(dr);
+        indices.push_back(ul);
+        indices.push_back(dl);
+
+        prev_yaw = yaw;
+    }
+
+
+    return std::make_shared<Mesh>(vertices, indices);
 }
 
 class TestApp : public App {
@@ -151,7 +278,10 @@ public:
         m_sphere_mesh = create_sphere_mesh(SPHERE_RADIUS);
         m_sphere_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
         m_sphere_material->set_ambient_strength(0.2f);
-        //m_sphere_material->set_color({0.5, 0.8, 0.1});
+
+        m_capsule_mesh = create_capsule_mesh(CAPSULE_RADIUS, CAPSULE_HEIGHT);
+        m_capsule_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
+        m_capsule_material->set_ambient_strength(0.2f);
 
         int mode = 2;
         if (mode == 0) {
@@ -189,7 +319,7 @@ public:
 
         } else if (mode == 2) {
             auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
-            int h = 35;
+            int h = 15;
             float spacing = 0.f;
             for (int j = 0; j < h; j++) {
                 for (int i = 0; i < h - j; i++) {
@@ -370,7 +500,12 @@ public:
                     fire_sphere();
                 break;
 
-            case Key::Space:
+            case Key::H:
+                if (is_pressed)
+                    fire_capsule();
+                break;
+
+                case Key::Space:
                 if (action == KeyAction::Press ) {
                     auto* phyics_single = m_world->modify_singleton<PhysicsSingleton>();
                     phyics_single->pause = !phyics_single->pause;
@@ -446,6 +581,36 @@ public:
         pc->actor = std::move(actor);
     }
 
+    void spawn_capsule(const Mat44& tr, const Vec3& velocity, float mass) {
+        auto e = m_world->create_entity();
+        auto* rc = m_world->create<RenderComponent>(e);
+        rc->mesh = m_capsule_mesh;
+        rc->material = m_capsule_material;
+
+        auto* tc = m_world->create<TransformComponent>(e);
+        tc->transform = tr;
+
+        auto* pc = m_world->create<PhysicsComponent>(e);
+
+        float radius = CAPSULE_RADIUS + BLOAT;
+
+        auto actor = std::make_shared<DynamicActor>();
+        actor->set_shape<CapsuleShape>(radius, CAPSULE_HEIGHT);
+        actor->set_transform(tc->transform);
+        actor->body().set_velocity(velocity);
+        actor->body().set_mass(mass);
+
+        float h = CAPSULE_HEIGHT + radius * 0.5f;
+        float xz_inertia = mass * (3.f * radius * radius + h * h) / 12.f;
+        float y_inertia = mass * radius * radius / 2.f;
+        actor->body().set_local_inertia({xz_inertia, y_inertia, xz_inertia});
+        //actor->body().set_local_inertia({mass, mass, mass});
+
+        actor->set_friction(0.7f);
+
+        pc->actor = std::move(actor);
+    }
+
     void fire_cube() {
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
         auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -25.f});
@@ -458,6 +623,12 @@ public:
         spawn_sphere(cam_tr->transform, vel, SPHERE_MASS);
     }
 
+    void fire_capsule() {
+        auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
+        auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -CAPSULE_SPEED});
+        spawn_capsule(cam_tr->transform, vel, CAPSULE_MASS);
+    }
+
     std::shared_ptr<Mesh> m_big_box_mesh;
     std::shared_ptr<ConvexPolyhedron> m_big_box;
 
@@ -467,6 +638,9 @@ public:
 
     std::shared_ptr<Mesh> m_sphere_mesh;
     std::shared_ptr<Material> m_sphere_material;
+
+    std::shared_ptr<Mesh> m_capsule_mesh;
+    std::shared_ptr<Material> m_capsule_material;
 
     GJKSolver m_gjk_solver;
     Entity m_gjk_entity;

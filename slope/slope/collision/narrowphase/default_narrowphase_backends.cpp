@@ -1,4 +1,4 @@
-#include "slope/collision/default_narrowphase_backends.hpp"
+#include "slope/collision/narrowphase/default_narrowphase_backends.hpp"
 
 namespace slope {
 
@@ -52,8 +52,32 @@ void SATConvexPolyhedronBackend::generate_contacts(ContactManifold& manifold)
 void GJKConvexPolyhedronBackend::generate_contacts(ContactManifold& manifold)
 {
     auto* ctx = context();
-    Vec3 min_pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
-    generate_polyhedra_contacts(ctx, manifold, shape1(), shape2(), min_pen_axis);
+    Vec3 pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+    generate_polyhedra_contacts(ctx, manifold, shape1(), shape2(), pen_axis);
+}
+
+void ConvexPolyhedronCapsuleBackend::generate_contacts(ContactManifold& manifold)
+{
+    auto* ctx = context();
+    Vec3 pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+
+    auto& support_face = ctx->support_face[0];
+    support_face.clear();
+
+    Vec3 support_normal;
+    shape1()->get_support_face(pen_axis, support_face, support_normal);
+
+    auto segment = ctx->face_clipper.clip_segment_by_convex_prism(
+        shape2()->segment(), support_face, pen_axis);
+
+    for (int i = 0; i < 2; i++) {
+        auto clipped_pt = segment[i] - pen_axis * shape2()->radius();
+        float t;
+        if (Plane(support_normal, support_face[0]).intersect_ray(t, clipped_pt, pen_axis)) {
+            auto p1 = clipped_pt + t * pen_axis;
+            manifold.add_contact({p1, clipped_pt, pen_axis});
+        }
+    }
 }
 
 void ConvexPolyhedronSphereBackend::generate_contacts(ContactManifold& manifold)

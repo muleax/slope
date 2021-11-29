@@ -1,5 +1,5 @@
 #pragma once
-#include "slope/collision/collision_shape.hpp"
+#include "slope/collision/shape/collision_shape.hpp"
 #include "slope/containers/array.hpp"
 #include <optional>
 

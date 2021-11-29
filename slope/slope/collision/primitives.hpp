@@ -21,6 +21,19 @@ struct Plane {
     float distance(const Vec3& p) const { return normal.dot(p) - dot; }
 };
 
+struct LineSegment {
+    Vec3 begin;
+    Vec3 end;
+
+    const Vec3* data() const { return &begin; }
+    Vec3* data() { return &begin; }
+
+    const Vec3& operator [](int i) const { return data()[i]; }
+    Vec3& operator [](int i) { return data()[i]; }
+
+    float closest_point(const LineSegment& other, float& t1, float& t2, Vec3& p1, Vec3& p2) const;
+};
+
 Vec3 find_orthogonal(const Vec3& normal);
 
 inline void find_tangent(Vec3& out_u, Vec3& out_v, const Vec3& normal) {

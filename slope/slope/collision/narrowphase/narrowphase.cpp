@@ -1,4 +1,4 @@
-#include "slope/collision/narrowphase.hpp"
+#include "slope/collision/narrowphase/narrowphase.hpp"
 
 namespace slope {
 

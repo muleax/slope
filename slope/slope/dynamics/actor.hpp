@@ -1,6 +1,6 @@
 #pragma once
 #include "slope/dynamics/rigid_body.hpp"
-#include "slope/collision/collision_shape.hpp"
+#include "slope/collision/shape/collision_shape.hpp"
 #include <memory>
 
 namespace slope {

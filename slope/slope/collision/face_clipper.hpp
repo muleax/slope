@@ -15,6 +15,9 @@ public:
         Vector<Vec3>& out_clipped_face,
         const Vector<Vec3>& face, const Vector<Vec3>& prism_base, const Vec3& prism_axis);
 
+    LineSegment clip_segment_by_convex_prism(
+        const LineSegment& segment, const Vector<Vec3>& prism_base, const Vec3& prism_axis);
+
 private:
     Vector<Vec3> m_buffer;
 };

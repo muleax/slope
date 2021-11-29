@@ -1,5 +1,5 @@
 #pragma once
-#include "slope/collision/narrowphase_backend.hpp"
+#include "slope/collision/narrowphase/narrowphase_backend.hpp"
 #include "slope/containers/array.hpp"
 #include <memory>
 

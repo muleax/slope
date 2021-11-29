@@ -4,7 +4,7 @@
 #include "slope/containers/vector.hpp"
 #include "slope/containers/unordered_map.hpp"
 #include "slope/collision/contact_manifold.hpp"
-#include "slope/collision/narrowphase.hpp"
+#include "slope/collision/narrowphase/narrowphase.hpp"
 #include "slope/debug/debug_drawer.hpp"
 #include <memory>
 

@@ -1,4 +1,4 @@
-#include "slope/collision/convex_polyhedron_shape.hpp"
+#include "slope/collision/shape/convex_polyhedron_shape.hpp"
 #include "slope/collision/primitives.hpp"
 
 namespace slope {
