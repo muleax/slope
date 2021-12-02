@@ -105,7 +105,7 @@ void ConstraintSolver::clear() {
 void ConstraintSolver::prepare_data() {
     static constexpr float INV_DIAG_EPSILON = 1e-8f;
 
-    // V_delta = V / dt + F * M_inv
+    // V_delta = V / dt + M_inv * F
     for (auto& b : m_bodies) {
         auto* body = b.body;
         b.v_delta[0] = body->velocity() * m_inv_dt + body->force() * body->inv_mass();
@@ -170,7 +170,7 @@ void ConstraintSolver::apply_impulses() {
 }
 
 float ConstraintSolver::max_error() const {
-    float err = -FLOAT_MAX;
+    float err = 0.f;
     for (auto& group : m_constraints)
         for (auto& c : group)
             err = std::fmax(err, fabs(c.delta_lambda));
@@ -186,6 +186,9 @@ float ConstraintSolver::avg_error() const {
         for (auto& c: group)
             err += fabs(c.delta_lambda);
     }
+
+    if (constraint_count == 0)
+        return 0.f;
 
     return err / static_cast<float>(constraint_count);
 }

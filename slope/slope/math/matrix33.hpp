@@ -8,6 +8,12 @@ class Quat;
 
 class Mat33 {
 public:
+    static Mat33 cross(const Vec3& v) {
+        return { 0.f, v.z, -v.y,
+                 -v.z, 0.f, v.x,
+                 v.y, -v.x, 0.f };
+    }
+
     constexpr Mat33()
             : _11(1.f), _12(0.f), _13(0.f)
             , _21(0.f), _22(1.f), _23(0.f)

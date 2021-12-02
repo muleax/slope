@@ -51,6 +51,7 @@ public:
 
     struct Config {
         bool randomize_order = true;
+        bool enable_gyroscopic_torque = true;
         float warmstarting_normal = 0.83f;
         float warmstarting_friction = 0.75f;
         Vec3 gravity = {0.f, -9.81f, 0.f};
@@ -104,6 +105,7 @@ private:
     void remove_actor_impl(Vector<T>& container, BaseActor* actor);
 
     void apply_gravity();
+    void apply_gyroscopic_torque(float dt);
     void perform_collision_detection();
     void collide(BaseActor& actor1, BaseActor& actor2);
     void apply_contacts();

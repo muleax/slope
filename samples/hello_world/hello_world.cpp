@@ -13,6 +13,7 @@
 #include "slope/collision/shape/sphere_shape.hpp"
 #include "slope/collision/shape/capsule_shape.hpp"
 #include "slope/collision/shape/convex_polyhedron_shape.hpp"
+#include "imgui/imgui.h"
 #include <memory>
 
 using namespace slope;
@@ -259,6 +260,8 @@ public:
 
         physics_single->dynamics_world.set_debug_drawer(debug_draw->drawer);
         physics_single->dynamics_world.config().solver_config.iteration_count = 30;
+        //physics_single->dynamics_world.config().gravity.set_zero();
+        //physics_single->time_step /= 5.f;
 
         ConvexPolyhedronFactory poly_factory;
         m_unit_box = poly_factory.box(Vec3{1.f + BLOAT, 1.f + BLOAT, 1.f + BLOAT}, Vec3{0.f, 0.f, 0.f});
@@ -445,6 +448,17 @@ public:
     }
 
     void update(float dt) override {
+        /*
+        if (cap_actor) {
+            ImGui::Begin("Gyro");
+            auto& b = cap_actor->body();
+            Mat44 I = b.inv_transform() * b.local_inertia() * b.transform();
+            auto Iw = I.apply_normal(b.ang_velocity());
+            ImGui::Text("L (%f, %f, %f)", Iw.x, Iw.y, Iw.z);
+            ImGui::Text("W %f   (%f, %f, %f)", b.ang_velocity().length(), b.ang_velocity().x, b.ang_velocity().y, b.ang_velocity().z);
+            ImGui::End();
+        }*/
+
         m_world->update(dt);
         //collide_gjk();
     }
@@ -581,7 +595,7 @@ public:
         pc->actor = std::move(actor);
     }
 
-    void spawn_capsule(const Mat44& tr, const Vec3& velocity, float mass) {
+    void spawn_capsule(const Mat44& tr, const Vec3& velocity, const Vec3& ang_velocity, float mass) {
         auto e = m_world->create_entity();
         auto* rc = m_world->create<RenderComponent>(e);
         rc->mesh = m_capsule_mesh;
@@ -598,15 +612,25 @@ public:
         actor->set_shape<CapsuleShape>(radius, CAPSULE_HEIGHT);
         actor->set_transform(tc->transform);
         actor->body().set_velocity(velocity);
+        actor->body().set_ang_velocity(ang_velocity);
         actor->body().set_mass(mass);
+
+        cap_actor = actor.get();
 
         float h = CAPSULE_HEIGHT + radius * 0.5f;
         float xz_inertia = mass * (3.f * radius * radius + h * h) / 12.f;
         float y_inertia = mass * radius * radius / 2.f;
-        actor->body().set_local_inertia({xz_inertia, y_inertia, xz_inertia});
+        Vec3 localInertia = {xz_inertia, y_inertia, xz_inertia};
+        localInertia = {1.666666f, 0.666667f, 1.666666f};
+        localInertia = {1.666666f, 0.666667f, 5.666666f};
+        localInertia = {1.666666f, 0.666667f, 1.666666f};
+        actor->body().set_local_inertia(localInertia);
         //actor->body().set_local_inertia({mass, mass, mass});
 
-        actor->set_friction(0.7f);
+        slope::log::info("cap mass {}", mass);
+        slope::log::info("cap inertia {} {} {}", localInertia.x, localInertia.y, localInertia.z);
+
+        actor->set_friction(0.5f);
 
         pc->actor = std::move(actor);
     }
@@ -626,7 +650,14 @@ public:
     void fire_capsule() {
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
         auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -CAPSULE_SPEED});
-        spawn_capsule(cam_tr->transform, vel, CAPSULE_MASS);
+        //Vec3 vel = {0.f, 0.f, -CAPSULE_SPEED};
+        //Vec3 vel = {0.f, 0.f, 0.f};
+        Vec3 ang_vel = cam_tr->transform.apply_normal({0.f, 8.f, 0.f});
+        //Vec3 ang_vel = {0.f, 0.f, 0.f};
+        spawn_capsule(cam_tr->transform, vel, ang_vel, CAPSULE_MASS);
+        auto tr = Mat44::translate({0.f, 4.5f, 0.f});
+
+        //spawn_capsule(tr, vel, ang_vel, CAPSULE_MASS);
     }
 
     std::shared_ptr<Mesh> m_big_box_mesh;
@@ -651,6 +682,8 @@ public:
     bool m_cam_move_mode = false;
     Entity m_cam_entity;
     std::unique_ptr<World> m_world;
+
+    DynamicActor* cap_actor = nullptr;
 };
 
 int main() {

@@ -42,6 +42,8 @@ public:
     void            apply_torque(const Vec3& torque);
     const Vec3&     torque() const { return m_torque; }
 
+    void            apply_gyroscopic_torque(float dt);
+
     void            integrate(float dt);
 
     int             in_solver_index() const { return m_in_solver_index; }
@@ -79,7 +81,8 @@ inline void RigidBody::set_local_inertia(const Vec3& diagonal) {
 
 inline void RigidBody::set_local_inertia(const Mat44& local_inertia) {
     m_local_inertia = local_inertia;
-    m_inv_local_inertia = m_local_inertia.inverted_orthonormal();
+    //m_inv_local_inertia = m_local_inertia.inverted_orthonormal();
+    m_inv_local_inertia = m_local_inertia.inverted();
     m_inv_inertia = m_inv_transform * m_inv_local_inertia * m_transform;
 }
 

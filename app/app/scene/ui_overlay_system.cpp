@@ -30,6 +30,7 @@ void UIOverlaySystem::update(float dt) {
         ImGui::Checkbox("Pause", &ps->pause);
         ImGui::Checkbox("Real Time Sync", &ps->real_time_sync);
         ImGui::Checkbox("Initial Randomization", &world_config.randomize_order);
+        ImGui::Checkbox("Gyroscopic Torque", &world_config.enable_gyroscopic_torque);
 
         bool use_pgs = (world_config.solver_type == DynamicsWorld::SolverType::PGS);
         if (ImGui::RadioButton("PGS", use_pgs))

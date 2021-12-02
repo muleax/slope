@@ -118,9 +118,17 @@ void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer) {
     m_debug_drawer = std::move(drawer);
 }
 
-void DynamicsWorld::apply_gravity() {
+void DynamicsWorld::apply_gravity()
+{
     for (auto& actor: m_dynamic_actors) {
         actor->body().apply_force_to_com(m_config.gravity * actor->body().mass());
+    }
+}
+
+void DynamicsWorld::apply_gyroscopic_torque(float dt)
+{
+    for (auto& actor: m_dynamic_actors) {
+        actor->body().apply_gyroscopic_torque(dt);
     }
 }
 
@@ -255,6 +263,9 @@ void DynamicsWorld::update(float dt) {
     m_solver->config() = m_config.solver_config;
 
     apply_gravity();
+
+    if (m_config.enable_gyroscopic_torque)
+        apply_gyroscopic_torque(dt);
 
     perform_collision_detection();
 
