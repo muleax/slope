@@ -1,38 +1,36 @@
 #include "slope/dynamics/dynamics_world.hpp"
-#include "slope/dynamics/pgs_constraint_solver.hpp"
+#include "slope/dynamics/constraint_solver.hpp"
 #include "slope/dynamics/pj_constraint_solver.hpp"
 #include "slope/collision/narrowphase/default_narrowphase_backends.hpp"
 #include "slope/debug/log.hpp"
-#include <tuple>
+#include <optional>
 
 namespace slope {
 
 namespace {
 
-// TODO: reconsider
-std::pair<Constraint, Constraint> default_contact_friction(RigidBody* body1, RigidBody* body2, ConstraintGeom& geom) {
-    Vec3 vel = body1->point_velocity(geom.p1);
+struct FrictionBasis {
+    Vec3 axis1;
+    Vec3 axis2;
+};
 
+std::optional<FrictionBasis> get_velocity_dependent_friction_basis(
+    RigidBody* body1, RigidBody* body2, ConstraintGeom& geom, float threshold)
+{
+    std::optional<FrictionBasis> basis;
+
+    Vec3 vel = body1->point_velocity(geom.p1);
     if (body2)
         vel -= body2->point_velocity(geom.p2);
 
-    Vec3 axis1;
-    Vec3 axis2;
-
-    bool fallback = true;
     auto lat_vel = vel - geom.axis * geom.axis.dot(vel);
-    if (lat_vel.length_squared() > 0.1f) {
-        axis1 = lat_vel.normalized();
-        axis2 = geom.axis.cross(axis1);
-        fallback = false;
+    if (lat_vel.length_squared() > threshold * threshold) {
+        auto axis1 = lat_vel.normalized();
+        auto axis2 = geom.axis.cross(axis1);
+        basis = FrictionBasis{axis1, axis2};
     }
 
-    if (fallback)
-        find_tangent(axis1, axis2, geom.axis);
-
-    return {
-        Constraint::bilateral(body1, body2, {geom.p1, geom.p2, axis1}),
-        Constraint::bilateral(body1, body2, {geom.p1, geom.p2, axis2}) };
+    return basis;
 }
 
 } // unnamed
@@ -53,7 +51,7 @@ void DynamicsWorld::setup_solver(SolverType type)
 
         switch (type) {
         case SolverType::PGS:
-            m_solver = std::make_unique<PGSConstraintSolver>();
+            m_solver = std::make_unique<ConstraintSolver>();
             break;
         case SolverType::PJ:
             m_solver = std::make_unique<PJConstraintSolver>();
@@ -197,7 +195,20 @@ void DynamicsWorld::apply_contacts() {
             body2 = &static_cast<DynamicActor*>(actor2)->body();
 
         Constraint nc = Constraint::stabilized_unilateral(body1, body2, geom);
-        auto [fc1, fc2] = default_contact_friction(body1, body2, geom);
+
+        std::optional<FrictionBasis> basis;
+        if (m_config.enable_velocity_dependent_friction) {
+            // TODO: reconsider threshold
+            basis = get_velocity_dependent_friction_basis(body1, body2, geom, 0.3f);
+        }
+
+        if (!basis) {
+            basis.emplace();
+            find_tangent(basis->axis1, basis->axis2, geom.axis);
+        }
+
+        auto fc1 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis1});
+        auto fc2 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis2});
 
         // TODO: implement policies
         float friction_ratio = actor1->friction() * actor2->friction();
@@ -207,8 +218,16 @@ void DynamicsWorld::apply_contacts() {
         fc2.init_lambda = p->friction2_lambda * m_config.warmstarting_friction;
 
         p->normal_constr_id    = m_solver->add_constraint(nc);
-        p->friction1_constr_id = m_solver->join_friction(fc1, friction_ratio, p->normal_constr_id);
-        p->friction2_constr_id = m_solver->join_friction(fc2, friction_ratio, p->normal_constr_id);
+
+        if (m_config.enable_cone_friction) {
+            auto ids = m_solver->join_cone_friction(fc1, fc2, {friction_ratio, friction_ratio}, p->normal_constr_id);
+            p->friction1_constr_id = ids.first;
+            p->friction2_constr_id = ids.second;
+
+        } else {
+            p->friction1_constr_id = m_solver->join_friction(fc1, friction_ratio, p->normal_constr_id);
+            p->friction2_constr_id = m_solver->join_friction(fc2, friction_ratio, p->normal_constr_id);
+        }
 
         if (debug_drawer) {
             if (m_config.draw_contact_normals) {

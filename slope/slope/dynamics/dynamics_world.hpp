@@ -52,6 +52,8 @@ public:
     struct Config {
         bool randomize_order = true;
         bool enable_gyroscopic_torque = true;
+        bool enable_velocity_dependent_friction = true;
+        bool enable_cone_friction = false;
         float warmstarting_normal = 0.83f;
         float warmstarting_friction = 0.75f;
         Vec3 gravity = {0.f, -9.81f, 0.f};

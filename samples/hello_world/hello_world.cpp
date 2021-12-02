@@ -265,11 +265,8 @@ public:
 
         ConvexPolyhedronFactory poly_factory;
         m_unit_box = poly_factory.box(Vec3{1.f + BLOAT, 1.f + BLOAT, 1.f + BLOAT}, Vec3{0.f, 0.f, 0.f});
-
-        {
-            auto visual_geom = poly_factory.box(Vec3{1.f, 1.f, 1.f}, Vec3{0.f, 0.f, 0.f});
-            m_unit_box_mesh = create_mesh_from_poly(visual_geom);
-        }
+        auto visual_geom = poly_factory.box(Vec3{1.f, 1.f, 1.f}, Vec3{0.f, 0.f, 0.f});
+        m_unit_box_mesh = create_mesh_from_poly(visual_geom);
 
         m_big_box = poly_factory.box(Vec3{1.5f, 1.5f, 1.5f}, Vec3{0.f, 0.f, 0.f});
         m_big_box_mesh = create_mesh_from_poly(m_big_box);
@@ -349,7 +346,38 @@ public:
                 pc->actor->set_shape<ConvexPolyhedronShape>(cup_geom);
                 pc->actor->set_transform(tc->transform);
             }
+        } else if (mode == 4) {
+            physics_single->dynamics_world.config().gravity.set_zero();
+
+            auto box = poly_factory.box(Vec3{2.f, 4.f, 0.4f }, Vec3{0.f, 0.f, 0.f});
+
+            auto e = m_world->create_entity();
+            auto* rc = m_world->create<RenderComponent>(e);
+            rc->mesh = create_mesh_from_poly(box);
+            rc->material = m_unit_box_material;
+
+            auto* tc = m_world->create<TransformComponent>(e);
+            tc->transform = Mat44::translate({0.f, 5.f, 0.f});
+
+            auto* pc = m_world->create<PhysicsComponent>(e);
+
+            auto actor = std::make_shared<DynamicActor>();
+            actor->set_shape<ConvexPolyhedronShape>(box);
+            actor->set_transform(tc->transform);
+            actor->body().set_velocity(Vec3::zero());
+            //actor->body().set_ang_velocity({8.f, 5.830945f, 1.f});
+            actor->body().set_ang_velocity({8.f, 5.85f, 1.f});
+            actor->body().set_mass(1.f);
+
+            Vec3 localInertia = {1.666666f, 0.666667f, 5.666666f};
+            actor->body().set_local_inertia(localInertia);
+
+            actor->set_friction(0.5f);
+
+            gyro_actor = actor.get();
+            pc->actor = std::move(actor);
         }
+
 
         {
             float floor_size = 500.f;
@@ -448,16 +476,16 @@ public:
     }
 
     void update(float dt) override {
-        /*
-        if (cap_actor) {
+
+        if (gyro_actor) {
             ImGui::Begin("Gyro");
-            auto& b = cap_actor->body();
+            auto& b = gyro_actor->body();
             Mat44 I = b.inv_transform() * b.local_inertia() * b.transform();
             auto Iw = I.apply_normal(b.ang_velocity());
             ImGui::Text("L (%f, %f, %f)", Iw.x, Iw.y, Iw.z);
             ImGui::Text("W %f   (%f, %f, %f)", b.ang_velocity().length(), b.ang_velocity().x, b.ang_velocity().y, b.ang_velocity().z);
             ImGui::End();
-        }*/
+        }
 
         m_world->update(dt);
         //collide_gjk();
@@ -615,8 +643,6 @@ public:
         actor->body().set_ang_velocity(ang_velocity);
         actor->body().set_mass(mass);
 
-        cap_actor = actor.get();
-
         float h = CAPSULE_HEIGHT + radius * 0.5f;
         float xz_inertia = mass * (3.f * radius * radius + h * h) / 12.f;
         float y_inertia = mass * radius * radius / 2.f;
@@ -683,7 +709,7 @@ public:
     Entity m_cam_entity;
     std::unique_ptr<World> m_world;
 
-    DynamicActor* cap_actor = nullptr;
+    DynamicActor* gyro_actor = nullptr;
 };
 
 int main() {

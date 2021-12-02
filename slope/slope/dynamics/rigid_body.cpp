@@ -24,7 +24,7 @@ void RigidBody::apply_gyroscopic_torque(float dt)
     // w' = w + h * inv(I) * (T - w' x Iw')
 
     // Solve for new angular velocity using Newton iteration:
-    // g(w) := Iw + h * w x Iw - (h * T + Iw_old)
+    // g(w) := Iw + h * w x Iw - (h * T + Iw0)
     // w' = w - inv(dg/dw[w]) * g(w)
 
     // Note:
@@ -51,8 +51,38 @@ void RigidBody::apply_gyroscopic_torque(float dt)
     auto dgdw = I + dt * (I * w_cross - Iw_cross);
 
     auto dw = -dgdw.inverted().apply_normal(g);
-
     m_ang_velocity += dw;
+
+
+    /*
+    auto w0 = w;
+    auto Iw0 = I.apply_normal(w);
+
+    // g(w) := Iw + h * w x Iw - (h * T + Iw_old)
+    auto calc_g = [&I, &dt, &Iw0](const Vec3& w) {
+        auto Iw = I.apply_normal(w);
+        return Iw + dt * (w.cross(Iw)) - Iw0;
+    };
+
+    // dg/dw = I + h * (cross[w] * I - cross[Iw])
+    auto calc_dgdw = [&I, &dt](const Vec3& w) {
+        auto Iw = I.apply_normal(w);
+        auto w_cross = Mat44{ Mat33::cross(w) };
+        auto Iw_cross = Mat44{ Mat33::cross(Iw) };
+        return I + dt * (I * w_cross - Iw_cross);
+    };
+
+    Vec3 wprev;
+    Vec3 wnew = w;
+
+    for (int i = 0; i < 5; i++) {
+        wprev = wnew;
+        wnew = wprev - calc_dgdw(wprev).inverted().apply_normal(calc_g(wprev));
+    }
+
+    auto dw = wnew - w0;
+    m_ang_velocity += dw;
+    */
 
     // apply_torque(-w.cross(I.apply_normal(w)));
 }

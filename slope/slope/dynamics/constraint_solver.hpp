@@ -15,7 +15,8 @@ struct ConstraintGeom {
 
 enum class ConstraintGroup : int {
     Normal = 0,
-    Friction = 1,
+    Friction,
+    ConeFriction,
     Count
 };
 
@@ -23,11 +24,11 @@ class ConstraintId {
 public:
     ConstraintId() = default;
     ConstraintId(int raw) : m_raw(raw) {}
-    ConstraintId(ConstraintGroup group, int index) : m_raw((int)group | index << 1) {}
+    ConstraintId(ConstraintGroup group, int index) : m_raw((int)group | index << 2) {}
 
     bool            is_valid() const { return m_raw >= 0; }
-    ConstraintGroup group() const { return ConstraintGroup(m_raw & 1); }
-    int             index() const { return m_raw >> 1; }
+    ConstraintGroup group() const { return ConstraintGroup(m_raw & 3); }
+    int             index() const { return m_raw >> 2; }
     int             raw() const { return m_raw; }
 
     operator int() const { return m_raw; }
@@ -35,6 +36,8 @@ public:
 private:
     int m_raw = -1;
 };
+
+using ConstraintIds = std::pair<ConstraintId, ConstraintId>;
 
 struct Constraint {
     static Constraint generic(
@@ -70,6 +73,7 @@ struct Constraint {
     float       pos_error = 0.f;
 };
 
+// Projected Gauss-Seidel constraint solver
 class ConstraintSolver
 {
 public:
@@ -87,8 +91,9 @@ public:
     void            set_time_interval(float value);
     float           time_interval() const { return m_dt; }
 
-    ConstraintId    add_constraint(Constraint& c);
-    ConstraintId    join_friction(Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
+    ConstraintId    add_constraint(const Constraint& c);
+    ConstraintId    join_friction(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
+    ConstraintIds   join_cone_friction(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id);
 
     void            solve();
     void            clear();
@@ -131,11 +136,15 @@ protected:
     };
 
     void            register_body(RigidBody* body);
-    auto            create_constraint(Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
+    auto            create_constraint(const Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
     void            prepare_data();
     void            apply_impulses();
 
-    virtual void    solve_impl() = 0;
+    float           solve_constraint_lambda(ConstraintData& c);
+    void            apply_constraint_lambda(ConstraintData& c, float lambda);
+    void            solve_constraint(ConstraintData& c, float min_bound, float max_bound);
+    void            solve_cone_friction(ConstraintData& c1, ConstraintData& c2);
+    virtual void    solve_iterations();
 
     float   m_dt = 1.f;
     float   m_inv_dt = 1.f;

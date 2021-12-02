@@ -25,7 +25,7 @@ void PJConstraintSolver::solve_constraint(ConstraintData& c)
     c.delta_lambda = delta;
 }
 
-void PJConstraintSolver::solve_impl()
+void PJConstraintSolver::solve_iterations()
 {
     for(uint32_t iter = 0; iter < m_config.iteration_count; ++iter) {
 

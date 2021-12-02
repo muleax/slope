@@ -1,5 +1,6 @@
 #include "slope/dynamics/constraint_solver.hpp"
 #include "slope/debug/assert.hpp"
+#include "slope/debug/log.hpp"
 
 namespace slope {
 
@@ -34,7 +35,7 @@ void ConstraintSolver::register_body(RigidBody* body) {
     m_bodies.push_back({body});
 }
 
-std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(Constraint& c, ConstraintGroup group) {
+std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(const Constraint& c, ConstraintGroup group) {
     if (c.body1->in_solver_index() == -1)
         register_body(c.body1);
 
@@ -58,7 +59,7 @@ std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::cre
     return { { group, static_cast<int>(m_constraints[(int)group].size() - 1) }, &data };
 }
 
-ConstraintId ConstraintSolver::add_constraint(Constraint& c) {
+ConstraintId ConstraintSolver::add_constraint(const Constraint& c) {
     auto [constr_id, data] = create_constraint(c, ConstraintGroup::Normal);
 
     data->min_bound = c.min_bound;
@@ -80,7 +81,7 @@ ConstraintId ConstraintSolver::add_constraint(Constraint& c) {
     return constr_id;
 }
 
-ConstraintId ConstraintSolver::join_friction(Constraint& c, float friction_ratio, ConstraintId normal_constr_id) {
+ConstraintId ConstraintSolver::join_friction(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id) {
     auto [constr_id, data] = create_constraint(c, ConstraintGroup::Friction);
 
     data->cfm_inv_dt = c.cfm * m_inv_dt;
@@ -90,6 +91,25 @@ ConstraintId ConstraintSolver::join_friction(Constraint& c, float friction_ratio
     data->normal_constr_idx = normal_constr_id.index();
 
     return constr_id;
+}
+
+ConstraintIds ConstraintSolver::join_cone_friction(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id)
+{
+    auto [constr_id1, data1] = create_constraint(c1, ConstraintGroup::ConeFriction);
+    auto [constr_id2, data2] = create_constraint(c2, ConstraintGroup::ConeFriction);
+
+    auto setup_constraint = [this, normal_constr_id](ConstraintData* data, const Constraint& c, float friction_ratio) {
+        data->cfm_inv_dt = c.cfm * m_inv_dt;
+        data->bg_error = 0.f;
+
+        data->friction_ratio = friction_ratio;
+        data->normal_constr_idx = normal_constr_id.index();
+    };
+
+    setup_constraint(data1, c1, friction_ratio.x);
+    setup_constraint(data2, c2, friction_ratio.y);
+
+    return {constr_id1, constr_id2};
 }
 
 void ConstraintSolver::clear() {
@@ -153,10 +173,154 @@ void ConstraintSolver::prepare_data() {
     }
 }
 
+inline float ConstraintSolver::solve_constraint_lambda(ConstraintData& c) {
+    float delta;
+    float dot = c.cfm_inv_dt;
+
+    if (c.body2_idx >= 0) {
+        auto& b1 = m_bodies[c.body1_idx];
+        auto& b2 = m_bodies[c.body2_idx];
+        dot += c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
+        dot += c.jacobian2[0].dot(b2.inv_m_f[0]) + c.jacobian2[1].dot(b2.inv_m_f[1]);
+
+        delta = (c.rhs - dot) * c.inv_diag;
+
+    } else {
+        auto& b1 = m_bodies[c.body1_idx];
+        dot += c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
+
+        delta = (c.rhs - dot) * c.inv_diag;
+    }
+
+    return c.lambda + delta;
+}
+
+inline void ConstraintSolver::apply_constraint_lambda(ConstraintData& c, float lambda) {
+    if (c.body2_idx >= 0) {
+        auto& b1 = m_bodies[c.body1_idx];
+        auto& b2 = m_bodies[c.body2_idx];
+
+        float delta = lambda - c.lambda;
+        c.lambda = lambda;
+        c.delta_lambda = delta;
+
+        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
+        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
+        b2.inv_m_f[0] += c.inv_m_j2[0] * delta;
+        b2.inv_m_f[1] += c.inv_m_j2[1] * delta;
+
+    } else {
+        auto& b1 = m_bodies[c.body1_idx];
+
+        float delta = lambda - c.lambda;
+        c.lambda = lambda;
+        c.delta_lambda = delta;
+
+        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
+        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
+    }
+}
+
+inline void ConstraintSolver::solve_constraint(ConstraintData& c, float min_bound, float max_bound)
+{
+    float cur_lambda = c.lambda;
+    float dot = cur_lambda * c.cfm_inv_dt;
+
+    if (c.body2_idx >= 0) {
+        auto& b1 = m_bodies[c.body1_idx];
+        auto& b2 = m_bodies[c.body2_idx];
+
+        dot += c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
+        dot += c.jacobian2[0].dot(b2.inv_m_f[0]) + c.jacobian2[1].dot(b2.inv_m_f[1]);
+
+        float delta = (c.rhs - dot) * c.inv_diag;
+        c.lambda = clamp(min_bound, cur_lambda + delta, max_bound);
+        delta = c.lambda - cur_lambda;
+        c.delta_lambda = delta;
+
+        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
+        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
+        b2.inv_m_f[0] += c.inv_m_j2[0] * delta;
+        b2.inv_m_f[1] += c.inv_m_j2[1] * delta;
+
+    } else {
+        auto& b1 = m_bodies[c.body1_idx];
+
+        dot += c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
+
+        float delta = (c.rhs - dot) * c.inv_diag;
+        c.lambda = clamp(min_bound, cur_lambda + delta, max_bound);
+        delta = c.lambda - cur_lambda;
+        c.delta_lambda = delta;
+
+        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
+        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
+    }
+}
+
+inline void ConstraintSolver::solve_cone_friction(ConstraintData& c1, ConstraintData& c2)
+{
+    float lambda1 = 0.f;
+    float lambda2 = 0.f;
+
+    float normal_lambda = fabsf(m_constraints[(int)ConstraintGroup::Normal][c1.normal_constr_idx].lambda);
+    if (normal_lambda > 0.f) {
+        float bound1 = c1.friction_ratio * normal_lambda;
+        float bound2 = c2.friction_ratio * normal_lambda;
+
+        lambda1 = solve_constraint_lambda(c1);
+        lambda2 = solve_constraint_lambda(c2);
+
+        double divisor = ((double)lambda1 * lambda1) * ((double)bound2 * bound2) + ((double)lambda2 * lambda2) * ((double)bound1 * bound1);
+        double product = (double)bound1 * bound2;
+
+        if (divisor > 1e-8 && divisor > product * product) {
+            // scale down and preserve angle
+            double t = product / sqrt(divisor);
+            lambda1 = float(t * lambda1);
+            lambda2 = float(t * lambda2);
+
+            // float angle = std::atan2f(lambda1, lambda2);
+            // lambda1 = bound1 * std::sinf(angle);
+            // lambda2 = bound2 * std::cosf(angle);
+
+        } else {
+            lambda1 = clamp(-bound1, lambda1, bound1);
+            lambda2 = clamp(-bound2, lambda2, bound2);
+        }
+    }
+
+    apply_constraint_lambda(c1, lambda1);
+    apply_constraint_lambda(c2, lambda2);
+}
+
+void ConstraintSolver::solve_iterations()
+{
+    for(uint32_t iter = 0; iter < m_config.iteration_count; ++iter) {
+
+        for (auto& c: m_constraints[(int) ConstraintGroup::Normal]) {
+            solve_constraint(c, c.min_bound, c.max_bound);
+        }
+
+        for (auto& c: m_constraints[(int) ConstraintGroup::Friction]) {
+            float normal_lambda = fabsf(m_constraints[(int) ConstraintGroup::Normal][c.normal_constr_idx].lambda);
+            float bound = c.friction_ratio * normal_lambda;
+            solve_constraint(c, -bound, bound);
+        }
+
+        auto& cone_friction_constrs = m_constraints[(int) ConstraintGroup::ConeFriction];
+        for (auto it = cone_friction_constrs.begin(); it != cone_friction_constrs.end();) {
+            auto& c1 = *(it++);
+            auto& c2 = *(it++);
+            solve_cone_friction(c1, c2);
+        }
+    }
+}
+
 void ConstraintSolver::solve() {
     if (!m_constraints.empty()) {
         prepare_data();
-        solve_impl();
+        solve_iterations();
         apply_impulses();
     }
 }
