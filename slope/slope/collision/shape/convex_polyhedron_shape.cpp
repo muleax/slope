@@ -38,7 +38,7 @@ void ConvexPolyhedronShape::set_transform(const Mat44& matrix)
     }
 }
 
-Vec3 ConvexPolyhedronShape::support_point(const Vec3& axis) const
+Vec3 ConvexPolyhedronShape::support_point(const Vec3& axis, float bloat) const
 {
     float max_dot = -FLOAT_MAX;
     const Vec3* best_point = nullptr;

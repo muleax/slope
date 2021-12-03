@@ -8,11 +8,11 @@ class CapsuleShape : public CollisionShapeImpl<ShapeType::Capsule> {
 public:
     CapsuleShape(float radius, float height) : m_radius(radius), m_height(height) {}
 
-    Vec3 support_point(const Vec3& axis) const final
+    Vec3 support_point(const Vec3& axis, float bloat) const final
     {
         int support_end = axis.dot(m_segment[0]) > axis.dot(m_segment[1]) ? 0 : 1;
         // TODO: consider getting rid of normalization
-        return m_segment[support_end] + axis.normalized() * m_radius;
+        return m_segment[support_end] + axis.normalized() * (m_radius + bloat);
     }
 
     void set_transform(const Mat44& matrix) final
@@ -22,10 +22,6 @@ public:
         Vec3 offset = {0.f, m_height * 0.5f, 0.f};
         m_segment.begin = matrix.apply_point(-offset);
         m_segment.end = matrix.apply_point(offset);
-
-        //m_segment.begin = matrix.apply_point(offset * 0.f);
-        //m_segment.end = matrix.apply_point(offset * 2.f);
-
 
         Vec3 delta = {m_radius, m_radius, m_radius};
         m_aabb.reset(m_segment.begin - delta, m_segment.begin + delta);

@@ -30,7 +30,7 @@ void ContactManifold::begin_update(uint32_t frame_id, const Mat44& shape1_inv_tr
         cache.friction2_lambda = pt.friction2_lambda;
     }
 
-    m_points_size = 0;
+    m_point_count = 0;
     m_touch_frame_id = frame_id;
     m_shape1_inv_transform = shape1_inv_transform;
 
@@ -82,8 +82,8 @@ void ContactManifold::add_contact(ContactGeom new_geom) {
     auto local_point = m_shape1_inv_transform.apply_point(new_geom.p1);
     float penetration = new_geom.normal.dot(new_geom.p1 - new_geom.p2);
 
-    if (m_points_size < MAX_SIZE) {
-        reset_point(m_points[m_points_size++], new_geom, local_point, penetration);
+    if (m_point_count < MAX_SIZE) {
+        reset_point(m_points[m_point_count++], new_geom, local_point, penetration);
         return;
     }
 

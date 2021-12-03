@@ -10,15 +10,16 @@ public:
     Narrowphase();
 
     template<class Backend>
-    void add_backend();
-    void reset_all_backends();
+    void                add_backend();
+    void                reset_all_backends();
 
-    bool intersect(const CollisionShape* shape1, const CollisionShape* shape2);
-    void generate_contacts(ContactManifold& manifold);
+    bool                intersect(const CollisionShape* shape1, const CollisionShape* shape2);
+    std::optional<Vec3> get_penetration_axis();
+    void                generate_contacts(ContactManifold& manifold);
 
-    GJKSolver& gjk_solver() { return m_context.gjk_solver; }
-    EPASolver& epa_solver() { return m_context.epa_solver; }
-    SATSolver& sat_solver() { return m_context.sat_solver; }
+    GJKSolver&          gjk_solver() { return m_context.gjk_solver; }
+    EPASolver&          epa_solver() { return m_context.epa_solver; }
+    SATSolver&          sat_solver() { return m_context.sat_solver; }
 
 private:
     void remove_backend(int type1, int type2);
@@ -53,6 +54,11 @@ inline bool Narrowphase::intersect(const CollisionShape* shape1, const Collision
 {
     m_current_backend = m_backend_map[static_cast<int>(shape1->type())][static_cast<int>(shape2->type())];
     return m_current_backend->intersect(shape1, shape2);
+}
+
+inline std::optional<Vec3> Narrowphase::get_penetration_axis()
+{
+    return m_current_backend->get_penetration_axis();
 }
 
 inline void Narrowphase::generate_contacts(ContactManifold& manifold)

@@ -263,6 +263,7 @@ inline void ConstraintSolver::solve_cone_friction(ConstraintData& c1, Constraint
     float lambda1 = 0.f;
     float lambda2 = 0.f;
 
+    // TODO: optimize
     float normal_lambda = fabsf(m_constraints[(int)ConstraintGroup::Normal][c1.normal_constr_idx].lambda);
     if (normal_lambda > 0.f) {
         float bound1 = c1.friction_ratio * normal_lambda;

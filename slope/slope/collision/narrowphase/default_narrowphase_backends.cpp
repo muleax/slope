@@ -51,19 +51,19 @@ void SATConvexPolyhedronBackend::generate_contacts(ContactManifold& manifold)
 
 void GJKConvexPolyhedronBackend::generate_contacts(ContactManifold& manifold)
 {
-    auto* ctx = context();
-    auto pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+    auto pen_axis = get_penetration_axis();
     if (pen_axis)
-        generate_polyhedra_contacts(ctx, manifold, shape1(), shape2(), *pen_axis);
+        generate_polyhedra_contacts(context(), manifold, shape1(), shape2(), *pen_axis);
 }
 
 void ConvexPolyhedronCapsuleBackend::generate_contacts(ContactManifold& manifold)
 {
-    auto* ctx = context();
-    auto pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+    auto pen_axis = get_penetration_axis();
     if (!pen_axis)
         return;
 
+    // TODO: robust solution for imprecise penetration axis
+    auto* ctx = context();
     auto& support_face = ctx->support_face[0];
     support_face.clear();
 
@@ -85,44 +85,22 @@ void ConvexPolyhedronCapsuleBackend::generate_contacts(ContactManifold& manifold
 
 void ConvexPolyhedronSphereBackend::generate_contacts(ContactManifold& manifold)
 {
-    auto* ctx = context();
-    auto pen_axis = ctx->epa_solver.find_penetration_axis(shape1(), shape2(), ctx->gjk_solver.simplex());
+    auto pen_axis = get_penetration_axis();
     if (!pen_axis)
         return;
 
+    // TODO: robust solution for imprecise penetration axis
     // TODO: optimize
+    auto* ctx = context();
     Vec3 face_normal;
     ctx->support_face[0].clear();
     shape1()->get_support_face(*pen_axis, ctx->support_face[0], face_normal);
 
-    auto p2 = shape2()->support_point(-*pen_axis);
+    auto p2 = shape2()->support_point(-*pen_axis, 0.f);
     float t;
     Plane(face_normal, ctx->support_face[0][0]).intersect_ray(t, p2, *pen_axis);
     auto p1 = p2 + t * *pen_axis;
     manifold.add_contact({p1, p2, *pen_axis});
-}
-
-
-bool SphereBackend::intersect()
-{
-    const auto& p1 = shape1()->transform().translation();
-    const auto& p2 = shape2()->transform().translation();
-    m_dist_sqr = p1.square_distance(p2);
-    float contact_dist = shape1()->radius() + shape2()->radius();
-    return m_dist_sqr <= contact_dist * contact_dist;
-}
-
-void SphereBackend::generate_contacts(ContactManifold& manifold)
-{
-    static constexpr float DIST_EPSILON = 1e-6f;
-
-    const auto& p1 = shape1()->transform().translation();
-    const auto& p2 = shape2()->transform().translation();
-
-    float dist = sqrtf(m_dist_sqr);
-    Vec3 pen_axis = dist > DIST_EPSILON ? (p2 - p1) / dist : Vec3{1.f, 0.f, 0.f};
-
-    manifold.add_contact({p1 + pen_axis * shape1()->radius(), p2 - pen_axis * shape2()->radius(), pen_axis});
 }
 
 } // slope

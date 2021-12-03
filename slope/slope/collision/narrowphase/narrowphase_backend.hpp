@@ -33,8 +33,9 @@ public:
     const Shape2*   shape2() const { return m_shape2; }
 
     // Expected interface:
-    // bool intersect(const Shape1* shape1, const Shape2* shape2);
-    // void generate_contacts(ContactManifold& manifold, const Shape1* shape1, const Shape2* shape2);
+    // bool                 intersect(const Shape1* shape1, const Shape2* shape2);
+    // std::optional<Vec3>  get_penetration_axis();
+    // void                 generate_contacts(ContactManifold& manifold, const Shape1* shape1, const Shape2* shape2);
 
 private:
     NpContext*      m_context = nullptr;
@@ -46,14 +47,16 @@ class INpBackendWrapper {
 public:
     virtual ~INpBackendWrapper() = default;
 
-    virtual bool intersect(const CollisionShape* shape1, const CollisionShape* shape2) = 0;
-    virtual void generate_contacts(ContactManifold& manifold) = 0;
+    virtual bool                intersect(const CollisionShape* shape1, const CollisionShape* shape2) = 0;
+    virtual void                generate_contacts(ContactManifold& manifold) = 0;
+    virtual std::optional<Vec3> get_penetration_axis() = 0;
 
 };
 
 class NpNullBackend : public INpBackendWrapper {
-    bool intersect(const CollisionShape* shape1, const CollisionShape* shape2) final { return false; }
-    void generate_contacts(ContactManifold& manifold) final {}
+    bool                intersect(const CollisionShape* shape1, const CollisionShape* shape2) final { return false; }
+    std::optional<Vec3> get_penetration_axis() final { return std::nullopt; }
+    void                generate_contacts(ContactManifold& manifold) final {}
 };
 
 template <class Backend, bool Inverted = false>
@@ -82,6 +85,11 @@ public:
             manifold.invert_input_order();
 
         m_backend.generate_contacts(manifold);
+    }
+
+    std::optional<Vec3> get_penetration_axis() final
+    {
+        return m_backend.get_penetration_axis();
     }
 
 private:

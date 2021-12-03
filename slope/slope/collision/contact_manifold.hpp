@@ -24,16 +24,18 @@ class ContactManifold {
 public:
     static constexpr float CACHE_THRESHOLD = 0.02f;
 
-    auto begin() { return m_points.begin(); }
-    auto end() { return m_points.begin() + m_points_size; }
+    auto        begin() { return m_points.begin(); }
+    auto        end() { return m_points.begin() + m_point_count; }
 
-    void begin_update(uint32_t frame_id, const Mat44& shape1_inv_transform);
-    void add_contact(ContactGeom new_geom);
-    void end_update();
+    uint32_t    size() const { return m_point_count; }
 
-    void invert_input_order() { m_inverted_input_order = !m_inverted_input_order; };
+    void        begin_update(uint32_t frame_id, const Mat44& shape1_inv_transform);
+    void        add_contact(ContactGeom new_geom);
+    void        end_update();
 
-    bool is_active(uint32_t frame_id) const { return m_points_size > 0 && m_touch_frame_id == frame_id; }
+    void        invert_input_order() { m_inverted_input_order = !m_inverted_input_order; };
+
+    bool        is_active(uint32_t frame_id) const { return m_point_count > 0 && m_touch_frame_id == frame_id; }
 
 private:
     static constexpr uint32_t MAX_SIZE = 4;
@@ -46,7 +48,7 @@ private:
     };
 
     Array<ManifoldPoint, MAX_SIZE> m_points;
-    uint32_t m_points_size = 0;
+    uint32_t m_point_count = 0;
 
     Array<PointLambdaCache, MAX_SIZE> m_lambda_cache;
     uint32_t m_lambda_cache_size = 0;

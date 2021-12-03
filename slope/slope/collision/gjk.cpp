@@ -91,7 +91,7 @@ bool GJKSolver::intersect(const CollisionShape* shape1, const CollisionShape* sh
     constexpr float SUPPORT_EPSILON = 1e-12f;
 
     Vec3 init_axis = shape1->transform().translation() - shape2->transform().translation();
-    m_simplex[0] = shape1->support_diff(shape2, init_axis);
+    m_simplex[0] = shape1->support_diff(shape2, init_axis, 0.f);
     m_simplex_size = 1;
 
     for (uint32_t iter = 0; iter < m_config.max_iteration_count; iter++) {
@@ -127,7 +127,7 @@ bool GJKSolver::intersect(const CollisionShape* shape1, const CollisionShape* sh
             return true;
         }
 
-        Vec3 new_pt = shape1->support_diff(shape2, *axis);
+        Vec3 new_pt = shape1->support_diff(shape2, *axis, 0.f);
 
         if (axis->dot(new_pt) < SUPPORT_EPSILON) {
             collect_stats(iter + 1, false);

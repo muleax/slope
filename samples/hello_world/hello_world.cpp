@@ -9,7 +9,8 @@
 #include "app/ecs/world.hpp"
 #include "slope/debug/log.hpp"
 #include "slope/collision/geometry.hpp"
-#include "slope/collision/gjk.hpp"
+#include "slope/collision/narrowphase/narrowphase.hpp"
+#include "slope/collision/narrowphase/default_narrowphase_backends.hpp"
 #include "slope/collision/shape/sphere_shape.hpp"
 #include "slope/collision/shape/capsule_shape.hpp"
 #include "slope/collision/shape/convex_polyhedron_shape.hpp"
@@ -283,8 +284,14 @@ public:
         m_capsule_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
         m_capsule_material->set_ambient_strength(0.2f);
 
-        int mode = 2;
-        if (mode == 0) {
+        m_narrowphase.add_backend<GJKConvexPolyhedronBackend>();
+        m_narrowphase.add_backend<ConvexPolyhedronSphereBackend>();
+        m_narrowphase.add_backend<ConvexPolyhedronCapsuleBackend>();
+        m_narrowphase.add_backend<CapsuleSphereBackend>();
+        m_narrowphase.add_backend<CapsuleBackend>();
+        m_narrowphase.add_backend<SphereBackend>();
+
+        if (m_mode == 0) {
             auto plate_geom = poly_factory.box(Vec3{20.f, 10.f, 20.f}, Vec3{0.f, 0.f, 0.f});
             auto plate_mesh = create_mesh_from_poly(plate_geom);
 
@@ -308,7 +315,7 @@ public:
             tr.set_translation({-5.f, 6.9f, 0.f});
             spawn_cube(tr, {}, 1.f);
         }
-        else if (mode == 1) {
+        else if (m_mode == 1) {
             int h = 5;
             float skew = 0.1f;
             for (int j = 0; j < h; j++) {
@@ -317,7 +324,7 @@ public:
                         spawn_sphere(tr, {}, 1.f);
             }
 
-        } else if (mode == 2) {
+        } else if (m_mode == 2) {
             auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
             int h = 25;
             float spacing = 0.f;
@@ -331,7 +338,7 @@ public:
                     }
                 }
             }
-        } else if (mode == 3) {
+        } else if (m_mode == 3) {
             auto cup_geom = poly_factory.box(Vec3{20.f, 10.f, 20.f}, Vec3{0.f, 0.f, 0.f});
             Vec3 cup_pos[4] = {{-13.f, 5.f, 0.f}, {13.f, 5.f, 0.f}, {0.f, 5.f, -13.f}, {0.f, 5.f, 13.f}};
 
@@ -346,7 +353,7 @@ public:
                 pc->actor->set_shape<ConvexPolyhedronShape>(cup_geom);
                 pc->actor->set_transform(tc->transform);
             }
-        } else if (mode == 4) {
+        } else if (m_mode == 4) {
             physics_single->dynamics_world.config().gravity.set_zero();
 
             auto box = poly_factory.box(Vec3{2.f, 4.f, 0.4f }, Vec3{0.f, 0.f, 0.f});
@@ -376,6 +383,49 @@ public:
 
             gyro_actor = actor.get();
             pc->actor = std::move(actor);
+
+        } else if (m_mode == 5) {
+
+            physics_single->dynamics_world.config().gravity.set_zero();
+            physics_single->dynamics_world.config().disable_constraint_resolving = true;
+            physics_single->dynamics_world.config().delay_integration = true;
+
+            auto box = poly_factory.box(Vec3{2.f, 2.f, 2.f}, Vec3{0.f, 0.f, 0.f});
+
+            auto e = m_world->create_entity();
+            auto* rc = m_world->create<RenderComponent>(e);
+            rc->mesh = create_mesh_from_poly(box);
+            rc->material = m_unit_box_material;
+            auto* tc = m_world->create<TransformComponent>(e);
+            tc->transform = Mat44::translate({0.f, 5.f, 0.f});
+
+            auto* pc = m_world->create<PhysicsComponent>(e);
+            auto actor = std::make_shared<DynamicActor>();
+            actor->set_shape<ConvexPolyhedronShape>(box);
+            actor->set_transform(tc->transform);
+            pc->actor = std::move(actor);
+
+            auto box2 = poly_factory.box(Vec3{1.f, 1.f, 1.f}, Vec3{0.f, 0.f, 0.f});
+
+            auto se = m_world->create_entity();
+            auto* src = m_world->create<RenderComponent>(se);
+            src->mesh = create_sphere_mesh(1.f);
+            //src->mesh = create_mesh_from_poly(box2);
+            src->material = m_unit_box_material;
+            auto* stc = m_world->create<TransformComponent>(se);
+            float offs = 0.55f;
+            stc->transform = Mat44::translate({2.f - offs, 7.f - offs, 2.f - offs});
+
+            auto* pc2 = m_world->create<PhysicsComponent>(se);
+            auto sactor = std::make_shared<DynamicActor>();
+
+            sactor->set_shape<SphereShape>(1.f);
+            //sactor->set_shape<ConvexPolyhedronShape>(box2);
+
+            sactor->set_transform(stc->transform);
+
+            control_actor = sactor.get();
+            pc2->actor = std::move(sactor);
         }
 
 
@@ -416,63 +466,9 @@ public:
             m_world->create<CameraComponent>(m_cam_entity);
         }
 
-        init_gjk_shape();
-
         set_background_color({0.2f, 0.2, 0.2f});
 
         m_world->modify_singleton<PhysicsSingleton>()->pause = true;
-    }
-
-    void init_gjk_shape() {
-        ConvexPolyhedronFactory poly_factory;
-
-        auto gjk_visual_box = poly_factory.box(Vec3{1.f + BLOAT, 1.f + BLOAT, 1.f + BLOAT}, Vec3{0.f, 0.f, 0.f});
-
-        auto gjk_box = poly_factory.box(Vec3{1.f + BLOAT, 1.f + BLOAT, 1.f + BLOAT}, Vec3{0.f, 0.f, 0.f});
-        m_gjk_shape = std::make_unique<ConvexPolyhedronShape>(gjk_box);
-
-        m_gjk_entity = m_world->create_entity();
-        auto* tc = m_world->create<TransformComponent>(m_gjk_entity);
-        tc->transform.set_translation({10.f, -15.f, 10.f});
-
-        m_gjk_shape->set_transform(tc->transform);
-
-        auto* rc = m_world->create<RenderComponent>(m_gjk_entity);
-        rc->mesh = create_mesh_from_poly(gjk_visual_box);
-        //rc->mesh = create_sphere_mesh(1.f);
-        rc->material = std::make_shared<Material>(DefaultShaders::mesh_shader());
-        rc->material->set_ambient_strength(0.5f);
-        rc->material->set_color({0.4, 0.8, 0.4});
-    }
-
-    void collide_gjk() {
-
-        if (m_bind_gjk_to_camera) {
-            auto* cam_tc = m_world->get<TransformComponent>(m_cam_entity);
-            auto* gjk_tc = m_world->modify<TransformComponent>(m_gjk_entity);
-            gjk_tc->transform = Mat44::translate({0.f, 0.f, -0.4f}) * cam_tc->transform;
-            m_gjk_shape->set_transform(gjk_tc->transform);
-        }
-
-        bool has_collision = false;
-
-
-
-        for (auto e : m_world->view<PhysicsComponent>()) {
-            auto* pc = m_world->get<PhysicsComponent>(e);
-            auto* shape2 = static_cast<ConvexPolyhedronShape*>(&pc->actor->shape());
-            if (m_gjk_solver.intersect(&*m_gjk_shape, shape2)) {
-                has_collision = true;
-                break;
-            }
-        }
-
-        auto* gjk_rc = m_world->get<RenderComponent>(m_gjk_entity);
-
-        if (has_collision)
-            gjk_rc->material->set_color({0.8, 0.4, 0.4});
-        else
-            gjk_rc->material->set_color({0.4, 0.8, 0.4});
     }
 
     void update(float dt) override {
@@ -487,8 +483,29 @@ public:
             ImGui::End();
         }
 
+        if (control_actor) {
+            ImGui::Begin("Control Actor");
+            auto& b = control_actor->body();
+            auto m = b.transform();
+            auto p = b.transform().translation();
+
+
+            ImGui::DragFloat("X", &p.x, 0.01);
+            ImGui::DragFloat("Y", &p.y, 0.01);
+            ImGui::DragFloat("Z", &p.z, 0.01);
+            ImGui::DragFloat("r_X", &control_euler.x, 0.01);
+            ImGui::DragFloat("r_Y", &control_euler.y, 0.01);
+            ImGui::DragFloat("r_Z", &control_euler.z, 0.01);
+
+            m = Mat44::rotation({1.f, 0.f, 0.f}, control_euler.x)
+                * Mat44::rotation({0.f, 1.f, 0.f}, control_euler.y)
+                * Mat44::rotation({0.f, 0.f, 1.f}, control_euler.z);
+            m.set_translation(p);
+            b.set_transform(m);
+            ImGui::End();
+        }
+
         m_world->update(dt);
-        //collide_gjk();
     }
 
     void on_window_resize(int width, int height) override {
@@ -514,17 +531,6 @@ public:
             case Key::S:
                 cam_ctl->move_bkwd = is_pressed;
                 break;
-
-            case Key::C:
-                if (action == KeyAction::Press) {
-                    m_bind_gjk_to_camera = !m_bind_gjk_to_camera;
-                    if (m_bind_gjk_to_camera) {
-                        auto* cam_tc = m_world->modify<TransformComponent>(m_cam_entity);
-                        auto* gjk_tc = m_world->get<TransformComponent>(m_gjk_entity);
-                        cam_tc->transform = gjk_tc->transform;
-                    }
-                    break;
-                }
 
             case Key::LeftShift: {
                 auto* cam = m_world->modify<CameraControllerComponent>(m_cam_entity);
@@ -699,17 +705,18 @@ public:
     std::shared_ptr<Mesh> m_capsule_mesh;
     std::shared_ptr<Material> m_capsule_material;
 
-    GJKSolver m_gjk_solver;
-    Entity m_gjk_entity;
-    std::shared_ptr<Mesh> m_gjk_mesh;
-    std::unique_ptr<ConvexPolyhedronShape> m_gjk_shape;
-    bool m_bind_gjk_to_camera = false;
+    Narrowphase m_narrowphase;
 
     bool m_cam_move_mode = false;
     Entity m_cam_entity;
     std::unique_ptr<World> m_world;
 
     DynamicActor* gyro_actor = nullptr;
+
+    Vec3 control_euler;
+    DynamicActor* control_actor = nullptr;
+
+    int m_mode = 2;
 };
 
 int main() {

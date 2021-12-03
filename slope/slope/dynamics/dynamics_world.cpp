@@ -235,13 +235,22 @@ void DynamicsWorld::apply_contacts() {
         }
 
         if (debug_drawer) {
-            if (m_config.draw_contact_normals) {
+            if (m_config.draw_contact_normals1) {
                 debug_drawer->draw_line(geom.p1, geom.p1 + geom.axis * 0.3f, {0.2f, 1.f, 0.2f});
             }
 
-            if (m_config.draw_contact_friction) {
+            if (m_config.draw_contact_friction1) {
                 debug_drawer->draw_line(geom.p1, geom.p1 + fc1.jacobian1[0] * 0.3f, {1.f, 0.1f, 0.2f});
                 debug_drawer->draw_line(geom.p1, geom.p1 + fc2.jacobian1[0] * 0.3f, {1.f, 0.1f, 0.2f});
+            }
+
+            if (m_config.draw_contact_normals2) {
+                debug_drawer->draw_line(geom.p2, geom.p2 - geom.axis * 0.3f, {0.2f, 1.f, 0.2f});
+            }
+
+            if (m_config.draw_contact_friction2) {
+                debug_drawer->draw_line(geom.p2, geom.p2 + fc1.jacobian1[0] * 0.3f, {1.f, 0.1f, 0.2f});
+                debug_drawer->draw_line(geom.p2, geom.p2 + fc2.jacobian1[0] * 0.3f, {1.f, 0.1f, 0.2f});
             }
         }
     }
@@ -280,6 +289,9 @@ void DynamicsWorld::update(float dt) {
     if (m_debug_drawer)
         m_debug_drawer->clear();
 
+    if (m_config.delay_integration)
+        integrate_bodies();
+
     setup_narrowphase(m_config.np_backend_hint);
     setup_solver(m_config.solver_type);
 
@@ -295,7 +307,8 @@ void DynamicsWorld::update(float dt) {
 
     apply_contacts();
 
-    m_solver->solve();
+    if (!m_config.disable_constraint_resolving)
+        m_solver->solve();
 
     m_stats.max_constraint_solver_error.update(m_solver->max_error());
     m_stats.avg_constraint_solver_error.update(m_solver->avg_error());
@@ -307,9 +320,10 @@ void DynamicsWorld::update(float dt) {
 
     m_solver->clear();
 
-    integrate_bodies();
-
     refresh_manifolds();
+
+    if (!m_config.delay_integration)
+        integrate_bodies();
 
     m_frame_id++;
 }

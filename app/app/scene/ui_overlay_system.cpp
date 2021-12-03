@@ -72,6 +72,7 @@ void UIOverlaySystem::update(float dt)
     if (ImGui::CollapsingHeader("Simulation", treeNodeFlags)) {
         ImGui::Checkbox("Pause", &ps->pause);
         ImGui::Checkbox("Real Time Sync", &ps->real_time_sync);
+        ImGui::Checkbox("Disable Constraint Resolving", &world_config.disable_constraint_resolving);
         ImGui::Checkbox("Initial Randomization", &world_config.randomize_order);
         ImGui::Checkbox("Velocity Dependent Friction", &world_config.enable_velocity_dependent_friction);
         ImGui::Checkbox("Cone Friction", &world_config.enable_cone_friction);
@@ -95,6 +96,9 @@ void UIOverlaySystem::update(float dt)
 
         ImGui::DragScalar("GJK Max Iters", ImGuiDataType_U32, &gjk_config.max_iteration_count);
         ImGui::DragScalar("EPA Max Iters", ImGuiDataType_U32, &epa_config.max_iteration_count);
+        ImGui::DragFloat("EPA Support Bloat", &epa_config.support_bloat);
+        ImGui::DragFloat("EPA Early Threshold", &epa_config.early_threshold, 1e-7f, -1.f, 1.f, "%.8f");
+        ImGui::DragFloat("EPA Final Threshold", &epa_config.final_threshold, 1e-4f, -1.f, 1.f, "%.8f");
 
         ImGui::DragFloat("Time Factor", &ps->time_factor, 0.01f, 0.001f, 100.f);
         float time_step_ms = ps->time_step * 1000.f;
@@ -112,8 +116,11 @@ void UIOverlaySystem::update(float dt)
     if (rs) {
         if (ImGui::CollapsingHeader("Render", treeNodeFlags)) {
             ImGui::Checkbox("Wireframe", &rs->wireframe);
-            ImGui::Checkbox("Contact Normals", &world_config.draw_contact_normals);
-            ImGui::Checkbox("Contact Friction", &world_config.draw_contact_friction);
+            ImGui::Checkbox("Contact Normals 1", &world_config.draw_contact_normals1);
+            ImGui::Checkbox("Contact Friction 1", &world_config.draw_contact_friction1);
+            ImGui::Checkbox("Contact Normals 2", &world_config.draw_contact_normals2);
+            ImGui::Checkbox("Contact Friction 2", &world_config.draw_contact_friction2);
+            ImGui::Checkbox("Delay Integration", &world_config.delay_integration);
         }
     }
 

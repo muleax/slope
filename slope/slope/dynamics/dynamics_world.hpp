@@ -51,6 +51,7 @@ public:
     };
 
     struct Config {
+        bool disable_constraint_resolving = false;
         bool randomize_order = true;
         bool enable_gyroscopic_torque = true;
         bool enable_velocity_dependent_friction = true;
@@ -65,8 +66,11 @@ public:
         ConstraintSolver::Config solver_config;
 
         // debug draw
-        bool draw_contact_normals = false;
-        bool draw_contact_friction = false;
+        bool draw_contact_normals1 = false;
+        bool draw_contact_friction1 = false;
+        bool draw_contact_normals2 = false;
+        bool draw_contact_friction2 = false;
+        bool delay_integration = false;
     };
 
     explicit DynamicsWorld(std::optional<Config> init_config = std::nullopt);

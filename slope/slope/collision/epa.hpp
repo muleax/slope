@@ -9,7 +9,10 @@ namespace slope {
 class EPASolver {
 public:
     struct Config {
-        uint32_t max_iteration_count = 30;
+        uint32_t max_iteration_count = 80;
+        float support_bloat = 0.f;
+        float early_threshold = 1e-6f;
+        float final_threshold = 0.01f;
     };
 
     struct Stats {

@@ -67,8 +67,6 @@ void EPASolver::add_face(uint32_t a_idx, uint32_t b_idx, uint32_t c_idx)
 std::optional<Vec3> EPASolver::find_penetration_axis(
     const CollisionShape* shape1, const CollisionShape* shape2, const GJKSolver::Simplex& simplex)
 {
-    constexpr float PROXIMITY_EPSILON = 1e-6f;
-
     //records.clear();
 
     m_points.clear();
@@ -93,11 +91,10 @@ std::optional<Vec3> EPASolver::find_penetration_axis(
     add_face(0, 2, 3);
     add_face(1, 2, 3);
 
-    for (int iter = 0; iter < m_config.max_iteration_count; iter++) {
-        SL_VERIFY(!m_heap.empty());
-
+    for (int iter = 1; true; iter++) {
         //records.push_back({});
 
+        SL_VERIFY(!m_heap.empty());
         while (m_heap.front().obsolete) {
             std::pop_heap(m_heap.begin(), m_heap.end());
             m_heap.pop_back();
@@ -107,14 +104,22 @@ std::optional<Vec3> EPASolver::find_penetration_axis(
         std::pop_heap(m_heap.begin(), m_heap.end());
         m_heap.pop_back();
 
-        // best_axis = face.normal;
+        auto new_pt = shape1->support_diff(shape2, face.normal, m_config.support_bloat);
 
-        auto new_pt = shape1->support_diff(shape2, face.normal);
+        float proximity = face.normal.dot(new_pt - m_points[face.a]);
 
-        float dot = face.normal.dot(new_pt - m_points[face.a]);
-        if (dot < PROXIMITY_EPSILON) {
-            collect_stats(iter + 1, false);
+        if (proximity < m_config.early_threshold) {
+            collect_stats(iter, false);
             return face.normal;
+        }
+
+        if (iter == m_config.max_iteration_count) {
+            if (proximity < m_config.final_threshold) {
+                collect_stats(iter, false);
+                return face.normal;
+            }
+
+            break;
         }
 
         int idx = static_cast<int>(m_points.size());
