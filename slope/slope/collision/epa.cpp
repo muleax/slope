@@ -20,6 +20,21 @@ inline std::pair<uint32_t, uint32_t> decode_edge(uint64_t code)
 
 } // unnamed
 
+void EPASolver::reset_stats()
+{
+    m_stats.cum_test_count = 0;
+    m_stats.cum_iterations_count = 0;
+    m_stats.max_iteration_count = 0;
+}
+
+void EPASolver::collect_stats(uint32_t iteration_count, bool fail)
+{
+    m_stats.cum_test_count++;
+    m_stats.cum_iterations_count += iteration_count;
+    m_stats.max_iteration_count = std::max(m_stats.max_iteration_count, iteration_count);
+    m_stats.total_fail_count += (int)fail;
+}
+
 void EPASolver::add_face(uint32_t a_idx, uint32_t b_idx, uint32_t c_idx)
 {
     constexpr float NORMAL_EPSILON = 1e-8f;
@@ -78,7 +93,7 @@ std::optional<Vec3> EPASolver::find_penetration_axis(
     add_face(0, 2, 3);
     add_face(1, 2, 3);
 
-    for (int iter = 0; iter < 30; iter++) {
+    for (int iter = 0; iter < m_config.max_iteration_count; iter++) {
         SL_VERIFY(!m_heap.empty());
 
         //records.push_back({});
@@ -98,6 +113,7 @@ std::optional<Vec3> EPASolver::find_penetration_axis(
 
         float dot = face.normal.dot(new_pt - m_points[face.a]);
         if (dot < PROXIMITY_EPSILON) {
+            collect_stats(iter + 1, false);
             return face.normal;
         }
 
@@ -137,6 +153,7 @@ std::optional<Vec3> EPASolver::find_penetration_axis(
         }
     }
 
+    collect_stats(m_config.max_iteration_count, true);
     return std::nullopt;
 }
 

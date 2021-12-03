@@ -3,6 +3,22 @@
 
 namespace slope {
 
+void GJKSolver::reset_stats()
+{
+    m_stats.cum_test_count = 0;
+    m_stats.cum_iterations_count = 0;
+    m_stats.max_iteration_count = 0;
+
+}
+
+void GJKSolver::collect_stats(uint32_t iteration_count, bool fail)
+{
+    m_stats.cum_test_count++;
+    m_stats.cum_iterations_count += iteration_count;
+    m_stats.max_iteration_count = std::max(m_stats.max_iteration_count, iteration_count);
+    m_stats.total_fail_count += (int)fail;
+}
+
 inline Vec3 GJKSolver::update_point(Vec3 a)
 {
     m_simplex_size = 1;
@@ -78,7 +94,7 @@ bool GJKSolver::intersect(const CollisionShape* shape1, const CollisionShape* sh
     m_simplex[0] = shape1->support_diff(shape2, init_axis);
     m_simplex_size = 1;
 
-    for (int iter = 0; iter < 50; iter++) {
+    for (uint32_t iter = 0; iter < m_config.max_iteration_count; iter++) {
         std::optional<Vec3> axis;
 
         switch (m_simplex_size) {
@@ -107,17 +123,21 @@ bool GJKSolver::intersect(const CollisionShape* shape1, const CollisionShape* sh
         if (!axis) {
             //slope::log::info("GJK Collision iter {}", iter);
             SL_ASSERT(m_simplex_size == 4);
+            collect_stats(iter + 1, false);
             return true;
         }
 
         Vec3 new_pt = shape1->support_diff(shape2, *axis);
 
-        if (axis->dot(new_pt) < SUPPORT_EPSILON)
+        if (axis->dot(new_pt) < SUPPORT_EPSILON) {
+            collect_stats(iter + 1, false);
             return false;
+        }
 
         m_simplex[m_simplex_size++] = new_pt;
     }
 
+    collect_stats(m_config.max_iteration_count, true);
     return false;
 }
 

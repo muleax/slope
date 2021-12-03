@@ -137,7 +137,8 @@ void DynamicsWorld::collide(BaseActor& actor1, BaseActor& actor2) {
     if (!shape1.aabb().intersects(shape2.aabb()))
         return;
 
-    //auto pen_axis = m_narrowphase.find_penetration_axis(&shape1, &shape2);
+    m_stats.np_test_count++;
+
     if (m_narrowphase.intersect(&shape1, &shape2)) {
         m_stats.collision_count++;
 
@@ -159,7 +160,11 @@ void DynamicsWorld::collide(BaseActor& actor1, BaseActor& actor2) {
 }
 
 void DynamicsWorld::perform_collision_detection() {
+    m_stats.np_test_count = 0;
     m_stats.collision_count = 0;
+    m_narrowphase.gjk_solver().reset_stats();
+    m_narrowphase.epa_solver().reset_stats();
+    m_narrowphase.sat_solver().reset_stats();
 
     for (auto actor1 = m_dynamic_actors.begin(); actor1 != m_dynamic_actors.end(); ++actor1)
         for (auto actor2 = actor1 + 1; actor2 != m_dynamic_actors.end(); ++actor2)

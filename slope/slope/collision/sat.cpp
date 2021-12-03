@@ -25,15 +25,25 @@ inline IntervalPenetration get_interval_penetration(const Interval& a, const Int
 
 } // unnamed
 
+void SATSolver::reset_stats()
+{
+    m_stats.cum_test_count = 0;
+    m_stats.cum_projection_count = 0;
+}
+
 std::optional<Vec3> SATSolver::find_penetration_axis(
     const ConvexPolyhedronShape* shape1, const ConvexPolyhedronShape* shape2)
 {
     const float EDGE_CROSS_EPSILON = 1e-12f;
 
+    m_stats.cum_test_count++;
+
     IntervalPenetration min_pen;
     Vec3 min_pen_axis;
 
-    auto sat_test = [&min_pen_axis, &min_pen, shape1, shape2](const Vec3& axis) -> bool {
+    auto sat_test = [this, &min_pen_axis, &min_pen, shape1, shape2](const Vec3& axis) -> bool {
+        m_stats.cum_projection_count++;
+
         Interval itv1 = shape1->project(axis);
         Interval itv2 = shape2->project(axis);
         if(!itv1.intersects(itv2))

@@ -41,6 +41,7 @@ public:
     struct Stats {
         uint32_t static_actor_count = 0;
         uint32_t dynamic_actor_count = 0;
+        uint32_t np_test_count = 0;
         uint32_t collision_count = 0;
         uint32_t contact_count = 0;
         float simulation_time = 0.f;

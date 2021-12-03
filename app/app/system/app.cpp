@@ -87,9 +87,12 @@ void App::init(const AppCfg& cfg) {
     // setup Dear ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
     ImGui_ImplOpenGL3_Init();
+
+    ImGui::StyleColorsDark();
+
+    //ImGui::LoadIniSettingsFromDisk("test.ini");
 
     m_start_time = glfwGetTime();
 
@@ -100,10 +103,7 @@ void App::init(const AppCfg& cfg) {
 }
 
 App::~App() {
-    if (m_window != nullptr) {
-        glfwDestroyWindow(m_window);
-        glfwTerminate();
-    }
+    //ImGui::SaveIniSettingsToDisk("test.ini");
 
     AppCallbacks::set_instance(nullptr);
 }
@@ -133,6 +133,13 @@ void App::run() {
         glfwSwapBuffers(m_window);
         glfwPollEvents();
     }
+
+    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui::DestroyContext();
+
+    glfwDestroyWindow(m_window);
+    glfwTerminate();
 }
 
 void App::stop() {

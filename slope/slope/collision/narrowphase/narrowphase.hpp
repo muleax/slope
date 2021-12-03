@@ -16,6 +16,10 @@ public:
     bool intersect(const CollisionShape* shape1, const CollisionShape* shape2);
     void generate_contacts(ContactManifold& manifold);
 
+    GJKSolver& gjk_solver() { return m_context.gjk_solver; }
+    EPASolver& epa_solver() { return m_context.epa_solver; }
+    SATSolver& sat_solver() { return m_context.sat_solver; }
+
 private:
     void remove_backend(int type1, int type2);
 
