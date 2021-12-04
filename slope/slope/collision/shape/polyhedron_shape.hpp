@@ -12,7 +12,8 @@ public:
     explicit PolyhedronShape(std::shared_ptr<ConvexPolyhedron> geometry);
 
     void        set_transform(const Mat44& matrix) final;
-    Vec3        support_point(const Vec3& axis, float bloat) const final;
+    Vec3        support(const Vec3& axis, float bloat) const final  { return support_impl(axis, bloat); }
+    Vec3        support_normalized(const Vec3& axis, float bloat) const final { return support_impl(axis, bloat); }
 
     float       get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const;
     Interval    project(const Vec3& axis) const;
@@ -22,6 +23,8 @@ public:
     Vec3        world_face_normal(const ConvexPolyhedron::Face& face) const;
 
 private:
+    Vec3 support_impl(const Vec3& axis, float bloat) const;
+
     std::shared_ptr<ConvexPolyhedron> m_geometry;
     Vector<Vec3> m_world_vertices;
     Vector<Vec3> m_principal_face_axes;
@@ -41,6 +44,22 @@ inline Interval PolyhedronShape::project(const Vec3& axis) const {
         itv.extend(axis.dot(*vit));
 
     return itv;
+}
+
+inline Vec3 PolyhedronShape::support_impl(const Vec3& axis, float bloat) const
+{
+    // TODO: optimize with hill climbing
+    float max_dot = -FLOAT_MAX;
+    const Vec3* best_point = nullptr;
+    for (auto& p : m_world_vertices) {
+        float dot = axis.dot(p);
+        if (dot > max_dot) {
+            max_dot = dot;
+            best_point = &p;
+        }
+    }
+
+    return *best_point;
 }
 
 } // slope

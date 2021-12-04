@@ -20,20 +20,6 @@ void BoxShape::set_transform(const Mat44& matrix)
     m_aabb.reset(matrix.translation() - dv, matrix.translation() + dv);
 }
 
-Vec3 BoxShape::support_point(const Vec3& axis, float bloat) const
-{
-// TODO: consider getting rid of normalization
-    auto norm_axis = axis.normalized();
-
-    Vec3 offs;
-    for (int i = 0; i < 3; i++) {
-        float dot = norm_axis.dot(m_extents[i]);
-        offs += m_extents[i] * signf(dot);
-    }
-
-    return m_transform.translation() + offs;
-}
-
 float BoxShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const {
     int best_axis = -1;
     float best_proximity = -FLOAT_MAX;

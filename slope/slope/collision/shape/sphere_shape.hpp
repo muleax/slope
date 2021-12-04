@@ -7,21 +7,23 @@ class SphereShape : public CollisionShapeImpl<ShapeType::Sphere> {
 public:
     explicit SphereShape(float radius);
 
-    Vec3    support_point(const Vec3& axis, float bloat) const final;
+    Vec3    support(const Vec3& axis, float bloat) const final { return support_impl(axis.normalized(), bloat); }
+    Vec3    support_normalized(const Vec3& axis, float bloat) const final { return support_impl(axis, bloat); }
     void    set_transform(const Mat44& matrix) final;
 
     float   radius() const { return m_radius; }
 
 private:
+    Vec3 support_impl(const Vec3& axis, float bloat) const;
+
     float m_radius = 1.f;
 };
 
 inline SphereShape::SphereShape(float radius) : m_radius(radius) {}
 
-inline Vec3 SphereShape::support_point(const Vec3& axis, float bloat) const
+inline Vec3 SphereShape::support_impl(const Vec3& axis, float bloat) const
 {
-    // TODO: consider getting rid of normalization
-    return m_transform.translation() + axis.normalized() * (m_radius + bloat);
+    return m_transform.translation() + axis * (m_radius + bloat);
 }
 
 inline void SphereShape::set_transform(const Mat44& matrix)

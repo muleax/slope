@@ -33,7 +33,7 @@ public:
         ctx->support_face[0].clear();
         this->shape1()->get_support_face(*pen_axis, ctx->support_face[0], face_normal);
 
-        auto p2 = this->shape2()->support_point(-*pen_axis, 0.f);
+        auto p2 = this->shape2()->support_normalized(-*pen_axis, 0.f);
         auto t = Plane(face_normal, ctx->support_face[0][0]).intersect_ray(p2, *pen_axis);
         if (t) {
             auto p1 = p2 + *t * *pen_axis;

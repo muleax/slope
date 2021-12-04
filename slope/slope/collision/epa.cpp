@@ -104,7 +104,7 @@ std::optional<Vec3> EPASolver::find_penetration_axis(
         std::pop_heap(m_heap.begin(), m_heap.end());
         m_heap.pop_back();
 
-        auto new_pt = shape1->support_diff(shape2, face.normal, m_config.support_bloat);
+        auto new_pt = shape1->support_diff_normalized(shape2, face.normal, m_config.support_bloat);
 
         float proximity = face.normal.dot(new_pt - m_points[face.a]);
 
