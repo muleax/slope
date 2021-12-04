@@ -1,13 +1,14 @@
 #pragma once
 #include "slope/collision/narrowphase/narrowphase_backend.hpp"
-#include "slope/collision/shape/convex_polyhedron_shape.hpp"
+#include "slope/collision/shape/polyhedron_shape.hpp"
 #include "slope/collision/shape/sphere_shape.hpp"
 #include "slope/collision/shape/capsule_shape.hpp"
+#include "slope/collision/shape/box_shape.hpp"
 
 namespace slope {
 
 template <class A, class B>
-class GJKBackend : public NpBackend<A, B> {
+class PolyhedraCapsuleBackend : public NpBackend<A, B> {
 public:
     bool intersect()
     {
@@ -19,37 +20,37 @@ public:
         auto* ctx = this->context();
         return ctx->epa_solver.find_penetration_axis(this->shape1(), this->shape2(), ctx->gjk_solver.simplex());
     }
-};
 
-class GJKConvexPolyhedronBackend : public GJKBackend<ConvexPolyhedronShape, ConvexPolyhedronShape> {
-public:
-    void generate_contacts(ContactManifold& manifold);
-};
-
-class ConvexPolyhedronSphereBackend : public GJKBackend<ConvexPolyhedronShape, SphereShape> {
-public:
-    void generate_contacts(ContactManifold& manifold);
-};
-
-class ConvexPolyhedronCapsuleBackend : public GJKBackend<ConvexPolyhedronShape, CapsuleShape> {
-public:
-    void generate_contacts(ContactManifold& manifold);
-};
-
-class SATConvexPolyhedronBackend : public NpBackend<ConvexPolyhedronShape, ConvexPolyhedronShape> {
-public:
-    bool intersect()
+    void generate_contacts(ContactManifold& manifold)
     {
-        m_min_pen_axis = context()->sat_solver.find_penetration_axis(shape1(), shape2());
-        return m_min_pen_axis.has_value();
+        auto pen_axis = this->get_penetration_axis();
+        if (!pen_axis)
+            return;
+
+        // TODO: robust solution for imprecise penetration axis
+        auto* ctx = this->context();
+        auto& support_face = ctx->support_face[0];
+        support_face.clear();
+
+        Vec3 support_normal;
+        this->shape1()->get_support_face(*pen_axis, support_face, support_normal);
+
+        auto segment = ctx->face_clipper.clip_segment_by_convex_prism(
+            this->shape2()->segment(), support_face, *pen_axis);
+
+        for (int i = 0; i < 2; i++) {
+            auto clipped_pt = segment[i] - *pen_axis * this->shape2()->radius();
+            auto t = Plane(support_normal, support_face[0]).intersect_ray(clipped_pt, *pen_axis);
+            if (t) {
+                auto p1 = clipped_pt + *t * *pen_axis;
+                manifold.add_contact({p1, clipped_pt, *pen_axis});
+            }
+        }
     }
-
-    std::optional<Vec3> get_penetration_axis() { return m_min_pen_axis; }
-    void                generate_contacts(ContactManifold& manifold);
-
-private:
-    std::optional<Vec3> m_min_pen_axis;
 };
+
+using ConvexPolyhedronCapsuleBackend = PolyhedraCapsuleBackend<PolyhedronShape, CapsuleShape>;
+using BoxCapsuleBackend = PolyhedraCapsuleBackend<BoxShape, CapsuleShape>;
 
 class CapsuleSphereBackend : public NpBackend<CapsuleShape, SphereShape> {
 public:
@@ -109,36 +110,6 @@ public:
 private:
     Vec3 m_p1;
     Vec3 m_p2;
-};
-
-class SphereBackend : public NpBackend<SphereShape, SphereShape> {
-public:
-    bool intersect()
-    {
-        m_p1 = shape1()->transform().translation();
-        m_p2 = shape2()->transform().translation();
-        m_dist_sqr = m_p1.square_distance(m_p2);
-        float contact_dist = shape1()->radius() + shape2()->radius();
-        return m_dist_sqr <= contact_dist * contact_dist;
-    }
-
-    std::optional<Vec3> get_penetration_axis()
-    {
-        static constexpr float DIST_EPSILON = 1e-6f;
-        float dist = sqrtf(m_dist_sqr);
-        return dist > DIST_EPSILON ? (m_p2 - m_p1) / dist : Vec3{1.f, 0.f, 0.f};
-    }
-
-    void generate_contacts(ContactManifold& manifold)
-    {
-        auto pen_axis = *get_penetration_axis();
-        manifold.add_contact({m_p1 + pen_axis * shape1()->radius(), m_p2 - pen_axis * shape2()->radius(), pen_axis});
-    }
-
-private:
-    Vec3 m_p1;
-    Vec3 m_p2;
-    float m_dist_sqr = 0.f;
 };
 
 } // slope

@@ -1,5 +1,6 @@
 #pragma once
-#include "slope/collision/shape/convex_polyhedron_shape.hpp"
+#include "slope/collision/shape/polyhedron_shape.hpp"
+#include "slope/collision/shape/box_shape.hpp"
 #include <optional>
 
 namespace slope {
@@ -11,7 +12,9 @@ public:
         uint64_t cum_projection_count = 0;
     };
 
-    std::optional<Vec3> find_penetration_axis(const ConvexPolyhedronShape* shape1, const ConvexPolyhedronShape* shape2);
+    std::optional<Vec3> find_penetration_axis(const PolyhedronShape* shape1, const PolyhedronShape* shape2);
+    std::optional<Vec3> find_penetration_axis(const PolyhedronShape* shape1, const BoxShape* shape2);
+    std::optional<Vec3> find_penetration_axis(const BoxShape* shape1, const BoxShape* shape2);
 
     const Stats&        stats() const { return m_stats; }
     void                reset_stats();

@@ -1,7 +1,9 @@
 #include "slope/dynamics/dynamics_world.hpp"
 #include "slope/dynamics/constraint_solver.hpp"
 #include "slope/dynamics/pj_constraint_solver.hpp"
-#include "slope/collision/narrowphase/default_narrowphase_backends.hpp"
+#include "slope/collision/narrowphase/polyhedra_backends.hpp"
+#include "slope/collision/narrowphase/capsule_backends.hpp"
+#include "slope/collision/narrowphase/sphere_backends.hpp"
 #include "slope/debug/log.hpp"
 #include <optional>
 
@@ -67,14 +69,27 @@ void DynamicsWorld::setup_narrowphase(NpBackendHint hint)
 
         m_narrowphase.reset_all_backends();
 
-        if (hint == NpBackendHint::GJK_EPA) {
+        if (hint == NpBackendHint::Mixed) {
             m_narrowphase.add_backend<GJKConvexPolyhedronBackend>();
+            m_narrowphase.add_backend<GJKConvexPolyhedronBoxBackend>();
+            m_narrowphase.add_backend<SATBoxBackend>();
+
+        } else if (hint == NpBackendHint::GJK_EPA) {
+            m_narrowphase.add_backend<GJKConvexPolyhedronBackend>();
+            m_narrowphase.add_backend<GJKConvexPolyhedronBoxBackend>();
+            m_narrowphase.add_backend<GJKBoxBackend>();
+
         } else {
             m_narrowphase.add_backend<SATConvexPolyhedronBackend>();
+            m_narrowphase.add_backend<SATConvexPolyhedronBoxBackend>();
+            m_narrowphase.add_backend<SATBoxBackend>();
         }
 
         m_narrowphase.add_backend<ConvexPolyhedronCapsuleBackend>();
         m_narrowphase.add_backend<ConvexPolyhedronSphereBackend>();
+
+        m_narrowphase.add_backend<BoxCapsuleBackend>();
+        m_narrowphase.add_backend<BoxSphereBackend>();
 
         m_narrowphase.add_backend<CapsuleSphereBackend>();
         m_narrowphase.add_backend<CapsuleBackend>();

@@ -29,6 +29,7 @@ namespace slope {
 class DynamicsWorld {
 public:
     enum class NpBackendHint {
+        Mixed,
         GJK_EPA,
         SAT
     };
@@ -60,7 +61,7 @@ public:
         float warmstarting_friction = 0.75f;
         Vec3 gravity = {0.f, -9.81f, 0.f};
 
-        NpBackendHint np_backend_hint = NpBackendHint::GJK_EPA;
+        NpBackendHint np_backend_hint = NpBackendHint::Mixed;
 
         SolverType solver_type = SolverType::PGS;
         ConstraintSolver::Config solver_config;

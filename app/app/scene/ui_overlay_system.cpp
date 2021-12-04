@@ -86,6 +86,10 @@ void UIOverlaySystem::update(float dt)
         if (ImGui::RadioButton("Projected Jacobi", use_pj))
             world_config.solver_type = DynamicsWorld::SolverType::PJ;
 
+        bool use_mixed = (world_config.np_backend_hint == DynamicsWorld::NpBackendHint::Mixed);
+        if (ImGui::RadioButton("Mixed", use_mixed))
+            world_config.np_backend_hint = DynamicsWorld::NpBackendHint::Mixed;
+        ImGui::SameLine();
         bool use_gjk = (world_config.np_backend_hint == DynamicsWorld::NpBackendHint::GJK_EPA);
         if (ImGui::RadioButton("GJK/EPA", use_gjk))
             world_config.np_backend_hint = DynamicsWorld::NpBackendHint::GJK_EPA;

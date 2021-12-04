@@ -10,10 +10,10 @@
 #include "slope/debug/log.hpp"
 #include "slope/collision/geometry.hpp"
 #include "slope/collision/narrowphase/narrowphase.hpp"
-#include "slope/collision/narrowphase/default_narrowphase_backends.hpp"
 #include "slope/collision/shape/sphere_shape.hpp"
 #include "slope/collision/shape/capsule_shape.hpp"
-#include "slope/collision/shape/convex_polyhedron_shape.hpp"
+#include "slope/collision/shape/polyhedron_shape.hpp"
+#include "slope/collision/shape/box_shape.hpp"
 #include "imgui/imgui.h"
 #include <memory>
 
@@ -269,7 +269,7 @@ public:
         auto visual_geom = poly_factory.box(Vec3{1.f, 1.f, 1.f}, Vec3{0.f, 0.f, 0.f});
         m_unit_box_mesh = create_mesh_from_poly(visual_geom);
 
-        m_big_box = poly_factory.box(Vec3{1.5f, 1.5f, 1.5f}, Vec3{0.f, 0.f, 0.f});
+        m_big_box = poly_factory.box(Vec3{1.5f + BLOAT, 1.5f + BLOAT, 1.5f + BLOAT}, Vec3{0.f, 0.f, 0.f});
         m_big_box_mesh = create_mesh_from_poly(m_big_box);
 
         m_unit_box_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
@@ -283,13 +283,6 @@ public:
         m_capsule_mesh = create_capsule_mesh(CAPSULE_RADIUS, CAPSULE_HEIGHT);
         m_capsule_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
         m_capsule_material->set_ambient_strength(0.2f);
-
-        m_narrowphase.add_backend<GJKConvexPolyhedronBackend>();
-        m_narrowphase.add_backend<ConvexPolyhedronSphereBackend>();
-        m_narrowphase.add_backend<ConvexPolyhedronCapsuleBackend>();
-        m_narrowphase.add_backend<CapsuleSphereBackend>();
-        m_narrowphase.add_backend<CapsuleBackend>();
-        m_narrowphase.add_backend<SphereBackend>();
 
         if (m_mode == 0) {
             auto plate_geom = poly_factory.box(Vec3{20.f, 10.f, 20.f}, Vec3{0.f, 0.f, 0.f});
@@ -308,7 +301,7 @@ public:
 
             auto* pc = m_world->create<PhysicsComponent>(e);
             pc->actor = std::make_shared<StaticActor>();
-            pc->actor->set_shape<ConvexPolyhedronShape>(plate_geom);
+            pc->actor->set_shape<PolyhedronShape>(plate_geom);
             pc->actor->set_transform(tc->transform);
 
             Mat44 tr = Mat44::rotation({1.f, 0.f, 0.f}, angle);
@@ -339,6 +332,23 @@ public:
                 }
             }
         } else if (m_mode == 3) {
+            auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
+            int h = 16;
+            int l = 8;
+            int d = 8;
+            float spacing = 0.f;
+            for (int i = 0; i < l; i++) {
+                for (int j = 0; j < h; j++) {
+                    for (int k = 0; k < d; k++) {
+                        Mat44 tr = Mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
+                        tr.set_translation(
+                            {(float)i, (float)j, (float)k});
+                        //tr *= rot;
+                        spawn_cube(tr, {}, 1.f);
+                    }
+                }
+            }
+        } else if (m_mode == 4) {
             auto cup_geom = poly_factory.box(Vec3{20.f, 10.f, 20.f}, Vec3{0.f, 0.f, 0.f});
             Vec3 cup_pos[4] = {{-13.f, 5.f, 0.f}, {13.f, 5.f, 0.f}, {0.f, 5.f, -13.f}, {0.f, 5.f, 13.f}};
 
@@ -350,10 +360,10 @@ public:
 
                 auto* pc = m_world->create<PhysicsComponent>(e);
                 pc->actor = std::make_shared<StaticActor>();
-                pc->actor->set_shape<ConvexPolyhedronShape>(cup_geom);
+                pc->actor->set_shape<PolyhedronShape>(cup_geom);
                 pc->actor->set_transform(tc->transform);
             }
-        } else if (m_mode == 4) {
+        } else if (m_mode == 5) {
             physics_single->dynamics_world.config().gravity.set_zero();
 
             auto box = poly_factory.box(Vec3{2.f, 4.f, 0.4f }, Vec3{0.f, 0.f, 0.f});
@@ -369,7 +379,7 @@ public:
             auto* pc = m_world->create<PhysicsComponent>(e);
 
             auto actor = std::make_shared<DynamicActor>();
-            actor->set_shape<ConvexPolyhedronShape>(box);
+            actor->set_shape<PolyhedronShape>(box);
             actor->set_transform(tc->transform);
             actor->body().set_velocity(Vec3::zero());
             //actor->body().set_ang_velocity({8.f, 5.830945f, 1.f});
@@ -384,7 +394,7 @@ public:
             gyro_actor = actor.get();
             pc->actor = std::move(actor);
 
-        } else if (m_mode == 5) {
+        } else if (m_mode == 6) {
 
             physics_single->dynamics_world.config().gravity.set_zero();
             physics_single->dynamics_world.config().disable_constraint_resolving = true;
@@ -401,7 +411,8 @@ public:
 
             auto* pc = m_world->create<PhysicsComponent>(e);
             auto actor = std::make_shared<DynamicActor>();
-            actor->set_shape<ConvexPolyhedronShape>(box);
+            //actor->set_shape<ConvexPolyhedronShape>(box);
+            actor->set_shape<BoxShape>(Vec3{2.f, 2.f, 2.f});
             actor->set_transform(tc->transform);
             pc->actor = std::move(actor);
 
@@ -409,8 +420,8 @@ public:
 
             auto se = m_world->create_entity();
             auto* src = m_world->create<RenderComponent>(se);
-            src->mesh = create_sphere_mesh(1.f);
-            //src->mesh = create_mesh_from_poly(box2);
+            //src->mesh = create_sphere_mesh(1.f);
+            src->mesh = create_mesh_from_poly(box2);
             src->material = m_unit_box_material;
             auto* stc = m_world->create<TransformComponent>(se);
             float offs = 0.55f;
@@ -419,8 +430,9 @@ public:
             auto* pc2 = m_world->create<PhysicsComponent>(se);
             auto sactor = std::make_shared<DynamicActor>();
 
-            sactor->set_shape<SphereShape>(1.f);
+            //sactor->set_shape<SphereShape>(1.f);
             //sactor->set_shape<ConvexPolyhedronShape>(box2);
+            sactor->set_shape<BoxShape>(Vec3{1.f, 1.f, 1.f});
 
             sactor->set_transform(stc->transform);
 
@@ -447,7 +459,8 @@ public:
 
             auto* pc = m_world->create<PhysicsComponent>(e);
             pc->actor = std::make_shared<StaticActor>();
-            pc->actor->set_shape<ConvexPolyhedronShape>(floor_geom);
+            pc->actor->set_shape<PolyhedronShape>(floor_geom);
+            //pc->actor->set_shape<BoxShape>(Vec3{floor_size, 1.f, floor_size});
             pc->actor->set_friction(0.7f);
             pc->actor->set_transform(tc->transform);
         }
@@ -591,7 +604,11 @@ public:
         auto geom = big ? m_big_box : m_unit_box;
 
         auto actor = std::make_shared<DynamicActor>();
-        actor->set_shape<ConvexPolyhedronShape>(geom);
+
+        //actor->set_shape<ConvexPolyhedronShape>(geom);
+        float dim = big ? 1.5f : 1.f;
+        actor->set_shape<BoxShape>(Vec3{dim + BLOAT, dim + BLOAT, dim + BLOAT});
+
         actor->set_transform(tc->transform);
         actor->body().set_velocity(velocity);
         actor->body().set_mass(mass);
@@ -704,8 +721,6 @@ public:
 
     std::shared_ptr<Mesh> m_capsule_mesh;
     std::shared_ptr<Material> m_capsule_material;
-
-    Narrowphase m_narrowphase;
 
     bool m_cam_move_mode = false;
     Entity m_cam_entity;

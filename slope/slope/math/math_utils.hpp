@@ -107,8 +107,14 @@ constexpr T radians(T degrees) {
     return degrees / static_cast<T>(180.f) * pi<T>();
 }
 
-template <typename T> int sign(T val) {
+template <typename T> int sign(T val)
+{
     return (T(0) < val) - (val < T(0));
+}
+
+inline float signf(float val)
+{
+    return static_cast<float>(sign(val));
 }
 
 } // slope

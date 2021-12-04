@@ -55,14 +55,16 @@ float LineSegment::closest_point(const LineSegment& other, float& t1, float& t2,
                 t1 = 0.f;
             }
 
-            t2 = (b*t1 + f) / e;
+            float tnom = b*t1 + f;
 
-            if (t2 < 0.f) {
+            if (tnom < 0.f) {
                 t2 = 0.f;
                 t1 = clamp(0.f, -c/a, 1.f);
-            } else if (t2 > 1.f) {
+            } else if (tnom > e) {
                 t2 = 1.f;
                 t1 = clamp(0.f, (b-c)/a, 1.f);
+            } else {
+                t2 = tnom / e;
             }
         }
     }

@@ -1,18 +1,18 @@
-#include "slope/collision/shape/convex_polyhedron_shape.hpp"
+#include "slope/collision/shape/polyhedron_shape.hpp"
 #include "slope/collision/primitives.hpp"
 
 namespace slope {
 
-ConvexPolyhedronShape::ConvexPolyhedronShape(std::shared_ptr<ConvexPolyhedron> geometry)
+PolyhedronShape::PolyhedronShape(std::shared_ptr<ConvexPolyhedron> geometry)
     : m_geometry(std::move(geometry))
 {
     auto& geom = *m_geometry;
     m_world_vertices.reserve(geom.vertices().size());
-    m_world_face_normals.reserve(geom.face_normals().size());
-    m_world_edge_dirs.reserve(geom.edge_dirs().size());
+    m_principal_face_axes.reserve(geom.face_normals().size());
+    m_principal_edge_axes.reserve(geom.edge_dirs().size());
 }
 
-void ConvexPolyhedronShape::set_transform(const Mat44& matrix)
+void PolyhedronShape::set_transform(const Mat44& matrix)
 {
     m_transform = matrix;
     auto& geom = *m_geometry;
@@ -22,14 +22,14 @@ void ConvexPolyhedronShape::set_transform(const Mat44& matrix)
         m_world_vertices.push_back(m_transform.apply_point(vert));
     }
 
-    m_world_face_normals.clear();
+    m_principal_face_axes.clear();
     for (auto& normal: geom.face_normals()) {
-        m_world_face_normals.push_back(m_transform.apply_normal(normal));
+        m_principal_face_axes.push_back(m_transform.apply_normal(normal));
     }
 
-    m_world_edge_dirs.clear();
+    m_principal_edge_axes.clear();
     for (auto& dir: geom.edge_dirs()) {
-        m_world_edge_dirs.push_back(m_transform.apply_normal(dir));
+        m_principal_edge_axes.push_back(m_transform.apply_normal(dir));
     }
 
     m_aabb.reset(m_world_vertices[0]);
@@ -38,7 +38,7 @@ void ConvexPolyhedronShape::set_transform(const Mat44& matrix)
     }
 }
 
-Vec3 ConvexPolyhedronShape::support_point(const Vec3& axis, float bloat) const
+Vec3 PolyhedronShape::support_point(const Vec3& axis, float bloat) const
 {
     float max_dot = -FLOAT_MAX;
     const Vec3* best_point = nullptr;
@@ -53,7 +53,7 @@ Vec3 ConvexPolyhedronShape::support_point(const Vec3& axis, float bloat) const
     return *best_point;
 }
 
-float ConvexPolyhedronShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const
+float PolyhedronShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const
 {
     auto& geom = *m_geometry;
 
