@@ -29,13 +29,12 @@ public:
 
     uint32_t    size() const { return m_point_count; }
 
-    void        begin_update(uint32_t frame_id, const Mat44& shape1_inv_transform);
-    void        add_contact(ContactGeom new_geom);
+    void        update_inv_transform(const Mat44& shape1_inv_transform);
+
+    void        begin_update();
     void        end_update();
-
+    void        add_contact(ContactGeom new_geom);
     void        invert_input_order() { m_inverted_input_order = !m_inverted_input_order; };
-
-    bool        is_active(uint32_t frame_id) const { return m_point_count > 0 && m_touch_frame_id == frame_id; }
 
 private:
     static constexpr uint32_t MAX_SIZE = 4;
@@ -53,10 +52,13 @@ private:
     Array<PointLambdaCache, MAX_SIZE> m_lambda_cache;
     uint32_t m_lambda_cache_size = 0;
 
-    uint32_t m_touch_frame_id = 0;
-    Mat44 m_shape1_inv_transform;
-
     bool m_inverted_input_order = false;
+    Mat44 m_shape1_inv_transform;
 };
+
+inline void ContactManifold::update_inv_transform(const Mat44& shape1_inv_transform)
+{
+    m_shape1_inv_transform = shape1_inv_transform;
+}
 
 } // slope

@@ -80,10 +80,11 @@ public:
     }
 
     constexpr Vec4& operator/=(float value) {
-        x /= value;
-        y /= value;
-        z /= value;
-        w /= value;
+        float rcp = 1.f / value;
+        x *= rcp;
+        y *= rcp;
+        z *= rcp;
+        w *= rcp;
 
         return *this;
     }

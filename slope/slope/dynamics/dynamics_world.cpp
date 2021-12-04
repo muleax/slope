@@ -43,10 +43,10 @@ DynamicsWorld::DynamicsWorld(std::optional<Config> init_config)
         m_config = *init_config;
 
     setup_narrowphase(m_config.np_backend_hint);
-    setup_solver(m_config.solver_type);
+    setup_solver(m_config.solver_type, 1.f);
 }
 
-void DynamicsWorld::setup_solver(SolverType type)
+void DynamicsWorld::setup_solver(SolverType type, float dt)
 {
     if (m_solver_type != type) {
         m_solver_type = type;
@@ -60,6 +60,9 @@ void DynamicsWorld::setup_solver(SolverType type)
             break;
         }
     }
+
+    m_solver->config() = m_config.solver_config;
+    m_solver->set_time_interval(dt);
 }
 
 void DynamicsWorld::setup_narrowphase(NpBackendHint hint)
@@ -160,14 +163,12 @@ void DynamicsWorld::collide(BaseActor& actor1, BaseActor& actor2) {
         auto& cache = m_manifolds[{ &shape1, &shape2 }];
         cache.actor1 = &actor1;
         cache.actor2 = &actor2;
+        cache.touch_frame_id = m_frame_id;
 
         auto& manifold = cache.manifold;
-        manifold.begin_update(m_frame_id, actor1.inv_transform());
 
-        //m_narrowphase.generate_contacts(manifold, *pen_axis, &shape1, &shape2);
+        manifold.update_inv_transform(actor1.inv_transform());
         m_narrowphase.generate_contacts(manifold);
-
-        manifold.end_update();
 
         for (auto& p: manifold)
             m_pending_contacts.push_back({&cache, &p});
@@ -277,8 +278,6 @@ void DynamicsWorld::cache_lambdas() {
         p->friction1_lambda = m_solver->get_lambda(p->friction1_constr_id);
         p->friction2_lambda = m_solver->get_lambda(p->friction2_constr_id);
     }
-
-    m_pending_contacts.clear();
 }
 
 void DynamicsWorld::integrate_bodies() {
@@ -293,27 +292,39 @@ void DynamicsWorld::integrate_bodies() {
 
 void DynamicsWorld::refresh_manifolds() {
     for (auto it = m_manifolds.begin(); it != m_manifolds.end();) {
-        if (it->second.manifold.is_active(m_frame_id))
+        auto& cache = it->second;
+        if (cache.touch_frame_id == m_frame_id && cache.manifold.size() > 0)
             ++it;
         else
             it = m_manifolds.erase(it);
     }
 }
 
+void DynamicsWorld::update_constraint_stats()
+{
+    m_stats.max_constraint_solver_error.update(m_solver->max_error());
+    m_stats.avg_constraint_solver_error.update(m_solver->avg_error());
+}
+
+void DynamicsWorld::update_general_stats()
+{
+    m_stats.static_actor_count = m_static_actors.size();
+    m_stats.dynamic_actor_count = m_dynamic_actors.size();
+    m_stats.simulation_time += m_solver->time_interval();
+}
+
 void DynamicsWorld::update(float dt) {
     if (m_debug_drawer)
         m_debug_drawer->clear();
 
-    if (m_config.delay_integration)
+    if (m_config.enable_integration && m_config.delay_integration)
         integrate_bodies();
 
     setup_narrowphase(m_config.np_backend_hint);
-    setup_solver(m_config.solver_type);
+    setup_solver(m_config.solver_type, dt);
 
-    m_solver->set_time_interval(dt);
-    m_solver->config() = m_config.solver_config;
-
-    apply_gravity();
+    if (m_config.enable_gravity)
+        apply_gravity();
 
     if (m_config.enable_gyroscopic_torque)
         apply_gyroscopic_torque(dt);
@@ -322,23 +333,21 @@ void DynamicsWorld::update(float dt) {
 
     apply_contacts();
 
-    if (!m_config.disable_constraint_resolving)
+    if (m_config.enable_constraint_resolving) {
         m_solver->solve();
-
-    m_stats.max_constraint_solver_error.update(m_solver->max_error());
-    m_stats.avg_constraint_solver_error.update(m_solver->avg_error());
-    m_stats.static_actor_count = m_static_actors.size();
-    m_stats.dynamic_actor_count = m_dynamic_actors.size();
-    m_stats.simulation_time += dt;
-
-    cache_lambdas();
+        cache_lambdas();
+        update_constraint_stats();
+    }
 
     m_solver->clear();
+    m_pending_contacts.clear();
 
     refresh_manifolds();
 
-    if (!m_config.delay_integration)
+    if (m_config.enable_integration && !m_config.delay_integration)
         integrate_bodies();
+
+    update_general_stats();
 
     m_frame_id++;
 }

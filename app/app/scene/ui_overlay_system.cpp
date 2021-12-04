@@ -72,7 +72,9 @@ void UIOverlaySystem::update(float dt)
     if (ImGui::CollapsingHeader("Simulation", treeNodeFlags)) {
         ImGui::Checkbox("Pause", &ps->pause);
         ImGui::Checkbox("Real Time Sync", &ps->real_time_sync);
-        ImGui::Checkbox("Disable Constraint Resolving", &world_config.disable_constraint_resolving);
+        ImGui::Checkbox("Enable Gravity", &world_config.enable_gravity);
+        ImGui::Checkbox("Enable Constraint Resolving", &world_config.enable_constraint_resolving);
+        ImGui::Checkbox("Enable Integration", &world_config.enable_integration);
         ImGui::Checkbox("Initial Randomization", &world_config.randomize_order);
         ImGui::Checkbox("Velocity Dependent Friction", &world_config.enable_velocity_dependent_friction);
         ImGui::Checkbox("Cone Friction", &world_config.enable_cone_friction);

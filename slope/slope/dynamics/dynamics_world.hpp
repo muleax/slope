@@ -52,7 +52,9 @@ public:
     };
 
     struct Config {
-        bool disable_constraint_resolving = false;
+        bool enable_gravity = true;
+        bool enable_constraint_resolving = true;
+        bool enable_integration = true;
         bool randomize_order = true;
         bool enable_gyroscopic_torque = true;
         bool enable_velocity_dependent_friction = true;
@@ -102,6 +104,7 @@ private:
         ContactManifold manifold;
         BaseActor* actor1 = nullptr;
         BaseActor* actor2 = nullptr;
+        uint32_t touch_frame_id = 0;
     };
 
     struct PendingContact {
@@ -117,11 +120,13 @@ private:
     void perform_collision_detection();
     void collide(BaseActor& actor1, BaseActor& actor2);
     void apply_contacts();
+    void update_constraint_stats();
+    void update_general_stats();
     void cache_lambdas();
     void integrate_bodies();
     void refresh_manifolds();
 
-    void setup_solver(SolverType type);
+    void setup_solver(SolverType type, float dt);
     void setup_narrowphase(NpBackendHint hint);
 
     std::unique_ptr<ConstraintSolver> m_solver;

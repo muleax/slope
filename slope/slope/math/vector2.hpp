@@ -63,8 +63,9 @@ public:
     }
 
     constexpr Vec2& operator/=(float value) {
-        x /= value;
-        y /= value;
+        float rcp = 1.f / value;
+        x *= rcp;
+        y *= rcp;
 
         return *this;
     }

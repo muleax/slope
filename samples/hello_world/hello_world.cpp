@@ -397,7 +397,7 @@ public:
         } else if (m_mode == 6) {
 
             physics_single->dynamics_world.config().gravity.set_zero();
-            physics_single->dynamics_world.config().disable_constraint_resolving = true;
+            physics_single->dynamics_world.config().enable_constraint_resolving = true;
             physics_single->dynamics_world.config().delay_integration = true;
 
             auto box = poly_factory.box(Vec3{2.f, 2.f, 2.f}, Vec3{0.f, 0.f, 0.f});

@@ -20,7 +20,7 @@ float evaluate_area(Vec3 p0, Vec3 p1, Vec3 p2, Vec3 p3) {
 
 } // unnamed
 
-void ContactManifold::begin_update(uint32_t frame_id, const Mat44& shape1_inv_transform) {
+void ContactManifold::begin_update() {
     m_lambda_cache_size = 0;
     for (auto& pt: *this) {
         auto& cache = m_lambda_cache[m_lambda_cache_size++];
@@ -31,9 +31,6 @@ void ContactManifold::begin_update(uint32_t frame_id, const Mat44& shape1_inv_tr
     }
 
     m_point_count = 0;
-    m_touch_frame_id = frame_id;
-    m_shape1_inv_transform = shape1_inv_transform;
-
     m_inverted_input_order = false;
 }
 
@@ -69,7 +66,6 @@ void ContactManifold::end_update() {
         pt.friction2_constr_id = -1;
     }
 }
-
 
 void ContactManifold::add_contact(ContactGeom new_geom) {
     static_assert(MAX_SIZE == 4);

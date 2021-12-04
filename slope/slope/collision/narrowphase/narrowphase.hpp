@@ -17,6 +17,8 @@ public:
     std::optional<Vec3> get_penetration_axis();
     void                generate_contacts(ContactManifold& manifold);
 
+    bool                collide(ContactManifold& manifold, const CollisionShape* shape1, const CollisionShape* shape2);
+
     GJKSolver&          gjk_solver() { return m_context.gjk_solver; }
     EPASolver&          epa_solver() { return m_context.epa_solver; }
     SATSolver&          sat_solver() { return m_context.sat_solver; }
@@ -63,7 +65,19 @@ inline std::optional<Vec3> Narrowphase::get_penetration_axis()
 
 inline void Narrowphase::generate_contacts(ContactManifold& manifold)
 {
-    return m_current_backend->generate_contacts(manifold);
+    manifold.begin_update();
+    m_current_backend->generate_contacts(manifold);
+    manifold.end_update();
+}
+
+inline bool Narrowphase::collide(ContactManifold& manifold, const CollisionShape* shape1, const CollisionShape* shape2)
+{
+    if (intersect(shape1, shape2)) {
+        generate_contacts(manifold);
+        return true;
+    }
+
+    return false;
 }
 
 } // slope
