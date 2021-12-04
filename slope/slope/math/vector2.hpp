@@ -141,11 +141,11 @@ public:
         return std::isfinite(x) && std::isfinite(y);
     }
 
-    [[nodiscard]] constexpr bool equal(const Vec2& rhs, float epsilon = EPSILON) const {
+    [[nodiscard]] constexpr bool equal(const Vec2& rhs, float epsilon = EQUALITY_EPSILON) const {
         return slope::equal(x, rhs.x, epsilon) && slope::equal(y, rhs.y, epsilon);
     }
 
-    [[nodiscard]] constexpr bool equal(float rhs, float epsilon = EPSILON) const {
+    [[nodiscard]] constexpr bool equal(float rhs, float epsilon = EQUALITY_EPSILON) const {
         return slope::equal(x, rhs, epsilon) && slope::equal(y, rhs, epsilon);
     }
 

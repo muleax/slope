@@ -6,7 +6,7 @@
 namespace slope {
 
 constexpr float     PI = 3.14159265358979323846264338327950288;
-constexpr float     EPSILON = 1e-6f;
+constexpr float     EQUALITY_EPSILON = 1e-6f;
 
 constexpr float     FLOAT_MAX = std::numeric_limits<float>::max();
 
@@ -84,7 +84,7 @@ constexpr T clamp(T min, T value, T max) {
 }
 
 template<class T>
-constexpr bool equal(T a, T b, T epsilon = static_cast<T>(EPSILON)) {
+constexpr bool equal(T a, T b, T epsilon = static_cast<T>(EQUALITY_EPSILON)) {
     static_assert(std::is_floating_point_v<T>);
     return a - b > -epsilon && a - b < epsilon;
 }

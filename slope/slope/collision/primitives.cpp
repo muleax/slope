@@ -19,9 +19,29 @@ Vec3 find_orthogonal(const Vec3& normal) {
     return ort;
 }
 
-float LineSegment::closest_point(const LineSegment& other, float& t1, float& t2, Vec3& p1, Vec3& p2) const
+void LineSegment::closest_point(const Vec3& other, float& t, Vec3& p) const
 {
-    // TODO: optimize
+    Vec3 dir = end - begin;
+
+    t = dir.dot(other - begin);
+
+    if (t < 0.f) {
+        t = 0.f;
+        p = begin;
+    } else {
+        float denom = dir.dot(dir);
+        if (t >= denom) {
+            t = 1.f;
+            p = end;
+        } else {
+            t = t / denom;
+            p = begin + t * dir;
+        }
+    }
+}
+
+void LineSegment::closest_point(const LineSegment& other, float& t1, float& t2, Vec3& p1, Vec3& p2) const
+{
     constexpr float EPSILON = 1e-6f;
     auto d1 = end - begin;
     auto d2 = other.end - other.begin;
@@ -34,7 +54,7 @@ float LineSegment::closest_point(const LineSegment& other, float& t1, float& t2,
         t1 = t2 = 0.f;
         p1 = begin;
         p2 = other.begin;
-        return (p1 - p2).length_squared();
+        return;
     }
 
     if (a <= EPSILON) {
@@ -71,7 +91,6 @@ float LineSegment::closest_point(const LineSegment& other, float& t1, float& t2,
 
     p1 = begin + d1 * t1;
     p2 = other.begin + d2 * t2;
-    return (p1 - p2).length_squared();
 }
 
 } // slope

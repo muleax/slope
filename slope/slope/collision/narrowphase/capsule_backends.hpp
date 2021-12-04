@@ -56,18 +56,16 @@ class CapsuleSphereBackend : public NpBackend<CapsuleShape, SphereShape> {
 public:
     bool intersect()
     {
-        float t1;
-        float t2;
-        auto& sp = shape2()->transform().translation();
-        // TODO: optimize
-        float sqr_dist = shape1()->segment().closest_point({sp, sp}, t1, t2, m_p1, m_p2);
+        auto& sphere_center = shape2()->transform().translation();
+        float t;
+        shape1()->segment().closest_point(sphere_center, t, m_p);
         float r = shape1()->radius() + shape2()->radius();
-        return sqr_dist <= r * r;
+        return sphere_center.square_distance(m_p) <= r * r;
     }
 
     std::optional<Vec3> get_penetration_axis()
     {
-        Vec3 pen_dir = m_p2 - m_p1;
+        Vec3 pen_dir = shape2()->transform().translation() - m_p;
         float pen_axis_len = pen_dir.length();
         return (pen_axis_len > 1e-6f) ? pen_dir / pen_axis_len : Vec3{1.f, 0.f, 0.f};
     }
@@ -75,12 +73,13 @@ public:
     void generate_contacts(ContactManifold& manifold)
     {
         auto pen_axis = *get_penetration_axis();
-        manifold.add_contact({m_p1 + pen_axis * shape1()->radius(), m_p2 - pen_axis * shape2()->radius(), pen_axis});
+        auto p1 = m_p + pen_axis * shape1()->radius();
+        auto p2 = shape2()->transform().translation() - pen_axis * shape2()->radius();
+        manifold.add_contact({p1, p2, pen_axis});
     }
 
 private:
-    Vec3 m_p1;
-    Vec3 m_p2;
+    Vec3 m_p;
 };
 
 class CapsuleBackend : public NpBackend<CapsuleShape, CapsuleShape> {
@@ -89,9 +88,9 @@ public:
     {
         float t1;
         float t2;
-        float sqr_dist = shape1()->segment().closest_point(shape2()->segment(), t1, t2, m_p1, m_p2);
+        shape1()->segment().closest_point(shape2()->segment(), t1, t2, m_p1, m_p2);
         float r = shape1()->radius() + shape2()->radius();
-        return sqr_dist <= r * r;
+        return m_p1.square_distance(m_p2) <= r * r;
     }
 
     std::optional<Vec3> get_penetration_axis()
@@ -104,7 +103,9 @@ public:
     void generate_contacts(ContactManifold& manifold)
     {
         auto pen_axis = *get_penetration_axis();
-        manifold.add_contact({m_p1 + pen_axis * shape1()->radius(), m_p2 - pen_axis * shape2()->radius(), pen_axis});
+        auto p1 = m_p1 + pen_axis * shape1()->radius();
+        auto p2 = m_p2 - pen_axis * shape2()->radius();
+        manifold.add_contact({p1, p2, pen_axis});
     }
 
 private:

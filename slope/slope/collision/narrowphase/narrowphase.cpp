@@ -25,7 +25,6 @@ void Narrowphase::remove_backend(int type1, int type2)
 
     if (type1 != type2) {
         INpBackendWrapper* inv_backend = m_backend_map[type2][type1];
-        //m_backends.erase(std::find(m_backends.begin(), m_backends.end(), inv_backend));
         m_backend_map[type2][type1] = &m_null_backend;
     }
 }

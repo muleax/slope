@@ -31,7 +31,8 @@ struct LineSegment {
     const Vec3& operator [](int i) const { return data()[i]; }
     Vec3& operator [](int i) { return data()[i]; }
 
-    float closest_point(const LineSegment& other, float& t1, float& t2, Vec3& p1, Vec3& p2) const;
+    void closest_point(const Vec3& other, float& t, Vec3& p) const;
+    void closest_point(const LineSegment& other, float& t1, float& t2, Vec3& p1, Vec3& p2) const;
 };
 
 Vec3 find_orthogonal(const Vec3& normal);

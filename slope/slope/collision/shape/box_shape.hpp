@@ -12,6 +12,7 @@ public:
 
     void        set_transform(const Mat44& matrix) final;
     Vec3        support_point(const Vec3& axis, float bloat) const final;
+
     float       get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const;
     Interval    project(const Vec3& axis) const;
     const auto& principal_face_axes() const { return m_principal_axes; };

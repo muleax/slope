@@ -191,7 +191,7 @@ public:
         return result;
     }
 
-    [[nodiscard]] constexpr bool equal(const Mat33& rhs, float epsilon = EPSILON) const {
+    [[nodiscard]] constexpr bool equal(const Mat33& rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(_11, rhs._11, epsilon) &&
                 slope::equal(_12, rhs._12, epsilon) &&
                 slope::equal(_13, rhs._13, epsilon) &&

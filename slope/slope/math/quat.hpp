@@ -116,7 +116,7 @@ public:
         return { tr.x * multiplier, tr.y * multiplier, tr.z * multiplier, tr.w * multiplier };
     }
 
-    [[nodiscard]] constexpr bool equal(const Quat& rhs, float epsilon = EPSILON) const {
+    [[nodiscard]] constexpr bool equal(const Quat& rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(x, rhs.x, epsilon) &&
                 slope::equal(y, rhs.y, epsilon) &&
                 slope::equal(z, rhs.z, epsilon) &&

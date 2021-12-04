@@ -133,7 +133,7 @@ public:
                  -value._21 * multiplier, value._11 * multiplier };
     }
 
-    [[nodiscard]] constexpr bool equal(const Mat22& rhs, float epsilon = EPSILON) const {
+    [[nodiscard]] constexpr bool equal(const Mat22& rhs, float epsilon = EQUALITY_EPSILON) const {
         return slope::equal(_11, rhs._11, epsilon) && slope::equal(_12, rhs._12, epsilon) &&
                 slope::equal(_21, rhs._21, epsilon) && slope::equal(_22, rhs._22, epsilon);
     }

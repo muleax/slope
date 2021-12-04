@@ -167,14 +167,14 @@ public:
         return std::isfinite(x) && std::isfinite(y) && std::isfinite(z) && std::isfinite(w);
     }
 
-    [[nodiscard]] constexpr bool equal(const Vec4& rhs, float epsilon = EPSILON) const {
+    [[nodiscard]] constexpr bool equal(const Vec4& rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(x, rhs.x, epsilon) &&
                 slope::equal(y, rhs.y, epsilon) &&
                 slope::equal(z, rhs.z, epsilon) &&
                 slope::equal(w, rhs.w, epsilon);
     }
 
-    [[nodiscard]] constexpr bool equal(float rhs, float epsilon = EPSILON) const {
+    [[nodiscard]] constexpr bool equal(float rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(x, rhs, epsilon) &&
                 slope::equal(y, rhs, epsilon) &&
                 slope::equal(z, rhs, epsilon) &&
