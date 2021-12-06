@@ -6,7 +6,11 @@
 // #define SLOPE_DISABLE_SIMD
 
 // TODO: make portable
+#ifdef _MSC_VER
+#define SLOPE_FORCEINLINE __forceinline
+#else
 #define SLOPE_FORCEINLINE __attribute__((always_inline))
+#endif
 
 namespace slope {
 
@@ -16,92 +20,153 @@ struct ConstraintHelper {
 
     Vector<BodyData>& bodies;
 
-    SLOPE_FORCEINLINE
-    float compute_lambda_unbounded(ConstraintData& c, float lambda)
+    void solve_constraint_ref(ConstraintData& c, float& lambda, float min_bound, float max_bound)
     {
-        float dot = lambda * c.cfm_inv_dt;
-
         if (c.body2_idx >= 0) {
             auto& b1 = bodies[c.body1_idx];
             auto& b2 = bodies[c.body2_idx];
+
+            float cur_lambda = lambda;
+
+            float dot = cur_lambda * c.cfm_inv_dt;
             dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
             dot += c.jacobian21.dot(b2.inv_m_f1) + c.jacobian22.dot(b2.inv_m_f2);
 
+            float delta = (c.rhs - dot) * c.inv_diag;
+            lambda = clamp(min_bound, cur_lambda + delta, max_bound);
+            delta = lambda - cur_lambda;
+
+            b1.inv_m_f1 += c.inv_m_j11 * delta;
+            b1.inv_m_f2 += c.inv_m_j12 * delta;
+            b2.inv_m_f1 += c.inv_m_j21 * delta;
+            b2.inv_m_f2 += c.inv_m_j22 * delta;
+
         } else {
             auto& b1 = bodies[c.body1_idx];
-            dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
-        }
 
+            float cur_lambda = lambda;
+
+            float dot = cur_lambda * c.cfm_inv_dt;
+            dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
+
+            float delta = (c.rhs - dot) * c.inv_diag;
+            lambda = clamp(min_bound, cur_lambda + delta, max_bound);
+            delta = lambda - cur_lambda;
+
+            b1.inv_m_f1 += c.inv_m_j11 * delta;
+            b1.inv_m_f2 += c.inv_m_j12 * delta;
+        }
+    }
+
+    SLOPE_FORCEINLINE
+    float compute_lambda_unbounded_single(ConstraintData& c, BodyData& b1, float lambda)
+    {
+        float dot = lambda * c.cfm_inv_dt;
+        dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
         float delta = (c.rhs - dot) * c.inv_diag;
 
         return lambda + delta;
     }
 
     SLOPE_FORCEINLINE
-    void apply_delta(ConstraintData& c, float delta)
+    float compute_lambda_unbounded_pair(ConstraintData& c, BodyData& b1, BodyData& b2, float lambda)
     {
-        if (c.body2_idx >= 0) {
-            auto& b1 = bodies[c.body1_idx];
-            auto& b2 = bodies[c.body2_idx];
+        float dot = lambda * c.cfm_inv_dt;
+        dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
+        dot += c.jacobian21.dot(b2.inv_m_f1) + c.jacobian22.dot(b2.inv_m_f2);
+        float delta = (c.rhs - dot) * c.inv_diag;
 
-            b1.inv_m_f1 += c.inv_m_j11 * delta;
-            b1.inv_m_f2 += c.inv_m_j12 * delta;
-            b2.inv_m_f1 += c.inv_m_j21 * delta;
-            b2.inv_m_f2 += c.inv_m_j22 * delta;
-
-        } else {
-            auto& b1 = bodies[c.body1_idx];
-
-            b1.inv_m_f1 += c.inv_m_j11 * delta;
-            b1.inv_m_f2 += c.inv_m_j12 * delta;
-        }
+        return lambda + delta;
     }
 
     SLOPE_FORCEINLINE
-    void solve_constraint_impl(ConstraintData& c, float& lambda, float min_bound, float max_bound)
+    void apply_delta_single(ConstraintData& c, BodyData& b1, float delta)
     {
-        float cur_lambda = lambda;
-        float dot = cur_lambda * c.cfm_inv_dt;
+        b1.inv_m_f1 += c.inv_m_j11 * delta;
+        b1.inv_m_f2 += c.inv_m_j12 * delta;
+    }
 
-        if (c.body2_idx >= 0) {
-            auto& b1 = bodies[c.body1_idx];
-            auto& b2 = bodies[c.body2_idx];
+    SLOPE_FORCEINLINE
+    void apply_delta_pair(ConstraintData& c, BodyData& b1, BodyData& b2, float delta)
+    {
+        b1.inv_m_f1 += c.inv_m_j11 * delta;
+        b1.inv_m_f2 += c.inv_m_j12 * delta;
+        b2.inv_m_f1 += c.inv_m_j21 * delta;
+        b2.inv_m_f2 += c.inv_m_j22 * delta;
+    }
 
-            dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
-            dot += c.jacobian21.dot(b2.inv_m_f1) + c.jacobian22.dot(b2.inv_m_f2);
+    SLOPE_FORCEINLINE
+    void solve_bounded_single(ConstraintData& c, BodyData& b1, float& lambda, float min_bound, float max_bound)
+    {
+        float new_lambda = compute_lambda_unbounded_single(c, b1, lambda);
 
-            float delta = (c.rhs - dot) * c.inv_diag;
-            lambda = clamp(min_bound, cur_lambda + delta, max_bound);
-            delta = lambda - cur_lambda;
+        new_lambda = clamp(min_bound, new_lambda, max_bound);
+        float delta = new_lambda - lambda;
+        lambda = new_lambda;
 
-            b1.inv_m_f1 += c.inv_m_j11 * delta;
-            b1.inv_m_f2 += c.inv_m_j12 * delta;
-            b2.inv_m_f1 += c.inv_m_j21 * delta;
-            b2.inv_m_f2 += c.inv_m_j22 * delta;
+        apply_delta_single(c, b1, delta);
+    }
+
+    SLOPE_FORCEINLINE
+    void solve_bounded_pair(ConstraintData& c, BodyData& b1, BodyData& b2, float& lambda, float min_bound, float max_bound)
+    {
+        float new_lambda = compute_lambda_unbounded_pair(c, b1, b2, lambda);
+
+        new_lambda = clamp(min_bound, new_lambda, max_bound);
+        float delta = new_lambda - lambda;
+        lambda = new_lambda;
+
+        apply_delta_pair(c, b1, b2, delta);
+    }
+
+    SLOPE_FORCEINLINE
+    void scale_lambda_to_cone(float& lambda1, float& lambda2, float bound1, float bound2)
+    {
+        double divisor = ((double)lambda1 * lambda1) * ((double)bound2 * bound2) + ((double)lambda2 * lambda2) * ((double)bound1 * bound1);
+        double product = (double)bound1 * bound2;
+
+        if (divisor > 1e-8 && divisor > product * product) {
+            // scale down and preserve angle
+            double t = product / sqrt(divisor);
+            lambda1 = float(t * lambda1);
+            lambda2 = float(t * lambda2);
+
+            // float angle = std::atan2f(new_lambda1, new_lambda2);
+            // new_lambda1 = bound1 * std::sinf(angle);
+            // new_lambda2 = bound2 * std::cosf(angle);
 
         } else {
-            auto& b1 = bodies[c.body1_idx];
-
-            dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
-
-            float delta = (c.rhs - dot) * c.inv_diag;
-            lambda = clamp(min_bound, cur_lambda + delta, max_bound);
-            delta = lambda - cur_lambda;
-
-            b1.inv_m_f1 += c.inv_m_j11 * delta;
-            b1.inv_m_f2 += c.inv_m_j12 * delta;
+            lambda1 = clamp(-bound1, lambda1, bound1);
+            lambda2 = clamp(-bound2, lambda2, bound2);
         }
     }
 
     void solve_constraint(ConstraintData& c, float& lambda, float min_bound, float max_bound)
     {
-        solve_constraint_impl(c, lambda, min_bound, max_bound);
+        if (c.body2_idx >= 0) {
+            auto& b1 = bodies[c.body1_idx];
+            auto& b2 = bodies[c.body2_idx];
+            solve_bounded_pair(c, b1, b2, lambda, min_bound, max_bound);
+
+        } else {
+            auto& b1 = bodies[c.body1_idx];
+            solve_bounded_single(c, b1, lambda, min_bound, max_bound);
+        }
     }
 
     void solve_constraint_friction_1d(ConstraintData& c, float& lambda, float normal_lambda)
     {
         float bound = normal_lambda * c.friction_ratio;
-        solve_constraint_impl(c, lambda, -bound, bound);
+
+        if (c.body2_idx >= 0) {
+            auto& b1 = bodies[c.body1_idx];
+            auto& b2 = bodies[c.body2_idx];
+            solve_bounded_pair(c, b1, b2, lambda, -bound, bound);
+
+        } else {
+            auto& b1 = bodies[c.body1_idx];
+            solve_bounded_single(c, b1, lambda, -bound, bound);
+        }
     }
 
     void solve_constraint_friction_2d(
@@ -109,48 +174,56 @@ struct ConstraintHelper {
     {
         float bound1 = normal_lambda * c1.friction_ratio;
         float bound2 = normal_lambda * c2.friction_ratio;
-        solve_constraint_impl(c1, lambda1, -bound1, bound1);
-        solve_constraint_impl(c2, lambda2, -bound2, bound2);
+
+        if (c1.body2_idx >= 0) {
+            auto& b1 = bodies[c1.body1_idx];
+            auto& b2 = bodies[c1.body2_idx];
+            solve_bounded_pair(c1, b1, b2, lambda1, -bound1, bound1);
+            solve_bounded_pair(c2, b1, b2, lambda2, -bound2, bound2);
+
+        } else {
+            auto& b1 = bodies[c1.body1_idx];
+            solve_bounded_single(c1, b1, lambda1, -bound1, bound1);
+            solve_bounded_single(c2, b1, lambda2, -bound2, bound2);
+        }
     }
 
     void solve_constraint_friction_cone(
         ConstraintData& c1, ConstraintData& c2, float& lambda1, float& lambda2, float normal_lambda)
     {
+        // TODO: SIMD version
         float new_lambda1 = 0.f;
         float new_lambda2 = 0.f;
 
-        // TODO: optimize, SIMD version
-        if (normal_lambda > 0.f) {
-            float bound1 = normal_lambda * c1.friction_ratio;
-            float bound2 = normal_lambda * c2.friction_ratio;
+        float bound1 = normal_lambda * c1.friction_ratio;
+        float bound2 = normal_lambda * c2.friction_ratio;
 
-            new_lambda1 = compute_lambda_unbounded(c1, lambda1);
-            new_lambda2 = compute_lambda_unbounded(c2, lambda2);
+        if (c1.body2_idx >= 0) {
+            auto& b1 = bodies[c1.body1_idx];
+            auto& b2 = bodies[c1.body2_idx];
 
-            double divisor = ((double)new_lambda1 * new_lambda1) * ((double)bound2 * bound2) + ((double)new_lambda2 * new_lambda2) * ((double)bound1 * bound1);
-            double product = (double)bound1 * bound2;
-
-            if (divisor > 1e-8 && divisor > product * product) {
-                // scale down and preserve angle
-                double t = product / sqrt(divisor);
-                new_lambda1 = float(t * new_lambda1);
-                new_lambda2 = float(t * new_lambda2);
-
-                // float angle = std::atan2f(new_lambda1, new_lambda2);
-                // new_lambda1 = bound1 * std::sinf(angle);
-                // new_lambda2 = bound2 * std::cosf(angle);
-
-            } else {
-                new_lambda1 = clamp(-bound1, new_lambda1, bound1);
-                new_lambda2 = clamp(-bound2, new_lambda2, bound2);
+            if (normal_lambda > 0.f) {
+                new_lambda1 = compute_lambda_unbounded_pair(c1, b1, b2, lambda1);
+                new_lambda2 = compute_lambda_unbounded_pair(c2, b1, b2, lambda2);
+                scale_lambda_to_cone(new_lambda1, new_lambda2, bound1, bound2);
             }
+
+            apply_delta_pair(c1, b1, b2, new_lambda1 - lambda1);
+            apply_delta_pair(c2, b1, b2, new_lambda2 - lambda2);
         }
+        else
+        {
+            auto& b1 = bodies[c1.body1_idx];
 
-        float delta1 = new_lambda1 - lambda1;
-        float delta2 = new_lambda2 - lambda2;
+            if (normal_lambda > 0.f) {
+                new_lambda1 = compute_lambda_unbounded_single(c1, b1, lambda1);
+                new_lambda2 = compute_lambda_unbounded_single(c2, b1, lambda2);
+                scale_lambda_to_cone(new_lambda1, new_lambda2, bound1, bound2);
+            }
 
-        apply_delta(c1, delta1);
-        apply_delta(c2, delta2);
+            apply_delta_single(c1, b1, new_lambda1 - lambda1);
+            apply_delta_single(c2, b1, new_lambda2 - lambda2);
+        }
 
         lambda1 = new_lambda1;
         lambda2 = new_lambda2;
@@ -159,20 +232,24 @@ struct ConstraintHelper {
 #ifndef SLOPE_DISABLE_SIMD
 
     SLOPE_FORCEINLINE
-    __m128 clamp_simd(__m128 value, float min_bound_scalar, float max_bound_scalar)
+    __m128 clamp_simd(__m128 value, __m128 min_bound, __m128 max_bound)
     {
-        auto min_bound = _mm_load1_ps(&min_bound_scalar);
-        auto max_bound = _mm_load1_ps(&max_bound_scalar);
         value = _mm_min_ps(value, max_bound);
         return _mm_max_ps(value, min_bound);
     }
 
     SLOPE_FORCEINLINE
-    __m128 clamp_simd(__m128 value, float bound_scalar)
+    __m128 clamp_simd(__m128 value, __m128 bound)
     {
-        auto bound = _mm_load1_ps(&bound_scalar);
         value = _mm_min_ps(value, bound);
         return _mm_max_ps(value, _mm_xor_ps(bound, _mm_set1_ps(-0.0)));
+    }
+
+    SLOPE_FORCEINLINE
+    void load_min_max(float bound_s, __m128& min_bound, __m128& max_bound)
+    {
+        max_bound = _mm_load1_ps(&bound_s);
+        min_bound = _mm_xor_ps(max_bound, _mm_set1_ps(-0.0));
     }
 
     SLOPE_FORCEINLINE
@@ -218,11 +295,11 @@ struct ConstraintHelper {
     SLOPE_FORCEINLINE
     __m128 dot_product(__m128 a, __m128 b)
     {
-        //auto m = _mm_mul_ps(a, b);
-        //m = _mm_add_ps(m, _mm_shuffle_ps(m, m, _MM_SHUFFLE(1, 0, 3, 2)));
-        //return _mm_add_ps(m, _mm_shuffle_ps(m, m, _MM_SHUFFLE(2, 3, 0, 1)));
+        auto m = _mm_mul_ps(a, b);
+        m = _mm_add_ps(m, _mm_shuffle_ps(m, m, _MM_SHUFFLE(1, 0, 3, 2)));
+        return _mm_add_ps(m, _mm_shuffle_ps(m, m, _MM_SHUFFLE(2, 3, 0, 1)));
 
-        return _mm_dp_ps(a, b, 255);
+        //return _mm_dp_ps(a, b, 255);
     }
 
     SLOPE_FORCEINLINE
@@ -291,65 +368,36 @@ struct ConstraintHelper {
     }
 
     SLOPE_FORCEINLINE
-    void solve_bounded_pair_simd(ConstraintData& c, float bound, float& lambda, __m128& inv_m_f0, __m128& inv_m_f1, __m128& inv_m_f2)
-    {
-        auto cur_lambda = _mm_load1_ps(&lambda);
-
-        auto new_lambda = compute_lambda_unbounded_pair_simd(c, cur_lambda, inv_m_f0, inv_m_f1, inv_m_f2);
-        new_lambda = clamp_simd(new_lambda, bound);
-        auto delta = _mm_sub_ps(new_lambda, cur_lambda);
-
-        apply_delta_pair_simd(c, delta, inv_m_f0, inv_m_f1, inv_m_f2);
-
-        lambda = _mm_cvtss_f32(new_lambda);
-    }
-
-    SLOPE_FORCEINLINE
     void solve_bounded_pair_simd(
-        ConstraintData& c, float min_bound, float max_bound,
-        float& lambda, __m128& inv_m_f0, __m128& inv_m_f1, __m128& inv_m_f2)
+        ConstraintData& c, __m128 min_bound, __m128 max_bound,
+        __m128& lambda, __m128& inv_m_f0, __m128& inv_m_f1, __m128& inv_m_f2)
     {
-        auto cur_lambda = _mm_load1_ps(&lambda);
-
-        auto new_lambda = compute_lambda_unbounded_pair_simd(c, cur_lambda, inv_m_f0, inv_m_f1, inv_m_f2);
+        auto new_lambda = compute_lambda_unbounded_pair_simd(c, lambda, inv_m_f0, inv_m_f1, inv_m_f2);
         new_lambda = clamp_simd(new_lambda, min_bound, max_bound);
-        auto delta = _mm_sub_ps(new_lambda, cur_lambda);
+        auto delta = _mm_sub_ps(new_lambda, lambda);
+        lambda = new_lambda;
 
         apply_delta_pair_simd(c, delta, inv_m_f0, inv_m_f1, inv_m_f2);
-
-        lambda = _mm_cvtss_f32(new_lambda);
     }
 
     SLOPE_FORCEINLINE
-    void solve_bounded_single_simd(ConstraintData& c, float bound, float& lambda, __m128& inv_m_f0, __m128& inv_m_f1)
+    void solve_bounded_single_simd(ConstraintData& c, __m128 min_bound, __m128 max_bound, __m128& lambda, __m128& inv_m_f0, __m128& inv_m_f1)
     {
-        auto cur_lambda = _mm_load1_ps(&lambda);
-
-        auto new_lambda = compute_lambda_unbounded_single_simd(c, cur_lambda, inv_m_f0, inv_m_f1);
-        new_lambda = clamp_simd(new_lambda, bound);
-        auto delta = _mm_sub_ps(new_lambda, cur_lambda);
-
-        apply_delta_single_simd(c, delta, inv_m_f0, inv_m_f1);
-
-        lambda = _mm_cvtss_f32(new_lambda);
-    }
-
-    SLOPE_FORCEINLINE
-    void solve_bounded_single_simd(ConstraintData& c, float min_bound, float max_bound, float& lambda, __m128& inv_m_f0, __m128& inv_m_f1)
-    {
-        auto cur_lambda = _mm_load1_ps(&lambda);
-
-        auto new_lambda = compute_lambda_unbounded_single_simd(c, cur_lambda, inv_m_f0, inv_m_f1);
+        auto new_lambda = compute_lambda_unbounded_single_simd(c, lambda, inv_m_f0, inv_m_f1);
         new_lambda = clamp_simd(new_lambda, min_bound, max_bound);
-        auto delta = _mm_sub_ps(new_lambda, cur_lambda);
+        auto delta = _mm_sub_ps(new_lambda, lambda);
+        lambda = new_lambda;
 
         apply_delta_single_simd(c, delta, inv_m_f0, inv_m_f1);
-
-        lambda = _mm_cvtss_f32(new_lambda);
     }
 
-    void solve_constraint_simd(ConstraintData& c, float& lambda, float min_bound, float max_bound)
+    void solve_constraint_simd(ConstraintData& c, float& lambda_s, float min_bound_s, float max_bound_s)
     {
+        __m128 min_bound = _mm_load1_ps(&min_bound_s);
+        __m128 max_bound = _mm_load1_ps(&max_bound_s);
+
+        __m128 lambda = _mm_load1_ps(&lambda_s);
+
         if (c.body2_idx >= 0) {
             auto& b1 = bodies[c.body1_idx];
             auto& b2 = bodies[c.body2_idx];
@@ -358,9 +406,7 @@ struct ConstraintHelper {
             __m128 inv_m_f1;
             __m128 inv_m_f2;
             load_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
-
             solve_bounded_pair_simd(c, min_bound, max_bound, lambda, inv_m_f0, inv_m_f1, inv_m_f2);
-
             store_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
 
         } else {
@@ -369,16 +415,20 @@ struct ConstraintHelper {
             __m128 inv_m_f0;
             __m128 inv_m_f1;
             load_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
-
             solve_bounded_single_simd(c, min_bound, max_bound, lambda, inv_m_f0, inv_m_f1);
-
             store_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
         }
+
+        lambda_s = _mm_cvtss_f32(lambda);
     }
 
-    void solve_constraint_friction_1d_simd(ConstraintData& c, float& lambda, float normal_lambda)
+    void solve_constraint_friction_1d_simd(ConstraintData& c, float& lambda_s, float normal_lambda_s)
     {
-        float bound = normal_lambda * c.friction_ratio;
+        __m128 min_bound;
+        __m128 max_bound;
+        load_min_max(normal_lambda_s * c.friction_ratio, min_bound, max_bound);
+
+        __m128 lambda = _mm_load1_ps(&lambda_s);
 
         if (c.body2_idx >= 0) {
             auto& b1 = bodies[c.body1_idx];
@@ -388,9 +438,7 @@ struct ConstraintHelper {
             __m128 inv_m_f1;
             __m128 inv_m_f2;
             load_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
-
-            solve_bounded_pair_simd(c, bound, lambda, inv_m_f0, inv_m_f1, inv_m_f2);
-
+            solve_bounded_pair_simd(c, min_bound, max_bound, lambda, inv_m_f0, inv_m_f1, inv_m_f2);
             store_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
 
         } else {
@@ -399,18 +447,26 @@ struct ConstraintHelper {
             __m128 inv_m_f0;
             __m128 inv_m_f1;
             load_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
-
-            solve_bounded_single_simd(c, bound, lambda, inv_m_f0, inv_m_f1);
-
+            solve_bounded_single_simd(c, min_bound, max_bound, lambda, inv_m_f0, inv_m_f1);
             store_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
         }
+
+        lambda_s = _mm_cvtss_f32(lambda);
     }
 
     void solve_constraint_friction_2d_simd(
-        ConstraintData& c1, ConstraintData& c2, float& lambda1, float& lambda2, float normal_lambda)
+        ConstraintData& c1, ConstraintData& c2, float& lambda1_s, float& lambda2_s, float normal_lambda_s)
     {
-        float bound1 = normal_lambda * c1.friction_ratio;
-        float bound2 = normal_lambda * c2.friction_ratio;
+        __m128 min_bound1;
+        __m128 max_bound1;
+        load_min_max(normal_lambda_s * c1.friction_ratio, min_bound1, max_bound1);
+
+        __m128 min_bound2;
+        __m128 max_bound2;
+        load_min_max(normal_lambda_s * c2.friction_ratio, min_bound2, max_bound2);
+
+        __m128 lambda1 = _mm_load1_ps(&lambda1_s);
+        __m128 lambda2 = _mm_load1_ps(&lambda2_s);
 
         if (c1.body2_idx >= 0) {
             auto& b1 = bodies[c1.body1_idx];
@@ -421,8 +477,8 @@ struct ConstraintHelper {
             __m128 inv_m_f2;
             load_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
 
-            solve_bounded_pair_simd(c1, bound1, lambda1, inv_m_f0, inv_m_f1, inv_m_f2);
-            solve_bounded_pair_simd(c2, bound2, lambda2, inv_m_f0, inv_m_f1, inv_m_f2);
+            solve_bounded_pair_simd(c1, min_bound1, max_bound1, lambda1, inv_m_f0, inv_m_f1, inv_m_f2);
+            solve_bounded_pair_simd(c2, min_bound2, max_bound2, lambda2, inv_m_f0, inv_m_f1, inv_m_f2);
 
             store_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
 
@@ -433,11 +489,14 @@ struct ConstraintHelper {
             __m128 inv_m_f1;
             load_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
 
-            solve_bounded_single_simd(c1, bound1, lambda1, inv_m_f0, inv_m_f1);
-            solve_bounded_single_simd(c2, bound2, lambda2, inv_m_f0, inv_m_f1);
+            solve_bounded_single_simd(c1, min_bound1, max_bound1, lambda1, inv_m_f0, inv_m_f1);
+            solve_bounded_single_simd(c2, min_bound2, max_bound2, lambda2, inv_m_f0, inv_m_f1);
 
             store_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
         }
+
+        lambda1_s = _mm_cvtss_f32(lambda1);
+        lambda2_s = _mm_cvtss_f32(lambda2);
     }
 
 #else // SLOPE_DISABLE_SIMD
