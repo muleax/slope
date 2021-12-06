@@ -332,17 +332,23 @@ public:
                 }
             }
         } else if (m_mode == 3) {
-            auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
-            int h = 16;
-            int l = 8;
-            int d = 8;
+            //physics_single->dynamics_world.config().enable_constraint_resolving = false;
+            physics_single->dynamics_world.config().enable_integration = false;
+            physics_single->dynamics_world.config().randomize_order = false;
+            physics_single->dynamics_world.config().enable_velocity_dependent_friction = false;
+            physics_single->dynamics_world.config().solver_config.iteration_count = 30;
+
+
+            int h = 10;
+            int l = 10;
+            int d = 10;
             float spacing = 0.f;
             for (int i = 0; i < l; i++) {
                 for (int j = 0; j < h; j++) {
                     for (int k = 0; k < d; k++) {
                         Mat44 tr = Mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
                         tr.set_translation(
-                            {(float)i, (float)j, (float)k});
+                            {(float)i * 0.99f, (float)j * 0.99f + 5.f, (float)k * 0.99f});
                         //tr *= rot;
                         spawn_cube(tr, {}, 1.f);
                     }
@@ -397,10 +403,10 @@ public:
         } else if (m_mode == 6) {
 
             physics_single->dynamics_world.config().gravity.set_zero();
-            physics_single->dynamics_world.config().enable_constraint_resolving = true;
+            physics_single->dynamics_world.config().enable_constraint_resolving = false;
             physics_single->dynamics_world.config().delay_integration = true;
 
-            auto box = poly_factory.box(Vec3{2.f, 2.f, 2.f}, Vec3{0.f, 0.f, 0.f});
+            auto box = poly_factory.box(Vec3{1.f, 1.f, 1.f}, Vec3{0.f, 0.f, 0.f});
 
             auto e = m_world->create_entity();
             auto* rc = m_world->create<RenderComponent>(e);
@@ -412,7 +418,7 @@ public:
             auto* pc = m_world->create<PhysicsComponent>(e);
             auto actor = std::make_shared<DynamicActor>();
             //actor->set_shape<ConvexPolyhedronShape>(box);
-            actor->set_shape<BoxShape>(Vec3{2.f, 2.f, 2.f});
+            actor->set_shape<BoxShape>(Vec3{1.f, 1.f, 1.f});
             actor->set_transform(tc->transform);
             pc->actor = std::move(actor);
 
@@ -424,8 +430,8 @@ public:
             src->mesh = create_mesh_from_poly(box2);
             src->material = m_unit_box_material;
             auto* stc = m_world->create<TransformComponent>(se);
-            float offs = 0.55f;
-            stc->transform = Mat44::translate({2.f - offs, 7.f - offs, 2.f - offs});
+            float offs = 0.f;
+            stc->transform = Mat44::translate({0.98f - offs, 5.f - offs, 0.f - offs});
 
             auto* pc2 = m_world->create<PhysicsComponent>(se);
             auto sactor = std::make_shared<DynamicActor>();
@@ -605,7 +611,7 @@ public:
 
         auto actor = std::make_shared<DynamicActor>();
 
-        //actor->set_shape<ConvexPolyhedronShape>(geom);
+        //actor->set_shape<PolyhedronShape>(geom);
         float dim = big ? 1.5f : 1.f;
         actor->set_shape<BoxShape>(Vec3{dim + BLOAT, dim + BLOAT, dim + BLOAT});
 
@@ -616,6 +622,8 @@ public:
         actor->body().set_local_inertia({inertia, inertia, inertia});
 
         actor->set_friction(0.7f);
+
+        actor->shape().set_transform(actor->body().transform());
 
         pc->actor = std::move(actor);
     }
@@ -731,7 +739,7 @@ public:
     Vec3 control_euler;
     DynamicActor* control_actor = nullptr;
 
-    int m_mode = 2;
+    int m_mode = 3;
 };
 
 int main() {

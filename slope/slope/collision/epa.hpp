@@ -8,6 +8,8 @@ namespace slope {
 
 class EPASolver {
 public:
+    using Simplex = GJKSolver::Simplex;
+
     struct Config {
         uint32_t max_iteration_count = 80;
         float support_bloat = 0.f;
@@ -22,12 +24,11 @@ public:
         uint32_t max_iteration_count = 0;
     };
 
-    std::optional<Vec3> find_penetration_axis(
-        const CollisionShape* shape1, const CollisionShape* shape2, const GJKSolver::Simplex& simplex);
+    std::optional<Vec3> find_penetration_axis(const CollisionShape* shape1, const CollisionShape* shape2, const Simplex& simplex);
 
-    Config&         config() { return m_config; }
-    const Stats&    stats() const { return m_stats; }
-    void            reset_stats();
+    Config&             config() { return m_config; }
+    const Stats&        stats() const { return m_stats; }
+    void                reset_stats();
 
 private:
     struct Face {

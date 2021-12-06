@@ -26,19 +26,4 @@ private:
     Stats m_stats;
 };
 
-inline std::optional<Vec3> SATSolver::find_penetration_axis(const PolyhedronShape* shape1, const PolyhedronShape* shape2)
-{
-    return find_penetration_axis_impl(shape1, shape2);
-}
-
-inline std::optional<Vec3> SATSolver::find_penetration_axis(const PolyhedronShape* shape1, const BoxShape* shape2)
-{
-    return find_penetration_axis_impl(shape1, shape2);
-}
-
-inline std::optional<Vec3> SATSolver::find_penetration_axis(const BoxShape* shape1, const BoxShape* shape2)
-{
-    return find_penetration_axis_impl(shape1, shape2);
-}
-
 } // slope

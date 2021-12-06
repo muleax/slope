@@ -5,9 +5,12 @@ namespace slope {
 
 // Experimental Projected Jacobi constraint solver
 class PJConstraintSolver : public ConstraintSolver {
+public:
+    void solve() final;
+
 private:
-    void solve_constraint(ConstraintData& c);
-    void solve_iterations() final;
+    void solve_constraint_pj(ConstraintData& c, float& lambda);
+    void solve_iterations_pj();
 };
 
 } // slope

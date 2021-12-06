@@ -85,8 +85,19 @@ std::optional<Vec3> SATSolver::find_penetration_axis_impl(const Shape1* shape1, 
     return min_pen_axis * min_pen.direction;
 }
 
-template std::optional<Vec3> SATSolver::find_penetration_axis_impl(const PolyhedronShape* shape1, const PolyhedronShape* shape2);
-template std::optional<Vec3> SATSolver::find_penetration_axis_impl(const PolyhedronShape* shape1, const BoxShape* shape2);
-template std::optional<Vec3> SATSolver::find_penetration_axis_impl(const BoxShape* shape1, const BoxShape* shape2);
+std::optional<Vec3> SATSolver::find_penetration_axis(const PolyhedronShape* shape1, const PolyhedronShape* shape2)
+{
+    return find_penetration_axis_impl(shape1, shape2);
+}
+
+std::optional<Vec3> SATSolver::find_penetration_axis(const PolyhedronShape* shape1, const BoxShape* shape2)
+{
+    return find_penetration_axis_impl(shape1, shape2);
+}
+
+std::optional<Vec3> SATSolver::find_penetration_axis(const BoxShape* shape1, const BoxShape* shape2)
+{
+    return find_penetration_axis_impl(shape1, shape2);
+}
 
 } // slope

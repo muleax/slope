@@ -166,6 +166,15 @@ public:
 
     void max(const Vec2& lhs, const Vec2& rhs);
 
+    void set_zero() {
+        x = 0.f;
+        y = 0.f;
+    }
+
+    bool is_zero() const {
+        return x == 0.f && y == 0.f;
+    }
+
     union {
         struct {
             float x, y;

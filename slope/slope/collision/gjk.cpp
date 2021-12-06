@@ -1,4 +1,5 @@
 #include "slope/collision/gjk.hpp"
+#include "slope/collision/primitives.hpp"
 #include <optional>
 
 namespace slope {
@@ -8,7 +9,6 @@ void GJKSolver::reset_stats()
     m_stats.cum_test_count = 0;
     m_stats.cum_iterations_count = 0;
     m_stats.max_iteration_count = 0;
-
 }
 
 void GJKSolver::collect_stats(uint32_t iteration_count, bool fail)
@@ -23,7 +23,9 @@ inline Vec3 GJKSolver::update_point(Vec3 a)
 {
     m_simplex_size = 1;
     m_simplex[0] = a;
-    return -a;
+
+    Vec3 axis = a.is_zero() ? Vec3{1.f, 0.f, 0.f} : -a;
+    return axis;
 }
 
 inline Vec3 GJKSolver::update_line(Vec3 b, Vec3 a)
@@ -35,7 +37,11 @@ inline Vec3 GJKSolver::update_line(Vec3 b, Vec3 a)
     Vec3 ab = b - a;
     Vec3 ao = -a;
 
-    return ab.cross(ao).cross(ab);
+    Vec3 axis = ab.cross(ao).cross(ab);
+    if (axis.is_zero())
+        axis = find_orthogonal(ao);
+
+    return axis;
 }
 
 Vec3 GJKSolver::update_triangle(Vec3 c, Vec3 b, Vec3 a)
@@ -45,11 +51,11 @@ Vec3 GJKSolver::update_triangle(Vec3 c, Vec3 b, Vec3 a)
     Vec3 ao = -a;
     Vec3 n = ab.cross(ac);
 
-    if (ab.cross(n).dot(ao) >= 0.f) {
+    if (ab.cross(n).dot(ao) > 0.f) {
         return update_line(b, a);
     }
 
-    if (n.cross(ac).dot(ao) >= 0.f) {
+    if (n.cross(ac).dot(ao) > 0.f) {
         return update_line(c, a);
     }
 
@@ -69,17 +75,17 @@ std::optional<Vec3> GJKSolver::update_tetrahedron(Vec3 d, Vec3 c, Vec3 b, Vec3 a
     Vec3 ao = -a;
 
     Vec3 abc = ab.cross(ac);
-    if (abc.dot(ad) * abc.dot(ao) <= 0.f) {
+    if (abc.dot(ad) * abc.dot(ao) < 0.f) {
         return update_triangle(c, b, a);
     }
 
     Vec3 abd = ab.cross(ad);
-    if (abd.dot(ac) * abd.dot(ao) <= 0.f) {
+    if (abd.dot(ac) * abd.dot(ao) < 0.f) {
         return update_triangle(d, b, a);
     }
 
     Vec3 acd = ac.cross(ad);
-    if (acd.dot(ab) * acd.dot(ao) <= 0.f) {
+    if (acd.dot(ab) * acd.dot(ao) < 0.f) {
         return update_triangle(d, c, a);
     }
 
@@ -91,7 +97,7 @@ bool GJKSolver::intersect(const CollisionShape* shape1, const CollisionShape* sh
     constexpr float SUPPORT_EPSILON = 1e-12f;
 
     Vec3 init_axis = shape1->transform().translation() - shape2->transform().translation();
-    m_simplex[0] = shape1->support_diff(shape2, init_axis, 0.f);
+    m_simplex[0] = shape1->support_diff(shape2, init_axis, 0.f, false);
     m_simplex_size = 1;
 
     for (uint32_t iter = 0; iter < m_config.max_iteration_count; iter++) {
@@ -127,9 +133,10 @@ bool GJKSolver::intersect(const CollisionShape* shape1, const CollisionShape* sh
             return true;
         }
 
-        Vec3 new_pt = shape1->support_diff(shape2, *axis, 0.f);
+        Vec3 new_pt = shape1->support_diff(shape2, *axis, 0.f, false);
 
-        if (axis->dot(new_pt) < SUPPORT_EPSILON) {
+        float proximity = axis->dot(new_pt);
+        if (proximity < SUPPORT_EPSILON) {
             collect_stats(iter + 1, false);
             return false;
         }

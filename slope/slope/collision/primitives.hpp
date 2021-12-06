@@ -35,7 +35,7 @@ struct LineSegment {
     void closest_point(const LineSegment& other, float& t1, float& t2, Vec3& p1, Vec3& p2) const;
 };
 
-Vec3 find_orthogonal(const Vec3& normal);
+Vec3 find_orthogonal(const Vec3& axis);
 
 inline void find_tangent(Vec3& out_u, Vec3& out_v, const Vec3& normal) {
     out_u = find_orthogonal(normal).normalized();

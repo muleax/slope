@@ -178,6 +178,10 @@ public:
         z = 0.f;
     }
 
+    bool is_zero() const {
+        return x == 0.f && y == 0.f && z == 0.f;
+    }
+
     union {
         struct {
             float x, y, z;

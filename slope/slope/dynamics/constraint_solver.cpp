@@ -1,13 +1,474 @@
 #include "slope/dynamics/constraint_solver.hpp"
 #include "slope/debug/assert.hpp"
 #include "slope/debug/log.hpp"
+#include <immintrin.h>
+
+// #define SLOPE_DISABLE_SIMD
+
+// TODO: make portable
+#define SLOPE_FORCEINLINE __attribute__((always_inline))
 
 namespace slope {
 
+struct ConstraintHelper {
+    using ConstraintData = ConstraintSolver::ConstraintData;
+    using BodyData = ConstraintSolver::BodyData;
+
+    Vector<BodyData>& bodies;
+
+    SLOPE_FORCEINLINE
+    float compute_lambda_unbounded(ConstraintData& c, float lambda)
+    {
+        float dot = lambda * c.cfm_inv_dt;
+
+        if (c.body2_idx >= 0) {
+            auto& b1 = bodies[c.body1_idx];
+            auto& b2 = bodies[c.body2_idx];
+            dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
+            dot += c.jacobian21.dot(b2.inv_m_f1) + c.jacobian22.dot(b2.inv_m_f2);
+
+        } else {
+            auto& b1 = bodies[c.body1_idx];
+            dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
+        }
+
+        float delta = (c.rhs - dot) * c.inv_diag;
+
+        return lambda + delta;
+    }
+
+    SLOPE_FORCEINLINE
+    void apply_delta(ConstraintData& c, float delta)
+    {
+        if (c.body2_idx >= 0) {
+            auto& b1 = bodies[c.body1_idx];
+            auto& b2 = bodies[c.body2_idx];
+
+            b1.inv_m_f1 += c.inv_m_j11 * delta;
+            b1.inv_m_f2 += c.inv_m_j12 * delta;
+            b2.inv_m_f1 += c.inv_m_j21 * delta;
+            b2.inv_m_f2 += c.inv_m_j22 * delta;
+
+        } else {
+            auto& b1 = bodies[c.body1_idx];
+
+            b1.inv_m_f1 += c.inv_m_j11 * delta;
+            b1.inv_m_f2 += c.inv_m_j12 * delta;
+        }
+    }
+
+    SLOPE_FORCEINLINE
+    void solve_constraint_impl(ConstraintData& c, float& lambda, float min_bound, float max_bound)
+    {
+        float cur_lambda = lambda;
+        float dot = cur_lambda * c.cfm_inv_dt;
+
+        if (c.body2_idx >= 0) {
+            auto& b1 = bodies[c.body1_idx];
+            auto& b2 = bodies[c.body2_idx];
+
+            dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
+            dot += c.jacobian21.dot(b2.inv_m_f1) + c.jacobian22.dot(b2.inv_m_f2);
+
+            float delta = (c.rhs - dot) * c.inv_diag;
+            lambda = clamp(min_bound, cur_lambda + delta, max_bound);
+            delta = lambda - cur_lambda;
+
+            b1.inv_m_f1 += c.inv_m_j11 * delta;
+            b1.inv_m_f2 += c.inv_m_j12 * delta;
+            b2.inv_m_f1 += c.inv_m_j21 * delta;
+            b2.inv_m_f2 += c.inv_m_j22 * delta;
+
+        } else {
+            auto& b1 = bodies[c.body1_idx];
+
+            dot += c.jacobian11.dot(b1.inv_m_f1) + c.jacobian12.dot(b1.inv_m_f2);
+
+            float delta = (c.rhs - dot) * c.inv_diag;
+            lambda = clamp(min_bound, cur_lambda + delta, max_bound);
+            delta = lambda - cur_lambda;
+
+            b1.inv_m_f1 += c.inv_m_j11 * delta;
+            b1.inv_m_f2 += c.inv_m_j12 * delta;
+        }
+    }
+
+    void solve_constraint(ConstraintData& c, float& lambda, float min_bound, float max_bound)
+    {
+        solve_constraint_impl(c, lambda, min_bound, max_bound);
+    }
+
+    void solve_constraint_friction_1d(ConstraintData& c, float& lambda, float normal_lambda)
+    {
+        float bound = normal_lambda * c.friction_ratio;
+        solve_constraint_impl(c, lambda, -bound, bound);
+    }
+
+    void solve_constraint_friction_2d(
+        ConstraintData& c1, ConstraintData& c2, float& lambda1, float& lambda2, float normal_lambda)
+    {
+        float bound1 = normal_lambda * c1.friction_ratio;
+        float bound2 = normal_lambda * c2.friction_ratio;
+        solve_constraint_impl(c1, lambda1, -bound1, bound1);
+        solve_constraint_impl(c2, lambda2, -bound2, bound2);
+    }
+
+    void solve_constraint_friction_cone(
+        ConstraintData& c1, ConstraintData& c2, float& lambda1, float& lambda2, float normal_lambda)
+    {
+        float new_lambda1 = 0.f;
+        float new_lambda2 = 0.f;
+
+        // TODO: optimize, SIMD version
+        if (normal_lambda > 0.f) {
+            float bound1 = normal_lambda * c1.friction_ratio;
+            float bound2 = normal_lambda * c2.friction_ratio;
+
+            new_lambda1 = compute_lambda_unbounded(c1, lambda1);
+            new_lambda2 = compute_lambda_unbounded(c2, lambda2);
+
+            double divisor = ((double)new_lambda1 * new_lambda1) * ((double)bound2 * bound2) + ((double)new_lambda2 * new_lambda2) * ((double)bound1 * bound1);
+            double product = (double)bound1 * bound2;
+
+            if (divisor > 1e-8 && divisor > product * product) {
+                // scale down and preserve angle
+                double t = product / sqrt(divisor);
+                new_lambda1 = float(t * new_lambda1);
+                new_lambda2 = float(t * new_lambda2);
+
+                // float angle = std::atan2f(new_lambda1, new_lambda2);
+                // new_lambda1 = bound1 * std::sinf(angle);
+                // new_lambda2 = bound2 * std::cosf(angle);
+
+            } else {
+                new_lambda1 = clamp(-bound1, new_lambda1, bound1);
+                new_lambda2 = clamp(-bound2, new_lambda2, bound2);
+            }
+        }
+
+        float delta1 = new_lambda1 - lambda1;
+        float delta2 = new_lambda2 - lambda2;
+
+        apply_delta(c1, delta1);
+        apply_delta(c2, delta2);
+
+        lambda1 = new_lambda1;
+        lambda2 = new_lambda2;
+    }
+
+#ifndef SLOPE_DISABLE_SIMD
+
+    SLOPE_FORCEINLINE
+    __m128 clamp_simd(__m128 value, float min_bound_scalar, float max_bound_scalar)
+    {
+        auto min_bound = _mm_load1_ps(&min_bound_scalar);
+        auto max_bound = _mm_load1_ps(&max_bound_scalar);
+        value = _mm_min_ps(value, max_bound);
+        return _mm_max_ps(value, min_bound);
+    }
+
+    SLOPE_FORCEINLINE
+    __m128 clamp_simd(__m128 value, float bound_scalar)
+    {
+        auto bound = _mm_load1_ps(&bound_scalar);
+        value = _mm_min_ps(value, bound);
+        return _mm_max_ps(value, _mm_xor_ps(bound, _mm_set1_ps(-0.0)));
+    }
+
+    SLOPE_FORCEINLINE
+    void load_inv_m_f_single(BodyData& b1, __m128& inv_m_f0, __m128& inv_m_f1)
+    {
+        inv_m_f0 = _mm_load_ps(b1.inv_m_f1.data);
+        inv_m_f1 = _mm_load_ps(b1.inv_m_f1.data + 4);
+    }
+
+    SLOPE_FORCEINLINE
+    void load_inv_m_f_pair(BodyData& b1, BodyData& b2, __m128& inv_m_f0, __m128& inv_m_f1, __m128& inv_m_f2)
+    {
+        inv_m_f0 = _mm_load_ps(b1.inv_m_f1.data);
+
+        auto inv_m_f01 = _mm_load_ps(b1.inv_m_f1.data + 4);
+        auto inv_m_f10 = _mm_load_ps(b2.inv_m_f1.data);
+        auto inv_m_f11 = _mm_load_ps(b2.inv_m_f1.data + 4);
+
+        inv_m_f1 = _mm_shuffle_ps(inv_m_f01, inv_m_f10, _MM_SHUFFLE(1, 0, 1, 0));
+        inv_m_f2 = _mm_shuffle_ps(inv_m_f10, inv_m_f11, _MM_SHUFFLE(1, 0, 3, 2));
+    }
+
+    SLOPE_FORCEINLINE
+    void store_inv_m_f_single(BodyData& b1, __m128 inv_m_f0, __m128 inv_m_f1)
+    {
+        _mm_store_ps(b1.inv_m_f1.data, inv_m_f0);
+        _mm_store_ps(b1.inv_m_f1.data + 4, inv_m_f1);
+    }
+
+    SLOPE_FORCEINLINE
+    void store_inv_m_f_pair(BodyData& b1, BodyData& b2, __m128 inv_m_f0, __m128 inv_m_f1, __m128 inv_m_f2)
+    {
+        _mm_store_ps(b1.inv_m_f1.data, inv_m_f0);
+        _mm_store_ps(b1.inv_m_f1.data + 4, inv_m_f1);
+
+        auto tmp1 = _mm_shuffle_ps(inv_m_f1, inv_m_f2, _MM_SHUFFLE(1, 0, 3, 2));
+        _mm_store_ps(b2.inv_m_f1.data, tmp1);
+
+        auto tmp2 = _mm_shuffle_ps(inv_m_f2, inv_m_f2, _MM_SHUFFLE(3, 2, 3, 2));
+        _mm_store_ps(b2.inv_m_f1.data + 4, tmp2);
+    }
+
+    SLOPE_FORCEINLINE
+    __m128 dot_product(__m128 a, __m128 b)
+    {
+        //auto m = _mm_mul_ps(a, b);
+        //m = _mm_add_ps(m, _mm_shuffle_ps(m, m, _MM_SHUFFLE(1, 0, 3, 2)));
+        //return _mm_add_ps(m, _mm_shuffle_ps(m, m, _MM_SHUFFLE(2, 3, 0, 1)));
+
+        return _mm_dp_ps(a, b, 255);
+    }
+
+    SLOPE_FORCEINLINE
+    __m128 compute_lambda_unbounded_single_simd(ConstraintData& c, __m128 cur_lambda, __m128 inv_m_f0, __m128 inv_m_f1)
+    {
+        auto dot_base = _mm_mul_ps(cur_lambda, _mm_load1_ps(&c.cfm_inv_dt));
+        auto delta = _mm_sub_ps(_mm_load1_ps(&c.rhs), dot_base);
+
+        auto j0 = _mm_load_ps(c.jacobian11.data);
+        auto j1 = _mm_load_ps(c.jacobian11.data + 4);
+
+        auto dot0 = dot_product(j0, inv_m_f0);
+        auto dot1 = dot_product(j1, inv_m_f1);
+
+        delta = _mm_sub_ps(delta, dot0);
+        delta = _mm_sub_ps(delta, dot1);
+
+        delta = _mm_mul_ps(delta, _mm_load1_ps(&c.inv_diag));
+
+        return _mm_add_ps(cur_lambda, delta);
+    }
+
+    SLOPE_FORCEINLINE
+    __m128 compute_lambda_unbounded_pair_simd(ConstraintData& c, __m128 cur_lambda, __m128 inv_m_f0, __m128 inv_m_f1, __m128 inv_m_f2)
+    {
+        auto dot_base = _mm_mul_ps(cur_lambda, _mm_load1_ps(&c.cfm_inv_dt));
+        auto delta = _mm_sub_ps(_mm_load1_ps(&c.rhs), dot_base);
+
+        auto j0 = _mm_load_ps(c.jacobian11.data);
+        auto j1 = _mm_load_ps(c.jacobian11.data + 4);
+        auto j2 = _mm_load_ps(c.jacobian11.data + 8);
+
+        auto dot0 = dot_product(j0, inv_m_f0);
+        auto dot1 = dot_product(j1, inv_m_f1);
+        auto dot2 = dot_product(j2, inv_m_f2);
+
+        auto d0d1 = _mm_add_ps(dot0, dot1);
+        delta = _mm_sub_ps(delta, d0d1);
+        delta = _mm_sub_ps(delta, dot2);
+
+        delta = _mm_mul_ps(delta, _mm_load1_ps(&c.inv_diag));
+
+        return _mm_add_ps(cur_lambda, delta);
+    }
+
+    SLOPE_FORCEINLINE
+    void apply_delta_single_simd(ConstraintData& c, __m128 delta, __m128& inv_m_f0, __m128& inv_m_f1)
+    {
+        auto inv_m_j0 = _mm_load_ps(c.inv_m_j11.data);
+        auto inv_m_j1 = _mm_load_ps(c.inv_m_j11.data + 4);
+
+        inv_m_f0 = _mm_add_ps(inv_m_f0, _mm_mul_ps(inv_m_j0, delta));
+        inv_m_f1 = _mm_add_ps(inv_m_f1, _mm_mul_ps(inv_m_j1, delta));
+    }
+
+    SLOPE_FORCEINLINE
+    void apply_delta_pair_simd(ConstraintData& c, __m128 delta, __m128& inv_m_f0, __m128& inv_m_f1, __m128& inv_m_f2)
+    {
+        auto inv_m_j0 = _mm_load_ps(c.inv_m_j11.data);
+        auto inv_m_j1 = _mm_load_ps(c.inv_m_j11.data + 4);
+        auto inv_m_j2 = _mm_load_ps(c.inv_m_j11.data + 8);
+
+        inv_m_f0 = _mm_add_ps(inv_m_f0, _mm_mul_ps(inv_m_j0, delta));
+        inv_m_f1 = _mm_add_ps(inv_m_f1, _mm_mul_ps(inv_m_j1, delta));
+        inv_m_f2 = _mm_add_ps(inv_m_f2, _mm_mul_ps(inv_m_j2, delta));
+    }
+
+    SLOPE_FORCEINLINE
+    void solve_bounded_pair_simd(ConstraintData& c, float bound, float& lambda, __m128& inv_m_f0, __m128& inv_m_f1, __m128& inv_m_f2)
+    {
+        auto cur_lambda = _mm_load1_ps(&lambda);
+
+        auto new_lambda = compute_lambda_unbounded_pair_simd(c, cur_lambda, inv_m_f0, inv_m_f1, inv_m_f2);
+        new_lambda = clamp_simd(new_lambda, bound);
+        auto delta = _mm_sub_ps(new_lambda, cur_lambda);
+
+        apply_delta_pair_simd(c, delta, inv_m_f0, inv_m_f1, inv_m_f2);
+
+        lambda = _mm_cvtss_f32(new_lambda);
+    }
+
+    SLOPE_FORCEINLINE
+    void solve_bounded_pair_simd(
+        ConstraintData& c, float min_bound, float max_bound,
+        float& lambda, __m128& inv_m_f0, __m128& inv_m_f1, __m128& inv_m_f2)
+    {
+        auto cur_lambda = _mm_load1_ps(&lambda);
+
+        auto new_lambda = compute_lambda_unbounded_pair_simd(c, cur_lambda, inv_m_f0, inv_m_f1, inv_m_f2);
+        new_lambda = clamp_simd(new_lambda, min_bound, max_bound);
+        auto delta = _mm_sub_ps(new_lambda, cur_lambda);
+
+        apply_delta_pair_simd(c, delta, inv_m_f0, inv_m_f1, inv_m_f2);
+
+        lambda = _mm_cvtss_f32(new_lambda);
+    }
+
+    SLOPE_FORCEINLINE
+    void solve_bounded_single_simd(ConstraintData& c, float bound, float& lambda, __m128& inv_m_f0, __m128& inv_m_f1)
+    {
+        auto cur_lambda = _mm_load1_ps(&lambda);
+
+        auto new_lambda = compute_lambda_unbounded_single_simd(c, cur_lambda, inv_m_f0, inv_m_f1);
+        new_lambda = clamp_simd(new_lambda, bound);
+        auto delta = _mm_sub_ps(new_lambda, cur_lambda);
+
+        apply_delta_single_simd(c, delta, inv_m_f0, inv_m_f1);
+
+        lambda = _mm_cvtss_f32(new_lambda);
+    }
+
+    SLOPE_FORCEINLINE
+    void solve_bounded_single_simd(ConstraintData& c, float min_bound, float max_bound, float& lambda, __m128& inv_m_f0, __m128& inv_m_f1)
+    {
+        auto cur_lambda = _mm_load1_ps(&lambda);
+
+        auto new_lambda = compute_lambda_unbounded_single_simd(c, cur_lambda, inv_m_f0, inv_m_f1);
+        new_lambda = clamp_simd(new_lambda, min_bound, max_bound);
+        auto delta = _mm_sub_ps(new_lambda, cur_lambda);
+
+        apply_delta_single_simd(c, delta, inv_m_f0, inv_m_f1);
+
+        lambda = _mm_cvtss_f32(new_lambda);
+    }
+
+    void solve_constraint_simd(ConstraintData& c, float& lambda, float min_bound, float max_bound)
+    {
+        if (c.body2_idx >= 0) {
+            auto& b1 = bodies[c.body1_idx];
+            auto& b2 = bodies[c.body2_idx];
+
+            __m128 inv_m_f0;
+            __m128 inv_m_f1;
+            __m128 inv_m_f2;
+            load_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
+
+            solve_bounded_pair_simd(c, min_bound, max_bound, lambda, inv_m_f0, inv_m_f1, inv_m_f2);
+
+            store_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
+
+        } else {
+            auto& b1 = bodies[c.body1_idx];
+
+            __m128 inv_m_f0;
+            __m128 inv_m_f1;
+            load_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
+
+            solve_bounded_single_simd(c, min_bound, max_bound, lambda, inv_m_f0, inv_m_f1);
+
+            store_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
+        }
+    }
+
+    void solve_constraint_friction_1d_simd(ConstraintData& c, float& lambda, float normal_lambda)
+    {
+        float bound = normal_lambda * c.friction_ratio;
+
+        if (c.body2_idx >= 0) {
+            auto& b1 = bodies[c.body1_idx];
+            auto& b2 = bodies[c.body2_idx];
+
+            __m128 inv_m_f0;
+            __m128 inv_m_f1;
+            __m128 inv_m_f2;
+            load_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
+
+            solve_bounded_pair_simd(c, bound, lambda, inv_m_f0, inv_m_f1, inv_m_f2);
+
+            store_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
+
+        } else {
+            auto& b1 = bodies[c.body1_idx];
+
+            __m128 inv_m_f0;
+            __m128 inv_m_f1;
+            load_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
+
+            solve_bounded_single_simd(c, bound, lambda, inv_m_f0, inv_m_f1);
+
+            store_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
+        }
+    }
+
+    void solve_constraint_friction_2d_simd(
+        ConstraintData& c1, ConstraintData& c2, float& lambda1, float& lambda2, float normal_lambda)
+    {
+        float bound1 = normal_lambda * c1.friction_ratio;
+        float bound2 = normal_lambda * c2.friction_ratio;
+
+        if (c1.body2_idx >= 0) {
+            auto& b1 = bodies[c1.body1_idx];
+            auto& b2 = bodies[c1.body2_idx];
+
+            __m128 inv_m_f0;
+            __m128 inv_m_f1;
+            __m128 inv_m_f2;
+            load_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
+
+            solve_bounded_pair_simd(c1, bound1, lambda1, inv_m_f0, inv_m_f1, inv_m_f2);
+            solve_bounded_pair_simd(c2, bound2, lambda2, inv_m_f0, inv_m_f1, inv_m_f2);
+
+            store_inv_m_f_pair(b1, b2, inv_m_f0, inv_m_f1, inv_m_f2);
+
+        } else {
+            auto& b1 = bodies[c1.body1_idx];
+
+            __m128 inv_m_f0;
+            __m128 inv_m_f1;
+            load_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
+
+            solve_bounded_single_simd(c1, bound1, lambda1, inv_m_f0, inv_m_f1);
+            solve_bounded_single_simd(c2, bound2, lambda2, inv_m_f0, inv_m_f1);
+
+            store_inv_m_f_single(b1, inv_m_f0, inv_m_f1);
+        }
+    }
+
+#else // SLOPE_DISABLE_SIMD
+
+    SLOPE_FORCEINLINE
+    void solve_constraint_simd(ConstraintData& c, float& lambda, float min_bound, float max_bound)
+    {
+        solve_constraint(c, lambda, min_bound, max_bound);
+    }
+
+    SLOPE_FORCEINLINE
+    void solve_constraint_friction_1d_simd(ConstraintData& c, float& lambda, float normal_lambda)
+    {
+        solve_constraint_friction_1d(c, lambda, normal_lambda);
+    }
+
+    SLOPE_FORCEINLINE
+    void solve_constraint_friction_2d_simd(
+        ConstraintData& c1, ConstraintData& c2, float& lambda1, float& lambda2, float normal_lambda)
+    {
+        solve_constraint_friction_2d(c1, c2, lambda1, lambda2, normal_lambda);
+    }
+
+#endif // SLOPE_DISABLE_SIMD
+
+};
+
 Constraint Constraint::generic(
         RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom,
-        float pos_error, float min_bound, float max_bound) {
-
+        float pos_error, float min_bound, float max_bound)
+{
     Constraint c;
     c.body1 = body1;
 
@@ -32,35 +493,40 @@ Constraint Constraint::generic(
 
 void ConstraintSolver::register_body(RigidBody* body) {
     body->set_in_solver_index(static_cast<int>(m_bodies.size()));
-    m_bodies.push_back({body});
+    m_bodies.emplace_back();
+    m_bodies_extra.emplace_back().body = body;
 }
 
-std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(const Constraint& c, ConstraintGroup group) {
+std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(const Constraint& c, ConstraintGroup group)
+{
     if (c.body1->in_solver_index() == -1)
         register_body(c.body1);
 
-    auto& data = m_constraints[(int)group].emplace_back();
+    auto& group_data = m_groups[(int)group];
+
+    auto& data = group_data.constraints.emplace_back();
 
     data.body1_idx = c.body1->in_solver_index();
-    data.jacobian1[0] = c.jacobian1[0];
-    data.jacobian1[1] = c.jacobian1[1];
+    data.jacobian11 = c.jacobian1[0];
+    data.jacobian12 = c.jacobian1[1];
 
     if (c.body2) {
         if (c.body2->in_solver_index() == -1)
             register_body(c.body2);
 
         data.body2_idx = c.body2->in_solver_index();
-        data.jacobian2[0] = c.jacobian2[0];
-        data.jacobian2[1] = c.jacobian2[1];
+        data.jacobian21 = c.jacobian2[0];
+        data.jacobian22 = c.jacobian2[1];
     }
 
-    data.lambda = c.init_lambda;
+    group_data.lambda.push_back(c.init_lambda);
 
-    return { { group, static_cast<int>(m_constraints[(int)group].size() - 1) }, &data };
+    return { { group, static_cast<int>(group_data.constraints.size() - 1) }, &data };
 }
 
-ConstraintId ConstraintSolver::add_constraint(const Constraint& c) {
-    auto [constr_id, data] = create_constraint(c, ConstraintGroup::Normal);
+ConstraintId ConstraintSolver::add_constraint(const Constraint& c)
+{
+    auto [constr_id, data] = create_constraint(c, ConstraintGroup::General);
 
     data->min_bound = c.min_bound;
     data->max_bound = c.max_bound;
@@ -81,8 +547,9 @@ ConstraintId ConstraintSolver::add_constraint(const Constraint& c) {
     return constr_id;
 }
 
-ConstraintId ConstraintSolver::join_friction(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id) {
-    auto [constr_id, data] = create_constraint(c, ConstraintGroup::Friction);
+ConstraintId ConstraintSolver::join_friction_1d(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id)
+{
+    auto [constr_id, data] = create_constraint(c, ConstraintGroup::Friction1D);
 
     data->cfm_inv_dt = c.cfm * m_inv_dt;
     data->bg_error = 0.f;
@@ -93,11 +560,8 @@ ConstraintId ConstraintSolver::join_friction(const Constraint& c, float friction
     return constr_id;
 }
 
-ConstraintIds ConstraintSolver::join_cone_friction(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id)
+ConstraintIds ConstraintSolver::join_friction_2d(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id)
 {
-    auto [constr_id1, data1] = create_constraint(c1, ConstraintGroup::ConeFriction);
-    auto [constr_id2, data2] = create_constraint(c2, ConstraintGroup::ConeFriction);
-
     auto setup_constraint = [this, normal_constr_id](ConstraintData* data, const Constraint& c, float friction_ratio) {
         data->cfm_inv_dt = c.cfm * m_inv_dt;
         data->bg_error = 0.f;
@@ -106,256 +570,196 @@ ConstraintIds ConstraintSolver::join_cone_friction(const Constraint& c1, const C
         data->normal_constr_idx = normal_constr_id.index();
     };
 
+    auto [constr1_id, data1] = create_constraint(c1, ConstraintGroup::Friction2D);
     setup_constraint(data1, c1, friction_ratio.x);
+
+    auto [constr2_id, data2] = create_constraint(c2, ConstraintGroup::Friction2D);
     setup_constraint(data2, c2, friction_ratio.y);
 
-    return {constr_id1, constr_id2};
+    return { constr1_id, constr2_id };
+}
+
+ConstraintIds ConstraintSolver::join_friction_cone(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id)
+{
+    auto setup_constraint = [this, normal_constr_id](ConstraintData* data, const Constraint& c, float friction_ratio) {
+        data->cfm_inv_dt = c.cfm * m_inv_dt;
+        data->bg_error = 0.f;
+
+        data->friction_ratio = friction_ratio;
+        data->normal_constr_idx = normal_constr_id.index();
+    };
+
+    auto [constr1_id, data1] = create_constraint(c1, ConstraintGroup::FrictionCone);
+    setup_constraint(data1, c1, friction_ratio.x);
+
+    auto [constr2_id, data2] = create_constraint(c2, ConstraintGroup::FrictionCone);
+    setup_constraint(data2, c2, friction_ratio.y);
+
+    return { constr1_id, constr2_id };
 }
 
 void ConstraintSolver::clear() {
-    for (auto& body : m_bodies)
-        body.body->set_in_solver_index(-1);
+    for (auto& data : m_bodies_extra)
+        data.body->set_in_solver_index(-1);
 
     m_bodies.clear();
+    m_bodies_extra.clear();
 
-    for (auto& container : m_constraints)
-        container.clear();
+    for (auto& container : m_groups) {
+        container.constraints.clear();
+        container.lambda.clear();
+    }
 }
 
 void ConstraintSolver::prepare_data() {
     static constexpr float INV_DIAG_EPSILON = 1e-8f;
 
     // V_delta = V / dt + M_inv * F
-    for (auto& b : m_bodies) {
-        auto* body = b.body;
-        b.v_delta[0] = body->velocity() * m_inv_dt + body->force() * body->inv_mass();
-        b.v_delta[1] = body->ang_velocity() * m_inv_dt + body->inv_inertia().apply_normal(body->torque());
 
-        b.inv_m_f[0].set_zero();
-        b.inv_m_f[1].set_zero();
+    auto b_extra = m_bodies_extra.begin();
+    for (auto b = m_bodies.begin(); b != m_bodies.end(); ++b, ++b_extra) {
+        auto* body = b_extra->body;
+        b_extra->v_delta1 = body->velocity() * m_inv_dt + body->force() * body->inv_mass();
+        b_extra->v_delta2 = body->ang_velocity() * m_inv_dt + body->inv_inertia().apply_normal(body->torque());
+
+        b->inv_m_f1.set_zero();
+        b->inv_m_f2.set_zero();
     }
 
     // J * M_inv * J_t * lambda = pos_error / dt^2 - J * V_delta
     // inv_diag = 1 / (cfm / dt + J * M_inv * J_t)
     // M_inv * force = M_inv * J_t * lambda
-    for (auto& container : m_constraints) {
-        for (auto& c: container) {
-            auto& b1 = m_bodies[c.body1_idx];
+    for (auto& group : m_groups) {
 
-            float j_v_delta = c.jacobian1[0].dot(b1.v_delta[0]) + c.jacobian1[1].dot(b1.v_delta[1]);
+        auto* lambda = group.lambda.data();
+        for (auto c = group.constraints.begin(); c != group.constraints.end(); ++c, ++lambda) {
+            auto& b1 = m_bodies[c->body1_idx];
+            auto& b1_extra = m_bodies_extra[c->body1_idx];
 
-            c.inv_m_j1[0] = c.jacobian1[0] * b1.body->inv_mass();
-            c.inv_m_j1[1] = b1.body->inv_inertia().apply_normal(c.jacobian1[1]);
+            float j_v_delta = c->jacobian11.dot(b1_extra.v_delta1) + c->jacobian12.dot(b1_extra.v_delta2);
 
-            b1.inv_m_f[0] += c.inv_m_j1[0] * c.lambda;
-            b1.inv_m_f[1] += c.inv_m_j1[1] * c.lambda;
+            c->inv_m_j11 = c->jacobian11 * b1_extra.body->inv_mass();
+            c->inv_m_j12 = b1_extra.body->inv_inertia().apply_normal(c->jacobian12);
 
-            float j_inv_m_j = c.jacobian1[0].dot(c.inv_m_j1[0]) + c.jacobian1[1].dot(c.inv_m_j1[1]);
+            b1.inv_m_f1 += c->inv_m_j11 * *lambda;
+            b1.inv_m_f2 += c->inv_m_j12 * *lambda;
 
-            if (c.body2_idx >= 0) {
-                auto& b2 = m_bodies[c.body2_idx];
-                j_v_delta += c.jacobian2[0].dot(b2.v_delta[0]) + c.jacobian2[1].dot(b2.v_delta[1]);
+            float j_inv_m_j = c->jacobian11.dot(c->inv_m_j11) + c->jacobian12.dot(c->inv_m_j12);
 
-                c.inv_m_j2[0] = c.jacobian2[0] * b2.body->inv_mass();
-                c.inv_m_j2[1] = b2.body->inv_inertia().apply_normal(c.jacobian2[1]);
+            if (c->body2_idx >= 0) {
+                auto& b2 = m_bodies[c->body2_idx];
+                auto& b2_extra = m_bodies_extra[c->body2_idx];
 
-                b2.inv_m_f[0] += c.inv_m_j2[0] * c.lambda;
-                b2.inv_m_f[1] += c.inv_m_j2[1] * c.lambda;
+                j_v_delta += c->jacobian21.dot(b2_extra.v_delta1) + c->jacobian22.dot(b2_extra.v_delta2);
 
-                j_inv_m_j += c.jacobian2[0].dot(c.inv_m_j2[0]) + c.jacobian2[1].dot(c.inv_m_j2[1]);
+                c->inv_m_j21 = c->jacobian21 * b2_extra.body->inv_mass();
+                c->inv_m_j22 = b2_extra.body->inv_inertia().apply_normal(c->jacobian22);
+
+                b2.inv_m_f1 += c->inv_m_j21 * *lambda;
+                b2.inv_m_f2 += c->inv_m_j22 * *lambda;
+
+                j_inv_m_j += c->jacobian21.dot(c->inv_m_j21) + c->jacobian22.dot(c->inv_m_j22);
             }
 
-            c.rhs = m_inv_dt * m_inv_dt * c.bg_error - j_v_delta;
+            c->rhs = m_inv_dt * m_inv_dt * c->bg_error - j_v_delta;
 
-            float rcp = c.cfm_inv_dt + j_inv_m_j;
-            c.inv_diag = rcp * rcp > INV_DIAG_EPSILON ? m_config.sor / rcp : 0.f;
+            float rcp = c->cfm_inv_dt + j_inv_m_j;
+            c->inv_diag = rcp * rcp > INV_DIAG_EPSILON ? m_config.sor / rcp : 0.f;
         }
     }
 }
 
-inline float ConstraintSolver::solve_constraint_lambda(ConstraintData& c) {
-    float delta;
-    float dot = c.cfm_inv_dt;
-
-    if (c.body2_idx >= 0) {
-        auto& b1 = m_bodies[c.body1_idx];
-        auto& b2 = m_bodies[c.body2_idx];
-        dot += c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
-        dot += c.jacobian2[0].dot(b2.inv_m_f[0]) + c.jacobian2[1].dot(b2.inv_m_f[1]);
-
-        delta = (c.rhs - dot) * c.inv_diag;
-
-    } else {
-        auto& b1 = m_bodies[c.body1_idx];
-        dot += c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
-
-        delta = (c.rhs - dot) * c.inv_diag;
-    }
-
-    return c.lambda + delta;
-}
-
-inline void ConstraintSolver::apply_constraint_lambda(ConstraintData& c, float lambda) {
-    if (c.body2_idx >= 0) {
-        auto& b1 = m_bodies[c.body1_idx];
-        auto& b2 = m_bodies[c.body2_idx];
-
-        float delta = lambda - c.lambda;
-        c.lambda = lambda;
-        c.delta_lambda = delta;
-
-        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
-        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
-        b2.inv_m_f[0] += c.inv_m_j2[0] * delta;
-        b2.inv_m_f[1] += c.inv_m_j2[1] * delta;
-
-    } else {
-        auto& b1 = m_bodies[c.body1_idx];
-
-        float delta = lambda - c.lambda;
-        c.lambda = lambda;
-        c.delta_lambda = delta;
-
-        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
-        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
-    }
-}
-
-inline void ConstraintSolver::solve_constraint(ConstraintData& c, float min_bound, float max_bound)
-{
-    float cur_lambda = c.lambda;
-    float dot = cur_lambda * c.cfm_inv_dt;
-
-    if (c.body2_idx >= 0) {
-        auto& b1 = m_bodies[c.body1_idx];
-        auto& b2 = m_bodies[c.body2_idx];
-
-        dot += c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
-        dot += c.jacobian2[0].dot(b2.inv_m_f[0]) + c.jacobian2[1].dot(b2.inv_m_f[1]);
-
-        float delta = (c.rhs - dot) * c.inv_diag;
-        c.lambda = clamp(min_bound, cur_lambda + delta, max_bound);
-        delta = c.lambda - cur_lambda;
-        c.delta_lambda = delta;
-
-        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
-        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
-        b2.inv_m_f[0] += c.inv_m_j2[0] * delta;
-        b2.inv_m_f[1] += c.inv_m_j2[1] * delta;
-
-    } else {
-        auto& b1 = m_bodies[c.body1_idx];
-
-        dot += c.jacobian1[0].dot(b1.inv_m_f[0]) + c.jacobian1[1].dot(b1.inv_m_f[1]);
-
-        float delta = (c.rhs - dot) * c.inv_diag;
-        c.lambda = clamp(min_bound, cur_lambda + delta, max_bound);
-        delta = c.lambda - cur_lambda;
-        c.delta_lambda = delta;
-
-        b1.inv_m_f[0] += c.inv_m_j1[0] * delta;
-        b1.inv_m_f[1] += c.inv_m_j1[1] * delta;
-    }
-}
-
-inline void ConstraintSolver::solve_cone_friction(ConstraintData& c1, ConstraintData& c2)
-{
-    float lambda1 = 0.f;
-    float lambda2 = 0.f;
-
-    // TODO: optimize
-    float normal_lambda = fabsf(m_constraints[(int)ConstraintGroup::Normal][c1.normal_constr_idx].lambda);
-    if (normal_lambda > 0.f) {
-        float bound1 = c1.friction_ratio * normal_lambda;
-        float bound2 = c2.friction_ratio * normal_lambda;
-
-        lambda1 = solve_constraint_lambda(c1);
-        lambda2 = solve_constraint_lambda(c2);
-
-        double divisor = ((double)lambda1 * lambda1) * ((double)bound2 * bound2) + ((double)lambda2 * lambda2) * ((double)bound1 * bound1);
-        double product = (double)bound1 * bound2;
-
-        if (divisor > 1e-8 && divisor > product * product) {
-            // scale down and preserve angle
-            double t = product / sqrt(divisor);
-            lambda1 = float(t * lambda1);
-            lambda2 = float(t * lambda2);
-
-            // float angle = std::atan2f(lambda1, lambda2);
-            // lambda1 = bound1 * std::sinf(angle);
-            // lambda2 = bound2 * std::cosf(angle);
-
-        } else {
-            lambda1 = clamp(-bound1, lambda1, bound1);
-            lambda2 = clamp(-bound2, lambda2, bound2);
-        }
-    }
-
-    apply_constraint_lambda(c1, lambda1);
-    apply_constraint_lambda(c2, lambda2);
-}
-
+template<bool UseSIMD>
 void ConstraintSolver::solve_iterations()
 {
+    ConstraintHelper helper{m_bodies};
+
     for(uint32_t iter = 0; iter < m_config.iteration_count; ++iter) {
 
-        for (auto& c: m_constraints[(int) ConstraintGroup::Normal]) {
-            solve_constraint(c, c.min_bound, c.max_bound);
+        auto& general_group = m_groups[(int) ConstraintGroup::General];
+        auto& general_lambda = general_group.lambda;
+
+        {
+            auto c          = general_group.constraints.begin();
+            auto c_end      = general_group.constraints.end();
+            auto c_lambda   = general_lambda.begin();
+            for (; c != c_end; ++c, ++c_lambda) {
+                if constexpr (UseSIMD)
+                    helper.solve_constraint_simd(*c, *c_lambda, c->min_bound, c->max_bound);
+                else
+                    helper.solve_constraint(*c, *c_lambda, c->min_bound, c->max_bound);
+            }
         }
 
-        for (auto& c: m_constraints[(int) ConstraintGroup::Friction]) {
-            float normal_lambda = fabsf(m_constraints[(int) ConstraintGroup::Normal][c.normal_constr_idx].lambda);
-            float bound = c.friction_ratio * normal_lambda;
-            solve_constraint(c, -bound, bound);
+        {
+            auto& friction_1d_group = m_groups[(int) ConstraintGroup::Friction1D];
+
+            auto c          = friction_1d_group.constraints.begin();
+            auto c_end      = friction_1d_group.constraints.end();
+            auto c_lambda   = friction_1d_group.lambda.data();
+            for (; c != c_end; ++c, ++c_lambda) {
+                float normal_lambda = c->friction_ratio * fabs(general_lambda[c->normal_constr_idx]);
+
+                if constexpr (UseSIMD)
+                    helper.solve_constraint_friction_1d_simd(*c, *c_lambda, normal_lambda);
+                else
+                    helper.solve_constraint_friction_1d(*c, *c_lambda, normal_lambda);
+            }
         }
 
-        auto& cone_friction_constrs = m_constraints[(int) ConstraintGroup::ConeFriction];
-        for (auto it = cone_friction_constrs.begin(); it != cone_friction_constrs.end();) {
-            auto& c1 = *(it++);
-            auto& c2 = *(it++);
-            solve_cone_friction(c1, c2);
+        {
+            auto& friction_2d_group = m_groups[(int) ConstraintGroup::Friction2D];
+
+            auto c1         = friction_2d_group.constraints.begin();
+            auto c1_end     = friction_2d_group.constraints.end();
+            auto c1_lambda  = friction_2d_group.lambda.data();
+            for (; c1 != c1_end; c1 += 2, c1_lambda += 2) {
+                auto c2 = c1 + 1;
+                auto c2_lambda = c1_lambda + 1;
+                float normal_lambda = fabs(general_lambda[c1->normal_constr_idx]);
+
+                if constexpr (UseSIMD)
+                    helper.solve_constraint_friction_2d_simd(*c1, *c2, *c1_lambda, *c2_lambda, normal_lambda);
+                else
+                    helper.solve_constraint_friction_2d(*c1, *c2, *c1_lambda, *c2_lambda, normal_lambda);
+            }
+        }
+
+        {
+            auto& friction_cone_group = m_groups[(int) ConstraintGroup::FrictionCone];
+
+            auto c1         = friction_cone_group.constraints.begin();
+            auto c1_end     = friction_cone_group.constraints.end();
+            auto c1_lambda  = friction_cone_group.lambda.data();
+            for (; c1 != c1_end; c1 += 2, c1_lambda += 2) {
+                auto c2 = c1 + 1;
+                auto c2_lambda = c1_lambda + 1;
+                float normal_lambda = fabs(general_lambda[c1->normal_constr_idx]);
+
+                helper.solve_constraint_friction_cone(*c1, *c2, *c1_lambda, *c2_lambda, normal_lambda);
+            }
         }
     }
 }
 
 void ConstraintSolver::solve() {
-    if (!m_constraints.empty()) {
-        prepare_data();
-        solve_iterations();
-        apply_impulses();
-    }
+    prepare_data();
+
+    if (m_config.use_simd)
+        solve_iterations<true>();
+    else
+        solve_iterations<false>();
+
+    apply_impulses();
 }
 
 void ConstraintSolver::apply_impulses() {
-    for (auto& b : m_bodies) {
-        auto* body = b.body;
-        body->set_velocity(body->velocity() + b.inv_m_f[0] * m_dt);
-        body->set_ang_velocity(body->ang_velocity() + b.inv_m_f[1] * m_dt);
+    auto b_extra = m_bodies_extra.begin();
+    for (auto b = m_bodies.begin(); b != m_bodies.end(); ++b, ++b_extra) {
+        auto* body = b_extra->body;
+        body->set_velocity(body->velocity() + b->inv_m_f1 * m_dt);
+        body->set_ang_velocity(body->ang_velocity() + b->inv_m_f2 * m_dt);
     }
-}
-
-float ConstraintSolver::max_error() const {
-    float err = 0.f;
-    for (auto& group : m_constraints)
-        for (auto& c : group)
-            err = std::fmax(err, fabs(c.delta_lambda));
-
-    return err;
-}
-
-float ConstraintSolver::avg_error() const {
-    float err = 0.f;
-    size_t constraint_count = 0;
-    for (auto& group : m_constraints) {
-        constraint_count += group.size();
-        for (auto& c: group)
-            err += fabs(c.delta_lambda);
-    }
-
-    if (constraint_count == 0)
-        return 0.f;
-
-    return err / static_cast<float>(constraint_count);
 }
 
 } // slope

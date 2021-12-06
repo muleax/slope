@@ -198,6 +198,17 @@ public:
 
     void max(const Vec4& lhs, const Vec4& rhs);
 
+    void set_zero() {
+        x = 0.f;
+        y = 0.f;
+        z = 0.f;
+        w = 0.f;
+    }
+
+    bool is_zero() const {
+        return x == 0.f && y == 0.f && z == 0.f && w == 0.f;
+    }
+
     union {
         struct {
             float x, y, z, w;

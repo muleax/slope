@@ -35,7 +35,7 @@ void UIOverlaySystem::update(float dt)
         if (ImGui::CollapsingHeader("General", treeNodeFlags))
         {
             ImGui::Text("Simulation Time: %.1f s", world_stats.simulation_time);
-            ImGui::Text("CPU Frame Time: %.1f ms", ps->cpu_time.smoothed() * 1000);
+            ImGui::Text("CPU Frame Time: %.1f ms", ps->cpu_time.instantaneous() * 1000);
             ImGui::Text("Static Actors: %d", world_stats.static_actor_count);
             ImGui::Text("Dynamic Actors: %d", world_stats.dynamic_actor_count);
         }
@@ -79,6 +79,7 @@ void UIOverlaySystem::update(float dt)
         ImGui::Checkbox("Velocity Dependent Friction", &world_config.enable_velocity_dependent_friction);
         ImGui::Checkbox("Cone Friction", &world_config.enable_cone_friction);
         ImGui::Checkbox("Gyroscopic Torque", &world_config.enable_gyroscopic_torque);
+        ImGui::Checkbox("Use SIMD solver", &world_config.solver_config.use_simd);
 
         bool use_pgs = (world_config.solver_type == DynamicsWorld::SolverType::PGS);
         if (ImGui::RadioButton("PGS", use_pgs))

@@ -5,10 +5,10 @@
 #include "slope/containers/unordered_map.hpp"
 #include "slope/collision/contact_manifold.hpp"
 #include "slope/collision/narrowphase/narrowphase.hpp"
+#include "slope/collision/broadphase/broadphase.hpp"
 #include "slope/debug/debug_drawer.hpp"
 #include <memory>
 
-// TODO: do not use pointers for hashing
 namespace slope {
 using ManifoldCacheKey = std::pair<const void*, const void*>;
 }
@@ -19,7 +19,9 @@ template<> struct hash<slope::ManifoldCacheKey>
 {
     std::size_t operator()(const slope::ManifoldCacheKey& key) const noexcept
     {
-        return reinterpret_cast<size_t>(key.first) ^ reinterpret_cast<size_t>(key.second);
+        auto a = reinterpret_cast<size_t>(key.first);
+        auto b = reinterpret_cast<size_t>(key.second);
+        return a ^ (b + 0x9e3779b9 + (a << 6) + (a >> 2));
     }
 };
 }
@@ -102,7 +104,7 @@ public:
 private:
     struct ManifoldCache {
         ContactManifold manifold;
-        BaseActor* actor1 = nullptr;
+        DynamicActor* actor1 = nullptr;
         BaseActor* actor2 = nullptr;
         uint32_t touch_frame_id = 0;
     };
@@ -112,13 +114,19 @@ private:
         ManifoldPoint* mf_point;
     };
 
+    template <class Actor>
+    struct ActorData {
+        Actor* actor = nullptr;
+        Broadphase<BaseActor>::ProxyId proxy_id = 0;
+    };
+
     template<class T>
     void remove_actor_impl(Vector<T>& container, BaseActor* actor);
 
     void apply_gravity();
     void apply_gyroscopic_torque(float dt);
     void perform_collision_detection();
-    void collide(BaseActor& actor1, BaseActor& actor2);
+    void collide(BaseActor* actor1, BaseActor* actor2);
     void apply_contacts();
     void update_constraint_stats();
     void update_general_stats();
@@ -131,8 +139,10 @@ private:
 
     std::unique_ptr<ConstraintSolver> m_solver;
 
-    Vector<DynamicActor*> m_dynamic_actors;
-    Vector<StaticActor*> m_static_actors;
+    Vector<ActorData<DynamicActor>> m_dynamic_actors;
+    Vector<ActorData<StaticActor>> m_static_actors;
+
+    Broadphase<BaseActor> m_broadphase;
 
     Vector<PendingContact> m_pending_contacts;
     Narrowphase m_narrowphase;

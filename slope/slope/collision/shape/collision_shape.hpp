@@ -19,16 +19,12 @@ public:
     explicit CollisionShape(ShapeType type) : m_type(type) {}
     virtual ~CollisionShape() = default;
 
-    const AABB&     aabb() const { return m_aabb; }
-    const Mat44&    transform() const { return m_transform; }
     virtual void    set_transform(const Mat44& matrix) = 0;
+    virtual Vec3    support(const Vec3& axis, float bloat, bool normalized) const = 0;
 
-    virtual Vec3    support(const Vec3& axis, float bloat) const = 0;
-    virtual Vec3    support_normalized(const Vec3& axis, float bloat) const = 0;
-
-    Vec3            support_diff(const CollisionShape* other, const Vec3& axis, float bloat) const;
-    Vec3            support_diff_normalized(const CollisionShape* other, const Vec3& axis, float bloat) const;
-
+    const Mat44&    transform() const { return m_transform; }
+    const AABB&     aabb() const { return m_aabb; }
+    Vec3            support_diff(const CollisionShape* other, const Vec3& axis, float bloat, bool normalized) const;
     ShapeType       type() const { return m_type; }
 
 protected:
@@ -45,14 +41,9 @@ public:
     CollisionShapeImpl() : CollisionShape(T) {}
 };
 
-inline Vec3 CollisionShape::support_diff(const CollisionShape* other, const Vec3& axis, float bloat) const
+inline Vec3 CollisionShape::support_diff(const CollisionShape* other, const Vec3& axis, float bloat, bool normalized) const
 {
-    return support(axis, bloat) - other->support(-axis, bloat);
-}
-
-inline Vec3 CollisionShape::support_diff_normalized(const CollisionShape* other, const Vec3& axis, float bloat) const
-{
-    return support_normalized(axis, bloat) - other->support_normalized(-axis, bloat);
+    return support(axis, bloat, normalized) - other->support(-axis, bloat, normalized);
 }
 
 } // slope

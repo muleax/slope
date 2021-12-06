@@ -14,9 +14,10 @@ struct ConstraintGeom {
 };
 
 enum class ConstraintGroup : int {
-    Normal = 0,
-    Friction,
-    ConeFriction,
+    General = 0,
+    Friction1D = 1,
+    Friction2D = 2,
+    FrictionCone = 3,
     Count
 };
 
@@ -78,6 +79,7 @@ class ConstraintSolver
 {
 public:
     struct Config {
+        bool        use_simd = false;
         // Successive over-relaxation
         float       sor = 1.f;
         int         iteration_count = 10;
@@ -92,35 +94,35 @@ public:
     float           time_interval() const { return m_dt; }
 
     ConstraintId    add_constraint(const Constraint& c);
-    ConstraintId    join_friction(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
-    ConstraintIds   join_cone_friction(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id);
+    ConstraintId    join_friction_1d(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
+    ConstraintIds   join_friction_2d(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id);
+    ConstraintIds   join_friction_cone(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id);
 
-    void            solve();
+    virtual void    solve();
     void            clear();
 
     float           get_lambda(ConstraintId constr_id) const;
 
-    float           max_error() const;
-    float           avg_error() const;
-
 protected:
-    struct ConstraintData {
-        int     body1_idx = -1;
-        int     body2_idx = -1;
+    struct alignas(16) ConstraintData {
+        Vec3    jacobian11;
+        Vec3    jacobian12;
+        Vec3    jacobian21;
+        Vec3    jacobian22;
 
-        Vec3    jacobian1[2];
-        Vec3    jacobian2[2];
-
-        Vec3    inv_m_j1[2];
-        Vec3    inv_m_j2[2];
+        Vec3    inv_m_j11;
+        Vec3    inv_m_j12;
+        Vec3    inv_m_j21;
+        Vec3    inv_m_j22;
 
         float   min_bound;
         float   max_bound;
-        float   lambda;
-        float   delta_lambda;
 
-        float   bg_error;
+        int     body1_idx = -1;
+        int     body2_idx = -1;
+
         float   cfm_inv_dt;
+        float   bg_error;
 
         float   rhs;
         float   inv_diag;
@@ -129,29 +131,40 @@ protected:
         int     normal_constr_idx = -1;
     };
 
-    struct BodyData {
-        RigidBody*  body;
-        Vec3        v_delta[2];
-        Vec3        inv_m_f[2];
+    struct alignas(16) BodyData {
+        Vec3        inv_m_f1;
+        Vec3        inv_m_f2;
+        float       _pad[2] = {};
     };
 
-    void            register_body(RigidBody* body);
-    auto            create_constraint(const Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
-    void            prepare_data();
-    void            apply_impulses();
+    struct BodyExtraData {
+        Vec3        v_delta1;
+        Vec3        v_delta2;
+        RigidBody*  body = nullptr;
+    };
 
-    float           solve_constraint_lambda(ConstraintData& c);
-    void            apply_constraint_lambda(ConstraintData& c, float lambda);
-    void            solve_constraint(ConstraintData& c, float min_bound, float max_bound);
-    void            solve_cone_friction(ConstraintData& c1, ConstraintData& c2);
-    virtual void    solve_iterations();
+    struct GroupData {
+        Vector<ConstraintData> constraints;
+        Vector<float> lambda;
+    };
+
+    void register_body(RigidBody* body);
+    auto create_constraint(const Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
+    void prepare_data();
+    void apply_impulses();
+
+    template<bool UseSIMD>
+    void solve_iterations();
 
     float   m_dt = 1.f;
     float   m_inv_dt = 1.f;
     Config  m_config;
 
     Vector<BodyData> m_bodies;
-    Array<Vector<ConstraintData>, (int)ConstraintGroup::Count> m_constraints;
+    Vector<BodyExtraData> m_bodies_extra;
+    Array<GroupData, (int)ConstraintGroup::Count> m_groups;
+
+    friend struct ConstraintHelper;
 };
 
 inline void ConstraintSolver::set_time_interval(float value) {
@@ -192,7 +205,7 @@ inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, const Cons
 }
 
 inline float ConstraintSolver::get_lambda(ConstraintId constr_id) const {
-    return m_constraints[(int)constr_id.group()][constr_id.index()].lambda;
+    return m_groups[(int)constr_id.group()].lambda[constr_id.index()];
 }
 
 } // slope
