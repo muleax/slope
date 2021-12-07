@@ -155,8 +155,11 @@ void DynamicsWorld::apply_gyroscopic_torque(float dt)
 }
 
 void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2) {
-    //if (!actor1->is<DynamicActor>())
-    //    std::swap(actor1, actor2);
+    if (actor1 > actor2)
+        std::swap(actor1, actor2);
+
+    if (!actor1->is<DynamicActor>())
+        std::swap(actor1, actor2);
 
     auto& shape1 = actor1->shape();
     auto& shape2 = actor2->shape();
@@ -189,17 +192,17 @@ void DynamicsWorld::perform_collision_detection() {
     m_narrowphase.epa_solver().reset_stats();
     m_narrowphase.sat_solver().reset_stats();
 
-/*    for (auto& data : m_dynamic_actors)
+    for (auto& data : m_dynamic_actors)
         m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
 
     for (auto& data : m_static_actors)
         m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
 
-    m_broadphase.find_overlapping_pairs([this](BaseActor* actor1, BaseActor* actor2) {
+    m_broadphase.find_overlapping_pairs_SP([this](BaseActor* actor1, BaseActor* actor2) {
         collide(actor1, actor2);
     });
-*/
 
+/*
     for (auto actor1 = m_dynamic_actors.begin(); actor1 != m_dynamic_actors.end(); ++actor1) {
         auto* a1 = actor1->actor;
         auto& shape1 = a1->shape();
@@ -220,7 +223,7 @@ void DynamicsWorld::perform_collision_detection() {
             if (shape1.aabb().intersects(shape2.aabb()))
                 collide(a1, a2);
         }
-    }
+    }*/
 }
 
 void DynamicsWorld::apply_contacts() {

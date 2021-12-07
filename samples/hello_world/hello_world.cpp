@@ -318,8 +318,13 @@ public:
             }
 
         } else if (m_mode == 2) {
+            physics_single->dynamics_world.config().enable_integration = false;
+            physics_single->dynamics_world.config().randomize_order = true;
+            physics_single->dynamics_world.config().enable_velocity_dependent_friction = false;
+            physics_single->dynamics_world.config().solver_config.iteration_count = 300;
+
             auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
-            int h = 25;
+            int h = 30;
             float spacing = 0.f;
             for (int j = 0; j < h; j++) {
                 for (int i = 0; i < h - j; i++) {
@@ -333,22 +338,23 @@ public:
             }
         } else if (m_mode == 3) {
             //physics_single->dynamics_world.config().enable_constraint_resolving = false;
-            physics_single->dynamics_world.config().enable_integration = false;
-            physics_single->dynamics_world.config().randomize_order = false;
-            physics_single->dynamics_world.config().enable_velocity_dependent_friction = false;
-            physics_single->dynamics_world.config().solver_config.iteration_count = 30;
+            physics_single->dynamics_world.config().enable_integration = true;
+            physics_single->dynamics_world.config().randomize_order = true;
+            physics_single->dynamics_world.config().enable_velocity_dependent_friction = true;
+            physics_single->dynamics_world.config().solver_config.iteration_count = 5;
+            physics_single->dynamics_world.config().solver_config.use_simd = true;
 
 
-            int h = 10;
-            int l = 10;
-            int d = 10;
-            float spacing = 0.f;
+            int h = 47;
+            int l = 8;
+            int d = 8;
+            float spacing = 1.5f;
             for (int i = 0; i < l; i++) {
                 for (int j = 0; j < h; j++) {
                     for (int k = 0; k < d; k++) {
                         Mat44 tr = Mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
                         tr.set_translation(
-                            {(float)i * 0.99f, (float)j * 0.99f + 5.f, (float)k * 0.99f});
+                            {(float)i * spacing + j * 0.2f, (float)j * spacing + 0.5f, (float)k * spacing + j * 0.2f});
                         //tr *= rot;
                         spawn_cube(tr, {}, 1.f);
                     }
@@ -465,9 +471,9 @@ public:
 
             auto* pc = m_world->create<PhysicsComponent>(e);
             pc->actor = std::make_shared<StaticActor>();
-            pc->actor->set_shape<PolyhedronShape>(floor_geom);
-            //pc->actor->set_shape<BoxShape>(Vec3{floor_size, 1.f, floor_size});
-            pc->actor->set_friction(0.7f);
+            //pc->actor->set_shape<PolyhedronShape>(floor_geom);
+            pc->actor->set_shape<BoxShape>(Vec3{floor_size, 1.f, floor_size});
+            pc->actor->set_friction(0.5f);
             pc->actor->set_transform(tc->transform);
         }
 
@@ -621,7 +627,7 @@ public:
         float inertia = mass / 6.f;
         actor->body().set_local_inertia({inertia, inertia, inertia});
 
-        actor->set_friction(0.7f);
+        actor->set_friction(0.5f);
 
         actor->shape().set_transform(actor->body().transform());
 
