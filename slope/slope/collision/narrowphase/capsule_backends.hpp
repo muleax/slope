@@ -10,42 +10,39 @@ namespace slope {
 template <class A, class B>
 class PolyhedraCapsuleBackend : public NpBackend<A, B> {
 public:
-    bool intersect()
+    bool intersect(const A* shape1, const B* shape2)
     {
-        return this->context()->gjk_solver.intersect(this->shape1(), this->shape2());
+        return this->ctx()->gjk_solver.intersect(shape1, shape2);
     }
 
-    std::optional<Vec3> get_penetration_axis()
+    bool collide(const A* shape1, const B* shape2, NpContactPatch& patch)
     {
-        auto* ctx = this->context();
-        return ctx->epa_solver.find_penetration_axis(this->shape1(), this->shape2(), ctx->gjk_solver.simplex());
-    }
+        if (!this->intersect(shape1, shape2))
+            return false;
 
-    void generate_contacts(ContactManifold& manifold)
-    {
-        auto pen_axis = this->get_penetration_axis();
-        if (!pen_axis)
-            return;
+        auto* ctx = this->ctx();
+        auto pen_axis = ctx->epa_solver.find_penetration_axis(shape1, shape2, ctx->gjk_solver.simplex());
+        if (pen_axis) {
+            // TODO: robust solution for imprecise penetration axis
+            auto& support_face = ctx->support_face[0];
+            support_face.clear();
 
-        // TODO: robust solution for imprecise penetration axis
-        auto* ctx = this->context();
-        auto& support_face = ctx->support_face[0];
-        support_face.clear();
+            Vec3 support_normal;
+            shape1->get_support_face(*pen_axis, support_face, support_normal);
 
-        Vec3 support_normal;
-        this->shape1()->get_support_face(*pen_axis, support_face, support_normal);
+            auto segment = ctx->face_clipper.clip_segment_by_convex_prism(shape2->segment(), support_face, *pen_axis);
 
-        auto segment = ctx->face_clipper.clip_segment_by_convex_prism(
-            this->shape2()->segment(), support_face, *pen_axis);
-
-        for (int i = 0; i < 2; i++) {
-            auto clipped_pt = segment[i] - *pen_axis * this->shape2()->radius();
-            auto t = Plane(support_normal, support_face[0]).intersect_ray(clipped_pt, *pen_axis);
-            if (t) {
-                auto p1 = clipped_pt + *t * *pen_axis;
-                manifold.add_contact({p1, clipped_pt, *pen_axis});
+            for (int i = 0; i < 2; i++) {
+                auto clipped_pt = segment[i] - *pen_axis * shape2->radius();
+                auto t = Plane(support_normal, support_face[0]).intersect_ray(clipped_pt, *pen_axis);
+                if (t) {
+                    auto p1 = clipped_pt + *t * *pen_axis;
+                    patch.contacts.push_back({p1, clipped_pt, *pen_axis});
+                }
             }
         }
+
+        return true;
     }
 };
 
@@ -54,63 +51,83 @@ using BoxCapsuleBackend = PolyhedraCapsuleBackend<BoxShape, CapsuleShape>;
 
 class CapsuleSphereBackend : public NpBackend<CapsuleShape, SphereShape> {
 public:
-    bool intersect()
+    bool intersect(const Shape1* shape1, const Shape2* shape2)
     {
-        auto& sphere_center = shape2()->transform().translation();
-        float t;
-        shape1()->segment().closest_point(sphere_center, t, m_p);
-        float r = shape1()->radius() + shape2()->radius();
-        return sphere_center.square_distance(m_p) <= r * r;
+        Vec3 closest_pt;
+        float sqr_dist;
+        return intersect_impl(shape1, shape2, closest_pt, sqr_dist);
     }
 
-    std::optional<Vec3> get_penetration_axis()
+    bool collide(const Shape1* shape1, const Shape2* shape2, NpContactPatch& patch)
     {
-        Vec3 pen_dir = shape2()->transform().translation() - m_p;
-        float pen_axis_len = pen_dir.length();
-        return (pen_axis_len > 1e-6f) ? pen_dir / pen_axis_len : Vec3{1.f, 0.f, 0.f};
-    }
+        static constexpr float DIST_EPSILON = 1e-6f;
 
-    void generate_contacts(ContactManifold& manifold)
-    {
-        auto pen_axis = *get_penetration_axis();
-        auto p1 = m_p + pen_axis * shape1()->radius();
-        auto p2 = shape2()->transform().translation() - pen_axis * shape2()->radius();
-        manifold.add_contact({p1, p2, pen_axis});
+        Vec3 closest_pt;
+        float sqr_dist;
+        if (!intersect_impl(shape1, shape2, closest_pt, sqr_dist))
+            return false;
+
+        float dist = sqrtf(sqr_dist);
+        auto& sphere_center = shape2->transform().translation();
+        auto pen_axis = (dist > DIST_EPSILON) ? (sphere_center - closest_pt) / dist : Vec3{1.f, 0.f, 0.f};
+        auto p1 = closest_pt + pen_axis * shape1->radius();
+        auto p2 = sphere_center - pen_axis * shape2->radius();
+        patch.contacts.push_back({p1, p2, pen_axis});
+
+        return true;
     }
 
 private:
-    Vec3 m_p;
+    bool intersect_impl(const Shape1* shape1, const Shape2* shape2, Vec3& closest_pt, float& sqr_dist)
+    {
+        auto& sphere_center = shape2->transform().translation();
+        float t;
+        shape1->segment().closest_point(sphere_center, t, closest_pt);
+        float r = shape1->radius() + shape2->radius();
+        sqr_dist = sphere_center.square_distance(closest_pt);
+        return sqr_dist <= r * r;
+    }
 };
 
 class CapsuleBackend : public NpBackend<CapsuleShape, CapsuleShape> {
 public:
-    bool intersect()
+    bool intersect(const Shape1* shape1, const Shape1* shape2)
     {
-        float t1;
-        float t2;
-        shape1()->segment().closest_point(shape2()->segment(), t1, t2, m_p1, m_p2);
-        float r = shape1()->radius() + shape2()->radius();
-        return m_p1.square_distance(m_p2) <= r * r;
+        Vec3 closest_pt1;
+        Vec3 closest_pt2;
+        float sqr_dist;
+        return intersect_impl(shape1, shape2, closest_pt1, closest_pt2, sqr_dist);
     }
 
-    std::optional<Vec3> get_penetration_axis()
+    bool collide(const Shape1* shape1, const Shape1* shape2, NpContactPatch& patch)
     {
-        Vec3 pen_dir = m_p2 - m_p1;
-        float pen_axis_len = pen_dir.length();
-        return (pen_axis_len > 1e-6f) ? pen_dir / pen_axis_len : Vec3{1.f, 0.f, 0.f};
-    }
+        static constexpr float DIST_EPSILON = 1e-6f;
 
-    void generate_contacts(ContactManifold& manifold)
-    {
-        auto pen_axis = *get_penetration_axis();
-        auto p1 = m_p1 + pen_axis * shape1()->radius();
-        auto p2 = m_p2 - pen_axis * shape2()->radius();
-        manifold.add_contact({p1, p2, pen_axis});
+        Vec3 closest_pt1;
+        Vec3 closest_pt2;
+        float sqr_dist;
+        if (!intersect_impl(shape1, shape2, closest_pt1, closest_pt2, sqr_dist))
+            return false;
+
+        float dist = sqrtf(sqr_dist);
+        auto pen_axis = (dist > DIST_EPSILON) ? (closest_pt2 - closest_pt1) / dist : Vec3{1.f, 0.f, 0.f};
+        auto p1 = closest_pt1 + pen_axis * shape1->radius();
+        auto p2 = closest_pt2 - pen_axis * shape2->radius();
+        patch.contacts.push_back({p1, p2, pen_axis});
+
+        return true;
     }
 
 private:
-    Vec3 m_p1;
-    Vec3 m_p2;
+    bool intersect_impl(const Shape1* shape1, const Shape1* shape2, Vec3& closest_pt1, Vec3& closest_pt2, float& sqr_dist)
+    {
+        float t1;
+        float t2;
+        shape1->segment().closest_point(shape2->segment(), t1, t2, closest_pt1, closest_pt2);
+        float r = shape1->radius() + shape2->radius();
+        sqr_dist = closest_pt1.square_distance(closest_pt2);
+        return sqr_dist <= r * r;
+    }
 };
 
 } // slope

@@ -357,6 +357,8 @@ public:
                             {(float)i * spacing + j * 0.2f, (float)j * spacing + 0.5f, (float)k * spacing + j * 0.2f});
                         //tr *= rot;
                         spawn_cube(tr, {}, 1.f);
+                        //spawn_sphere(tr, {}, 1.f);
+                        //spawn_capsule(tr, {}, {}, 1.f);
                     }
                 }
             }

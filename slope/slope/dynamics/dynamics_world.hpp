@@ -147,6 +147,7 @@ private:
     Vector<PendingContact> m_pending_contacts;
     Narrowphase m_narrowphase;
 
+    NpContactPatch m_contact_patch;
     UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
 
     std::optional<NpBackendHint> m_np_backend_hint;

@@ -8,9 +8,9 @@ namespace slope {
 template <class A, class B>
 class PolyhedraBackendBase : public NpBackend<A, B> {
 protected:
-    void generate_contacts_impl(ContactManifold& manifold, const Vec3& pen_axis)
+    void generate_contact_patch(const A* shape1, const B* shape2, const Vec3& pen_axis, NpContactPatch& patch)
     {
-        auto* ctx = this->context();
+        auto* ctx = this->ctx();
 
         float proximity[2];
         Vec3 support_normal[2];
@@ -19,8 +19,8 @@ protected:
         ctx->support_face[1].clear();
         ctx->clipped_face.clear();
 
-        proximity[0] = this->shape1()->get_support_face(pen_axis, ctx->support_face[0], support_normal[0]);
-        proximity[1] = this->shape2()->get_support_face(-pen_axis, ctx->support_face[1], support_normal[1]);
+        proximity[0] = shape1->get_support_face(pen_axis, ctx->support_face[0], support_normal[0]);
+        proximity[1] = shape2->get_support_face(-pen_axis, ctx->support_face[1], support_normal[1]);
 
         int face;
         int clipper;
@@ -34,7 +34,7 @@ protected:
             face = 0;
             clipper = 1;
             clipper_axis = -pen_axis;
-            manifold.invert_input_order();
+            patch.invert_input_order();
         }
 
         ctx->face_clipper.clip_convex_face_by_convex_prism(
@@ -46,7 +46,7 @@ protected:
             auto t = Plane(support_normal[clipper], ctx->support_face[clipper][0]).intersect_ray(clipped_pt, clipper_axis);
             if (t) {
                 auto p1 = clipped_pt + clipper_axis * *t;
-                manifold.add_contact({p1, clipped_pt, clipper_axis});
+                patch.contacts.push_back({p1, clipped_pt, clipper_axis});
             }
         }
     }
@@ -55,46 +55,43 @@ protected:
 template <class A, class B>
 class GJKPolyhedraBackend : public PolyhedraBackendBase<A, B> {
 public:
-    bool intersect()
+    bool intersect(const A* shape1, const B* shape2)
     {
-        return this->context()->gjk_solver.intersect(this->shape1(), this->shape2());
+        return this->ctx()->gjk_solver.intersect(shape1, shape2);
     }
 
-    std::optional<Vec3> get_penetration_axis()
+    bool collide(const A* shape1, const B* shape2, NpContactPatch& patch)
     {
-        auto* ctx = this->context();
-        return ctx->epa_solver.find_penetration_axis(this->shape1(), this->shape2(), ctx->gjk_solver.simplex());
-    }
+        if (this->intersect(shape1, shape2)) {
+            auto pen_axis = this->ctx()->epa_solver.find_penetration_axis(shape1, shape2, this->ctx()->gjk_solver.simplex());
+            if (pen_axis)
+                this->generate_contact_patch(shape1, shape2, *pen_axis, patch);
 
-    void generate_contacts(ContactManifold& manifold)
-    {
-        auto pen_axis = this->get_penetration_axis();
-        if (pen_axis)
-            this->generate_contacts_impl(manifold, *pen_axis);
+            return true;
+        }
+
+        return false;
     }
 };
 
 template <class A, class B>
 class SATPolyhedraBackend : public PolyhedraBackendBase<A, B> {
 public:
-    bool intersect()
+    bool intersect(const A* shape1, const B* shape2)
     {
-        m_min_pen_axis = this->context()->sat_solver.find_penetration_axis(this->shape1(), this->shape2());
-        return m_min_pen_axis.has_value();
+        return this->ctx()->sat_solver.find_penetration_axis(shape1, shape2).has_value();
     }
 
-    std::optional<Vec3> get_penetration_axis()
+    bool collide(const A* shape1, const B* shape2, NpContactPatch& patch)
     {
-        return m_min_pen_axis;
-    }
+        auto pen_axis = this->ctx()->sat_solver.find_penetration_axis(shape1, shape2);
+        if (pen_axis) {
+            this->generate_contact_patch(shape1, shape2, *pen_axis, patch);
+            return true;
+        }
 
-    void generate_contacts(ContactManifold& manifold)
-    {
-        this->generate_contacts_impl(manifold, *m_min_pen_axis);
+        return false;
     }
-
-private:
-    std::optional<Vec3> m_min_pen_axis;
 };
 
 using GJKConvexPolyhedronBackend = GJKPolyhedraBackend<PolyhedronShape, PolyhedronShape>;

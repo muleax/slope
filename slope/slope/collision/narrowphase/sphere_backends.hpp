@@ -9,36 +9,34 @@ namespace slope {
 template <class A, class B>
 class PolyhedraSphereBackend : public NpBackend<A, B> {
 public:
-    bool intersect()
+    bool intersect(const A* shape1, const B* shape2)
     {
-        return this->context()->gjk_solver.intersect(this->shape1(), this->shape2());
+        return this->ctx()->gjk_solver.intersect(shape1, shape2);
     }
 
-    std::optional<Vec3> get_penetration_axis()
+    bool collide(const A* shape1, const B* shape2, NpContactPatch& patch)
     {
-        auto* ctx = this->context();
-        return ctx->epa_solver.find_penetration_axis(this->shape1(), this->shape2(), ctx->gjk_solver.simplex());
-    }
+        if (!this->intersect(shape1, shape2))
+            return false;
 
-    void generate_contacts(ContactManifold& manifold)
-    {
-        auto pen_axis = this->get_penetration_axis();
-        if (!pen_axis)
-            return;
+        auto* ctx = this->ctx();
+        auto pen_axis = ctx->epa_solver.find_penetration_axis(shape1, shape2, ctx->gjk_solver.simplex());
+        if (pen_axis) {
+            // TODO: robust solution for imprecise penetration axis
+            // TODO: optimize
+            Vec3 face_normal;
+            ctx->support_face[0].clear();
+            shape1->get_support_face(*pen_axis, ctx->support_face[0], face_normal);
 
-        // TODO: robust solution for imprecise penetration axis
-        // TODO: optimize
-        auto* ctx = this->context();
-        Vec3 face_normal;
-        ctx->support_face[0].clear();
-        this->shape1()->get_support_face(*pen_axis, ctx->support_face[0], face_normal);
-
-        auto p2 = this->shape2()->support(-*pen_axis, 0.f, true);
-        auto t = Plane(face_normal, ctx->support_face[0][0]).intersect_ray(p2, *pen_axis);
-        if (t) {
-            auto p1 = p2 + *t * *pen_axis;
-            manifold.add_contact({p1, p2, *pen_axis});
+            auto p2 = shape2->support(-*pen_axis, 0.f, true);
+            auto t = Plane(face_normal, ctx->support_face[0][0]).intersect_ray(p2, *pen_axis);
+            if (t) {
+                auto p1 = p2 + *t * *pen_axis;
+                patch.contacts.push_back({p1, p2, *pen_axis});
+            }
         }
+
+        return true;
     }
 };
 
@@ -47,29 +45,41 @@ using BoxSphereBackend = PolyhedraSphereBackend<BoxShape, SphereShape>;
 
 class SphereBackend : public NpBackend<SphereShape, SphereShape> {
 public:
-    bool intersect()
+    bool intersect(const Shape1* shape1, const Shape2* shape2)
     {
-        m_p1 = shape1()->transform().translation();
-        m_p2 = shape2()->transform().translation();
-        m_dist_sqr = m_p1.square_distance(m_p2);
-        float contact_dist = shape1()->radius() + shape2()->radius();
-        return m_dist_sqr <= contact_dist * contact_dist;
+        float sqr_dist;
+        return intersect_impl(shape1, shape2, sqr_dist);
     }
 
-    std::optional<Vec3> get_penetration_axis()
+    bool collide(const Shape1* shape1, const Shape2* shape2, NpContactPatch& patch)
     {
         static constexpr float DIST_EPSILON = 1e-6f;
-        float dist = sqrtf(m_dist_sqr);
-        return dist > DIST_EPSILON ? (m_p2 - m_p1) / dist : Vec3{1.f, 0.f, 0.f};
-    }
 
-    void generate_contacts(ContactManifold& manifold)
-    {
-        auto pen_axis = *get_penetration_axis();
-        manifold.add_contact({m_p1 + pen_axis * shape1()->radius(), m_p2 - pen_axis * shape2()->radius(), pen_axis});
+        float sqr_dist;
+        if (!intersect_impl(shape1, shape2, sqr_dist))
+            return false;
+
+        float dist = sqrtf(sqr_dist);
+        auto& center1 = shape1->transform().translation();
+        auto& center2 = shape2->transform().translation();
+        auto pen_axis = dist > DIST_EPSILON ? (center2 - center1) / dist : Vec3{1.f, 0.f, 0.f};
+        auto p1 = center1 + pen_axis * shape1->radius();
+        auto p2 = center2 - pen_axis * shape2->radius();
+        patch.contacts.push_back({ p1, p2, pen_axis });
+
+        return true;
     }
 
 private:
+    bool intersect_impl(const Shape1* shape1, const Shape2* shape2, float& sqr_dist)
+    {
+        auto& p1 = shape1->transform().translation();
+        auto& p2 = shape2->transform().translation();
+        float contact_dist = shape1->radius() + shape2->radius();
+        sqr_dist = p1.square_distance(p2);
+        return sqr_dist <= contact_dist * contact_dist;
+    }
+
     Vec3 m_p1;
     Vec3 m_p2;
     float m_dist_sqr = 0.f;

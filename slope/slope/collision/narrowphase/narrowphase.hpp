@@ -10,27 +10,22 @@ public:
     Narrowphase();
 
     template<class Backend>
-    void                add_backend();
-    void                reset_all_backends();
+    void        add_backend();
+    void        reset_all_backends();
 
-    bool                intersect(const CollisionShape* shape1, const CollisionShape* shape2);
-    std::optional<Vec3> get_penetration_axis();
-    void                generate_contacts(ContactManifold& manifold);
+    bool        intersect(const CollisionShape* shape1, const CollisionShape* shape2);
+    bool        collide(const CollisionShape* shape1, const CollisionShape* shape2, NpContactPatch& patch);
 
-    bool                collide(ContactManifold& manifold, const CollisionShape* shape1, const CollisionShape* shape2);
-
-    GJKSolver&          gjk_solver() { return m_context.gjk_solver; }
-    EPASolver&          epa_solver() { return m_context.epa_solver; }
-    SATSolver&          sat_solver() { return m_context.sat_solver; }
+    GJKSolver&  gjk_solver() { return m_context.gjk_solver; }
+    EPASolver&  epa_solver() { return m_context.epa_solver; }
+    SATSolver&  sat_solver() { return m_context.sat_solver; }
 
 private:
+    INpBackendWrapper* find_backend(const CollisionShape* shape1, const CollisionShape* shape2);
     void remove_backend(int type1, int type2);
 
     NpContext m_context;
-
     NpNullBackend m_null_backend;
-    INpBackendWrapper* m_current_backend = nullptr;
-
     Vector<std::unique_ptr<INpBackendWrapper>> m_backends;
     Array<Array<INpBackendWrapper*, (int)ShapeType::Count>, (int)ShapeType::Count> m_backend_map;
 };
@@ -52,32 +47,19 @@ void Narrowphase::add_backend()
     }
 }
 
+inline INpBackendWrapper* Narrowphase::find_backend(const CollisionShape* shape1, const CollisionShape* shape2)
+{
+    return m_backend_map[(int)shape1->type()][(int)shape2->type()];
+}
+
 inline bool Narrowphase::intersect(const CollisionShape* shape1, const CollisionShape* shape2)
 {
-    m_current_backend = m_backend_map[static_cast<int>(shape1->type())][static_cast<int>(shape2->type())];
-    return m_current_backend->intersect(shape1, shape2);
+    return find_backend(shape1, shape2)->intersect(shape1, shape2);
 }
 
-inline std::optional<Vec3> Narrowphase::get_penetration_axis()
+inline bool Narrowphase::collide(const CollisionShape* shape1, const CollisionShape* shape2, NpContactPatch& patch)
 {
-    return m_current_backend->get_penetration_axis();
-}
-
-inline void Narrowphase::generate_contacts(ContactManifold& manifold)
-{
-    manifold.begin_update();
-    m_current_backend->generate_contacts(manifold);
-    manifold.end_update();
-}
-
-inline bool Narrowphase::collide(ContactManifold& manifold, const CollisionShape* shape1, const CollisionShape* shape2)
-{
-    if (intersect(shape1, shape2)) {
-        generate_contacts(manifold);
-        return true;
-    }
-
-    return false;
+    return find_backend(shape1, shape2)->collide(shape1, shape2, patch);
 }
 
 } // slope

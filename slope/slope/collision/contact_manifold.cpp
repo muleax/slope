@@ -31,7 +31,6 @@ void ContactManifold::begin_update() {
     }
 
     m_point_count = 0;
-    m_inverted_input_order = false;
 }
 
 void ContactManifold::end_update() {
@@ -67,13 +66,8 @@ void ContactManifold::end_update() {
     }
 }
 
-void ContactManifold::add_contact(ContactGeom new_geom) {
+void ContactManifold::add_contact(const ContactGeom& new_geom) {
     static_assert(MAX_SIZE == 4);
-
-    if (m_inverted_input_order) {
-        std::swap(new_geom.p1, new_geom.p2);
-        new_geom.normal = -new_geom.normal;
-    }
 
     auto local_point = m_shape1_inv_transform.apply_point(new_geom.p1);
     float penetration = new_geom.normal.dot(new_geom.p1 - new_geom.p2);

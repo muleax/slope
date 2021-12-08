@@ -33,8 +33,7 @@ public:
 
     void        begin_update();
     void        end_update();
-    void        add_contact(ContactGeom new_geom);
-    void        invert_input_order() { m_inverted_input_order = !m_inverted_input_order; };
+    void        add_contact(const ContactGeom& new_geom);
 
 private:
     static constexpr uint32_t MAX_SIZE = 4;
@@ -52,7 +51,6 @@ private:
     Array<PointLambdaCache, MAX_SIZE> m_lambda_cache;
     uint32_t m_lambda_cache_size = 0;
 
-    bool m_inverted_input_order = false;
     Mat44 m_shape1_inv_transform;
 };
 

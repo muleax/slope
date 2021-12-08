@@ -166,7 +166,8 @@ void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2) {
 
     m_stats.np_test_count++;
 
-    if (m_narrowphase.intersect(&shape1, &shape2)) {
+    m_contact_patch.reset();
+    if (m_narrowphase.collide(&shape1, &shape2, m_contact_patch)) {
         m_stats.collision_count++;
 
         auto& cache = m_manifolds[{ &shape1, &shape2 }];
@@ -176,11 +177,16 @@ void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2) {
         cache.touch_frame_id = m_frame_id;
 
         auto& manifold = cache.manifold;
-
         manifold.update_inv_transform(actor1->inv_transform());
-        m_narrowphase.generate_contacts(manifold);
+        manifold.begin_update();
 
-        for (auto& p: manifold)
+        m_contact_patch.normalize_order();
+        for (auto& geom : m_contact_patch.contacts)
+            manifold.add_contact(geom);
+
+        manifold.end_update();
+
+        for (auto& p : manifold)
             m_pending_contacts.push_back({&cache, &p});
     }
 }
