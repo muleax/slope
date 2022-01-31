@@ -33,13 +33,10 @@ bool convert(const String& path) {
         return false;
     }
 
-    String token;
     String line;
     while (std::getline(src,line)) {
         std::istringstream ss(line);
-        ss >> token;
-        if (token == "o")
-        std::cout << line << '\n';
+        // TODO: conversion
     }
     src.close();
 

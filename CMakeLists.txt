@@ -5,19 +5,6 @@ set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
 
 set(SLOPE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-function(slope_external_deps target privacy deps)
-    foreach(dep ${deps} ${ARGN})
-        cmake_language(CALL _target_add_${dep} ${target} ${privacy} ${SLOPE_ROOT_DIR}/deps/${dep})
-    endforeach()
-endfunction()
-
-function(slope_internal_deps target privacy deps)
-    foreach(dep ${deps} ${ARGN})
-        target_include_directories(${target} ${privacy} ${SLOPE_ROOT_DIR}/${dep})
-        target_link_libraries(${target} ${privacy} ${dep})
-    endforeach()
-endfunction()
-
 function(slope_library target)
     file(GLOB_RECURSE LIB_HEADERS "*.hpp")
     file(GLOB_RECURSE LIB_SOURCES "*.cpp")

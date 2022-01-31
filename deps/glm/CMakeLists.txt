@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
 
-function(_target_add_glm target privacy path)
-    target_include_directories(${target} ${privacy} ${path}/glm)
-endfunction()
+add_library(glm INTERFACE)
+
+target_include_directories(glm INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/glm)
