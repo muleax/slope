@@ -101,7 +101,7 @@ public:
         return data;
     }
 
-    [[nodiscard]] constexpr const float* begin() const {
+    constexpr const float* begin() const {
         return data;
     }
 
@@ -109,19 +109,19 @@ public:
         return data + 4;
     }
 
-    [[nodiscard]] constexpr const float* end() const {
+    constexpr const float* end() const {
         return data + 4;
     }
 
-    [[nodiscard]] float constexpr determinant() const {
+    float constexpr determinant() const {
         return _11 * _22 - _12 * _21;
     }
 
-    [[nodiscard]] constexpr Mat22 transposed() const {
+    constexpr Mat22 transposed() const {
         return { _11, _21, _12, _22 };
     }
 
-    [[nodiscard]] constexpr Mat22 inverted(const Mat22& value) const {
+    constexpr Mat22 inverted(const Mat22& value) const {
         float det = determinant();
 
         if (slope::equal(det, 0.f)) {
@@ -133,12 +133,12 @@ public:
                  -value._21 * multiplier, value._11 * multiplier };
     }
 
-    [[nodiscard]] constexpr bool equal(const Mat22& rhs, float epsilon = EQUALITY_EPSILON) const {
+    constexpr bool equal(const Mat22& rhs, float epsilon = EQUALITY_EPSILON) const {
         return slope::equal(_11, rhs._11, epsilon) && slope::equal(_12, rhs._12, epsilon) &&
                 slope::equal(_21, rhs._21, epsilon) && slope::equal(_22, rhs._22, epsilon);
     }
 
-    [[nodiscard]] bool isfinite() const {
+    bool isfinite() const {
         return std::isfinite(_11) && std::isfinite(_12) &&
                std::isfinite(_21) && std::isfinite(_22);
     }

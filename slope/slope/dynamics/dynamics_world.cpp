@@ -123,6 +123,18 @@ void DynamicsWorld::remove_actor(BaseActor* actor) {
     }
 }
 
+void DynamicsWorld::clear() {
+    for (auto& actor : m_dynamic_actors)
+        m_broadphase.remove_proxy(actor.proxy_id);
+
+    m_dynamic_actors.clear();
+
+    for (auto& actor : m_static_actors)
+        m_broadphase.remove_proxy(actor.proxy_id);
+
+    m_static_actors.clear();
+}
+
 template<class T>
 void DynamicsWorld::remove_actor_impl(Vector<T>& container, BaseActor* actor) {
     auto it = std::find_if(container.begin(), container.end(), [&actor](const auto& data) { return data.actor == actor; });

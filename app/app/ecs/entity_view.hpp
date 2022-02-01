@@ -21,13 +21,7 @@ public:
         m_it++;
         return *this;
     }
-/*
-    EntityViewIterator operator++(int) {
-        auto tmp = *this;
-        ++m_it;
-        return tmp;
-    }
-*/
+
     friend bool operator== (const EntityViewIterator& a, const EntityViewIterator& b) {
         return a.m_it == b.m_it;
     }
@@ -98,7 +92,6 @@ public:
 
 private:
     std::mutex m_mutex;
-    // TODO: unordered map
     UnorderedMap<ComponentMask, EntityView::Id> m_mask_to_id;
 
     static EntityViewRegistry s_instance;

@@ -125,7 +125,7 @@ public:
         return data;
     }
 
-    [[nodiscard]] const float* begin() const {
+    const float* begin() const {
         return data;
     }
 
@@ -133,60 +133,60 @@ public:
         return data + 4;
     }
 
-    [[nodiscard]] const float *end() const {
+    const float *end() const {
         return data + 4;
     }
 
-    [[nodiscard]] constexpr float dot(const Vec4& rhs) const {
+    constexpr float dot(const Vec4& rhs) const {
         return x * rhs.x + y * rhs.y + z * rhs.z + w * rhs.w;
     }
 
-    [[nodiscard]] constexpr Vec4 cross(const Vec4& rhs) const {
+    constexpr Vec4 cross(const Vec4& rhs) const {
         return { y * rhs.z - z * rhs.y,
                  z * rhs.x - x * rhs.z,
                  x * rhs.y - y * rhs.x,
                  1.f };
     }
 
-    [[nodiscard]] constexpr float length_squared() const {
+    constexpr float length_squared() const {
         return sqr(x) + sqr(y) + sqr(z) + sqr(w);
     }
 
-    [[nodiscard]] float length() const {
+    float length() const {
         return std::sqrt(length_squared());
     }
 
-    [[nodiscard]] constexpr float square_distance(const Vec4& rhs) const {
+    constexpr float square_distance(const Vec4& rhs) const {
         return sqr(x - rhs.x) + sqr(y - rhs.y) + sqr(z - rhs.z) + sqr(w - rhs.w);
     }
 
-    [[nodiscard]] float distance(const Vec4& rhs) const {
+    float distance(const Vec4& rhs) const {
         return std::sqrt(square_distance(rhs));
     }
 
-    [[nodiscard]] bool isfinite() const {
+    bool isfinite() const {
         return std::isfinite(x) && std::isfinite(y) && std::isfinite(z) && std::isfinite(w);
     }
 
-    [[nodiscard]] constexpr bool equal(const Vec4& rhs, float epsilon = EQUALITY_EPSILON) const {
+    constexpr bool equal(const Vec4& rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(x, rhs.x, epsilon) &&
                 slope::equal(y, rhs.y, epsilon) &&
                 slope::equal(z, rhs.z, epsilon) &&
                 slope::equal(w, rhs.w, epsilon);
     }
 
-    [[nodiscard]] constexpr bool equal(float rhs, float epsilon = EQUALITY_EPSILON) const {
+    constexpr bool equal(float rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(x, rhs, epsilon) &&
                 slope::equal(y, rhs, epsilon) &&
                 slope::equal(z, rhs, epsilon) &&
                 slope::equal(w, rhs, epsilon);
     }
 
-    [[nodiscard]] Vec4 normalized() const;
+    Vec4 normalized() const;
 
-    [[nodiscard]] constexpr Vec4 reflected(const Vec4& normal) const;
+    constexpr Vec4 reflected(const Vec4& normal) const;
 
-    [[nodiscard]] Vec4 abs() const;
+    Vec4 abs() const;
 
     constexpr void lerp(const Vec4& from, const Vec4& to, float t);
 

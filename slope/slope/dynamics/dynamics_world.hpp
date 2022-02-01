@@ -82,6 +82,7 @@ public:
 
     void                    add_actor(BaseActor* actor);
     void                    remove_actor(BaseActor* actor);
+    void                    clear();
 
     void                    update(float dt);
 

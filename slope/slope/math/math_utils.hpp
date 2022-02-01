@@ -5,8 +5,8 @@
 
 namespace slope {
 
-constexpr float     PI = 3.14159265358979323846264338327950288;
-constexpr float     EQUALITY_EPSILON = 1e-6f;
+constexpr double    PI = 3.14159265358979323846264338327950288;
+constexpr double    EQUALITY_EPSILON = 1e-6;
 
 constexpr float     FLOAT_MAX = std::numeric_limits<float>::max();
 
@@ -29,7 +29,6 @@ struct Interval {
 
     void extend(float value) {
         SL_ASSERT(min <= max);
-
         if (value > max)
             max = value;
         else if (value < min)

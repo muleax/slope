@@ -75,6 +75,7 @@ public:
         m_systems.emplace_back(new T(this));
     }
 
+    // TODO: init/fini views
     template <class... Ts>
     const EntityView& view() {
         auto view_id = EntityViewRegistry::instance().get_id<Ts...>();
@@ -98,6 +99,14 @@ public:
         }
 
         return *view;
+    }
+
+    template<class T>
+    void visit_entities(T&& visitor) {
+        for (Entity::Id eid = 1; eid < m_entities.size(); eid++) {
+            if (m_entities[eid].alive)
+                visitor(Entity{eid});
+        }
     }
 
     void update(float dt);

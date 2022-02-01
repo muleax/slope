@@ -137,7 +137,7 @@ public:
         return data;
     }
 
-    [[nodiscard]] constexpr const float* begin() const {
+    constexpr const float* begin() const {
         return data;
     }
 
@@ -145,22 +145,22 @@ public:
         return data + 9;
     }
 
-    [[nodiscard]] constexpr const float* end() const {
+    constexpr const float* end() const {
         return data + 9;
     }
 
-    [[nodiscard]] constexpr float determinant() const {
+    constexpr float determinant() const {
         return _11 * _11 + _21 * _12 + _31 * _13;
     }
 
-    [[nodiscard]] constexpr Mat33 transposed(const Mat33& value) const {
+    constexpr Mat33 transposed(const Mat33& value) const {
         return {
             value._11, value._21, value._31,
             value._12, value._22, value._32,
             value._13, value._23, value._33 };
     }
 
-    [[nodiscard]] constexpr Mat33 inverted() const {
+    constexpr Mat33 inverted() const {
         Mat33 result(
             _33 * _22 - _23 * _32,
             _13 * _32 - _33 * _12,
@@ -191,7 +191,7 @@ public:
         return result;
     }
 
-    [[nodiscard]] constexpr bool equal(const Mat33& rhs, float epsilon = EQUALITY_EPSILON) const {
+    constexpr bool equal(const Mat33& rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(_11, rhs._11, epsilon) &&
                 slope::equal(_12, rhs._12, epsilon) &&
                 slope::equal(_13, rhs._13, epsilon) &&
@@ -203,7 +203,7 @@ public:
                 slope::equal(_33, rhs._33, epsilon);
     }
 
-    [[nodiscard]] inline bool isfinite() const {
+    inline bool isfinite() const {
         return std::isfinite(_11) && std::isfinite(_12) && std::isfinite(_13) &&
                std::isfinite(_21) && std::isfinite(_22) && std::isfinite(_23) &&
                std::isfinite(_31) && std::isfinite(_32) && std::isfinite(_33);

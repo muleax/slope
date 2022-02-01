@@ -179,7 +179,7 @@ public:
         return data;
     }
 
-    [[nodiscard]] constexpr const float* begin() const {
+    constexpr const float* begin() const {
         return data;
     }
 
@@ -187,11 +187,11 @@ public:
         return data + 16;
     }
 
-    [[nodiscard]] constexpr const float* end() const {
+    constexpr const float* end() const {
         return data + 16;
     }
 
-    [[nodiscard]] constexpr Mat44 transposed() const {
+    constexpr Mat44 transposed() const {
         return {
             _11, _21, _31, _41,
             _12, _22, _32, _42,
@@ -199,25 +199,25 @@ public:
             _14, _24, _34, _44 };
     }
 
-    [[nodiscard]] constexpr Vec3 apply_point(const Vec3& point) const {
+    constexpr Vec3 apply_point(const Vec3& point) const {
         return {
             point.x * _11 + point.y * _21 + point.z * _31 + _41,
             point.x * _12 + point.y * _22 + point.z * _32 + _42,
             point.x * _13 + point.y * _23 + point.z * _33 + _43 };
     }
 
-    [[nodiscard]] constexpr Vec3 apply_normal(const Vec3& normal) const {
+    constexpr Vec3 apply_normal(const Vec3& normal) const {
         return {
                 normal.x * _11 + normal.y * _21 + normal.z * _31,
                 normal.x * _12 + normal.y * _22 + normal.z * _32,
                 normal.x * _13 + normal.y * _23 + normal.z * _33 };
     }
 
-    [[nodiscard]] const Vec3& translation() const {
+    const Vec3& translation() const {
         return *reinterpret_cast<const Vec3*>(rows + 3);
     }
 
-    [[nodiscard]] const Vec3& apply_to_unit_axis(uint32_t axis) const {
+    const Vec3& apply_to_unit_axis(uint32_t axis) const {
         return *reinterpret_cast<const Vec3*>(rows + axis);
     }
 
@@ -227,11 +227,11 @@ public:
         rows[3].z = translation.z;
     }
 
-    [[nodiscard]] Mat44 inverted_orthonormal() const;
+    Mat44 inverted_orthonormal() const;
 
-    [[nodiscard]] Mat44 inverted() const;
+    Mat44 inverted() const;
 
-    [[nodiscard]] constexpr bool equal(const Mat44& rhs, float epsilon = EQUALITY_EPSILON) const {
+    constexpr bool equal(const Mat44& rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(_11, rhs._11, epsilon) &&
                 slope::equal(_12, rhs._12, epsilon) &&
                 slope::equal(_13, rhs._13, epsilon) &&
@@ -250,7 +250,7 @@ public:
                 slope::equal(_44, rhs._44, epsilon);
     }
 
-    [[nodiscard]] bool isfinite() const {
+    bool isfinite() const {
         return std::isfinite(_11) && std::isfinite(_12) && std::isfinite(_13) && std::isfinite(_14) &&
                std::isfinite(_21) && std::isfinite(_22) && std::isfinite(_23) && std::isfinite(_24) &&
                std::isfinite(_31) && std::isfinite(_32) && std::isfinite(_33) && std::isfinite(_34) &&

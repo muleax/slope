@@ -81,7 +81,7 @@ public:
         return data;
     }
 
-    [[nodiscard]] constexpr const float* begin() const {
+    constexpr const float* begin() const {
         return data;
     }
 
@@ -89,41 +89,41 @@ public:
         return data + 4;
     }
 
-    [[nodiscard]] constexpr const float* end() const {
+    constexpr const float* end() const {
         return data + 4;
     }
 
-    [[nodiscard]] constexpr float length_squared() const {
+    constexpr float length_squared() const {
         return sqr(x) + sqr(y) + sqr(z) + sqr(w);
     }
 
-    [[nodiscard]] float length() const {
+    float length() const {
         return std::sqrt(length_squared());
     }
 
-    [[nodiscard]] Quat normalized() const {
+    Quat normalized() const {
         float multiplier = 1.f / length();
         return { x * multiplier, y * multiplier, z * multiplier, w * multiplier };
     }
 
-    [[nodiscard]] constexpr Quat transposed() const {
+    constexpr Quat transposed() const {
         return { -x, -y, -z, w };
     }
 
-    [[nodiscard]] constexpr Quat inverted() const {
+    constexpr Quat inverted() const {
         float multiplier = 1.f / length_squared();
         Quat tr = transposed();
         return { tr.x * multiplier, tr.y * multiplier, tr.z * multiplier, tr.w * multiplier };
     }
 
-    [[nodiscard]] constexpr bool equal(const Quat& rhs, float epsilon = EQUALITY_EPSILON) const {
+    constexpr bool equal(const Quat& rhs, float epsilon = EQUALITY_EPSILON) const {
         return  slope::equal(x, rhs.x, epsilon) &&
                 slope::equal(y, rhs.y, epsilon) &&
                 slope::equal(z, rhs.z, epsilon) &&
                 slope::equal(w, rhs.w, epsilon);
     }
 
-    [[nodiscard]] bool isfinite() const {
+    bool isfinite() const {
         return std::isfinite(x) && std::isfinite(y) && std::isfinite(z) && std::isfinite(w);
     }
 

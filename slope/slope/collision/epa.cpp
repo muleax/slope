@@ -60,20 +60,14 @@ void EPASolver::add_face(uint32_t a_idx, uint32_t b_idx, uint32_t c_idx)
 
     m_heap.push_back({a_idx, b_idx, c_idx, normal, dist});
     std::push_heap(m_heap.begin(), m_heap.end());
-
-    // records.back().push_back({a, b, c, normal, Status::New});
 }
 
 std::optional<Vec3> EPASolver::find_penetration_axis(
     const CollisionShape* shape1, const CollisionShape* shape2, const GJKSolver::Simplex& simplex)
 {
-    //records.clear();
-
     m_points.clear();
     m_heap.clear();
     m_edges.clear();
-
-    // Vec3 best_axis;
 
     m_inner_point.set_zero();
 
@@ -84,16 +78,12 @@ std::optional<Vec3> EPASolver::find_penetration_axis(
 
     m_inner_point *= 0.25f;
 
-    //records.push_back({});
-
     add_face(0, 1, 2);
     add_face(0, 1, 3);
     add_face(0, 2, 3);
     add_face(1, 2, 3);
 
     for (int iter = 1; true; iter++) {
-        //records.push_back({});
-
         SL_VERIFY(!m_heap.empty());
         while (m_heap.front().obsolete) {
             std::pop_heap(m_heap.begin(), m_heap.end());
@@ -161,65 +151,5 @@ std::optional<Vec3> EPASolver::find_penetration_axis(
     collect_stats(m_config.max_iteration_count, true);
     return std::nullopt;
 }
-
-/*
-struct EPADebugRecord {
-     enum Status {
-        Old,
-        New,
-        Removed
-    };
-
-    Vec3 a;
-    Vec3 b;
-    Vec3 c;
-    Vec3 n;
-    Status status;
-};
-
-void epa_debug_draw()
-{
-    float scale = 1.f;
-    Vec3 offs = {5.f, 5.f, 5.f};
-    Vec3 iter_offs = {4.f, 0.f, 0.f};
-    for (auto& iter: m_collider.m_epa.records) {
-        for (auto& tri: iter) {
-            Vec3 color = tri.status == Status::New
-                         ? Vec3{0.f, 1.f, 0.f}
-                         : (tri.status == Status::Old ? Vec3{0.5f, 0.5f, 1.f} : Vec3{1.f, 0.f, 0.f});
-
-            Vec3 moffs = tri.status == Status::New
-                         ? Vec3{0.02f, 0.f, 0.f}
-                         : (tri.status == Status::Old ? Vec3{0.0f, 0.f, 0.f} : Vec3{-0.02f, 0.f, 0.f});
-
-            m_debug_drawer->draw_line(tri.a * scale + offs + moffs, tri.b * scale + offs + moffs, color);
-            m_debug_drawer->draw_line(tri.b * scale + offs + moffs, tri.c * scale + offs + moffs, color);
-            m_debug_drawer->draw_line(tri.c * scale + offs + moffs, tri.a * scale + offs + moffs, color);
-
-            if (tri.status != Status::Removed) {
-
-                auto mid = (tri.a + tri.b + tri.c) / 3.f;
-
-                auto n_end = mid * scale + offs + tri.n * 0.4f;
-                m_debug_drawer->draw_line(mid * scale + offs, n_end, {0.f, 0.8f, 0.8f});
-
-                float no = 0.05f;
-                m_debug_drawer->draw_line(n_end + Vec3{0.f, no, 0.f}, n_end + Vec3{0.f, -no, 0.f},
-                                          {0.f, 0.8f, 0.8f});
-                m_debug_drawer->draw_line(n_end + Vec3{no, 0.f, 0.f}, n_end + Vec3{-no, 0.f, 0.f},
-                                          {0.f, 0.8f, 0.8f});
-                m_debug_drawer->draw_line(n_end + Vec3{0.f, 0.f, no}, n_end + Vec3{0.f, 0.f, -no},
-                                          {0.f, 0.8f, 0.8f});
-            }
-        }
-
-        m_debug_drawer->draw_line(Vec3{0.f, 0.1f, 0.f} + offs, Vec3{0.f, -0.1f, 0.f} + offs, {1.f, 1.f, 1.f});
-        m_debug_drawer->draw_line(Vec3{0.1f, 0.f, 0.f} + offs, Vec3{-0.1f, 0.f, 0.f} + offs, {1.f, 1.f, 1.f});
-        m_debug_drawer->draw_line(Vec3{0.f, 0.f, 0.1f} + offs, Vec3{0.f, -0.f, -0.1f} + offs, {1.f, 1.f, 1.f});
-
-        offs += iter_offs;
-    }
-}
-*/
 
 } // slope

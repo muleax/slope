@@ -63,6 +63,7 @@ void World::process_commands() {
 
         edata.mask.reset(type_id);
     }
+    m_component_destroy_orders.clear();
 
     for (auto e : m_entity_destroy_orders) {
         auto& edata = m_entities[e.id()];
@@ -85,6 +86,7 @@ void World::process_commands() {
 
         m_free_entity_ids.push_back(e.id());
     }
+    m_entity_destroy_orders.clear();
 
     for (auto [e, type_id] : m_component_create_orders) {
         auto& cdata = *m_components[type_id];
@@ -99,7 +101,7 @@ void World::process_commands() {
             }
         }
     }
-
+    m_component_create_orders.clear();
 }
 
 void World::update(float dt) {

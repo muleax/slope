@@ -75,7 +75,10 @@ public:
         };
 
         type.m_destructor = [](void* buffer) {
-            static_cast<T*>(buffer)->~T();
+            T* component = static_cast<T*>(buffer);
+            std::string tname = typeid(*component).name();
+
+            component->~T();
         };
 
         Component<T>::set_type_id(type_id);

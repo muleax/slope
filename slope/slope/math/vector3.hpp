@@ -106,7 +106,7 @@ public:
         return data;
     }
 
-    [[nodiscard]] const float* begin() const {
+    const float* begin() const {
         return data;
     }
 
@@ -114,53 +114,53 @@ public:
         return data + 3;
     }
 
-    [[nodiscard]] const float *end() const {
+    const float *end() const {
         return data + 3;
     }
 
-    [[nodiscard]] constexpr float dot(const Vec3& rhs) const {
+    constexpr float dot(const Vec3& rhs) const {
         return x * rhs.x + y * rhs.y + z * rhs.z;
     }
 
-    [[nodiscard]] constexpr Vec3 cross(const Vec3& rhs) const {
+    constexpr Vec3 cross(const Vec3& rhs) const {
         return { y * rhs.z - z * rhs.y,
                  z * rhs.x - x * rhs.z,
                  x * rhs.y - y * rhs.x };
     }
 
-    [[nodiscard]] constexpr float length_squared() const {
+    constexpr float length_squared() const {
         return sqr(x) + sqr(y) + sqr(z);
     }
 
-    [[nodiscard]] float length() const {
+    float length() const {
         return std::sqrt(length_squared());
     }
 
-    [[nodiscard]] constexpr float square_distance(const Vec3& rhs) const {
+    constexpr float square_distance(const Vec3& rhs) const {
         return sqr(x - rhs.x) + sqr(y - rhs.y) + sqr(z - rhs.z);
     }
 
-    [[nodiscard]] float distance(const Vec3& rhs) const {
+    float distance(const Vec3& rhs) const {
         return std::sqrt(square_distance(rhs));
     }
 
-    [[nodiscard]] bool isfinite() const {
+    bool isfinite() const {
         return std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
     }
 
-    [[nodiscard]] constexpr bool equal(const Vec3& rhs, float epsilon = EQUALITY_EPSILON) const {
+    constexpr bool equal(const Vec3& rhs, float epsilon = EQUALITY_EPSILON) const {
         return slope::equal(x, rhs.x, epsilon) && slope::equal(y, rhs.y, epsilon)  && slope::equal(z, rhs.z, epsilon);
     }
 
-    [[nodiscard]] constexpr bool equal(float rhs, float epsilon = EQUALITY_EPSILON) const {
+    constexpr bool equal(float rhs, float epsilon = EQUALITY_EPSILON) const {
         return slope::equal(x, rhs, epsilon) && slope::equal(y, rhs, epsilon) && slope::equal(z, rhs, epsilon);
     }
 
-    [[nodiscard]] Vec3 normalized() const;
+    Vec3 normalized() const;
 
-    [[nodiscard]] constexpr Vec3 reflected(const Vec3& normal) const;
+    constexpr Vec3 reflected(const Vec3& normal) const;
 
-    [[nodiscard]] Vec3 abs() const;
+    Vec3 abs() const;
 
     constexpr void lerp(const Vec3& from, const Vec3& to, float t);
 
