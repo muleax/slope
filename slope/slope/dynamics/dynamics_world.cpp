@@ -101,7 +101,8 @@ void DynamicsWorld::setup_narrowphase(NpBackendHint hint)
     }
 }
 
-void DynamicsWorld::add_actor(BaseActor* actor) {
+void DynamicsWorld::add_actor(BaseActor* actor)
+{
     auto proxy_id = m_broadphase.add_proxy(actor);
 
     if (actor->is<DynamicActor>()) {
@@ -113,7 +114,9 @@ void DynamicsWorld::add_actor(BaseActor* actor) {
     }
 }
 
-void DynamicsWorld::remove_actor(BaseActor* actor) {
+void DynamicsWorld::remove_actor(BaseActor* actor)
+{
+    // TODO: remove associated joints
     if (actor->is<DynamicActor>()) {
         remove_actor_impl(m_dynamic_actors, actor);
 
@@ -123,21 +126,37 @@ void DynamicsWorld::remove_actor(BaseActor* actor) {
     }
 }
 
-void DynamicsWorld::clear() {
-    for (auto& actor : m_dynamic_actors)
+void DynamicsWorld::add_joint(Joint* joint)
+{
+    m_joints.push_back(joint);
+}
+
+void DynamicsWorld::remove_joint(Joint* joint)
+{
+    auto it = std::remove(m_joints.begin(), m_joints.end(), joint);
+    m_joints.erase(it, m_joints.end());
+}
+
+void DynamicsWorld::clear()
+{
+    for (auto& actor: m_dynamic_actors)
         m_broadphase.remove_proxy(actor.proxy_id);
 
     m_dynamic_actors.clear();
 
-    for (auto& actor : m_static_actors)
+    for (auto& actor: m_static_actors)
         m_broadphase.remove_proxy(actor.proxy_id);
 
     m_static_actors.clear();
+
+    m_joints.clear();
 }
 
 template<class T>
-void DynamicsWorld::remove_actor_impl(Vector<T>& container, BaseActor* actor) {
-    auto it = std::find_if(container.begin(), container.end(), [&actor](const auto& data) { return data.actor == actor; });
+void DynamicsWorld::remove_actor_impl(Vector<T>& container, BaseActor* actor)
+{
+    auto it = std::find_if(container.begin(), container.end(),
+                           [&actor](const auto& data) { return data.actor == actor; });
     if (it == container.end()) {
         log::error("Remove actor: actor not found");
         return;
@@ -148,7 +167,8 @@ void DynamicsWorld::remove_actor_impl(Vector<T>& container, BaseActor* actor) {
     container.erase(it);
 }
 
-void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer) {
+void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer)
+{
     m_debug_drawer = std::move(drawer);
 }
 
@@ -166,7 +186,8 @@ void DynamicsWorld::apply_gyroscopic_torque(float dt)
     }
 }
 
-void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2) {
+void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2)
+{
     if (actor1 > actor2)
         std::swap(actor1, actor2);
 
@@ -182,7 +203,7 @@ void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2) {
     if (m_narrowphase.collide(&shape1, &shape2, m_contact_patch)) {
         m_stats.collision_count++;
 
-        auto& cache = m_manifolds[{ &shape1, &shape2 }];
+        auto& cache = m_manifolds[{&shape1, &shape2}];
         // TODO: check in broadphase
         cache.actor1 = static_cast<DynamicActor*>(actor1);
         cache.actor2 = actor2;
@@ -193,58 +214,37 @@ void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2) {
         manifold.begin_update();
 
         m_contact_patch.normalize_order();
-        for (auto& geom : m_contact_patch.contacts)
+        for (auto& geom: m_contact_patch.contacts)
             manifold.add_contact(geom);
 
         manifold.end_update();
 
-        for (auto& p : manifold)
+        for (auto& p: manifold)
             m_pending_contacts.push_back({&cache, &p});
     }
 }
 
-void DynamicsWorld::perform_collision_detection() {
+void DynamicsWorld::perform_collision_detection()
+{
     m_stats.np_test_count = 0;
     m_stats.collision_count = 0;
     m_narrowphase.gjk_solver().reset_stats();
     m_narrowphase.epa_solver().reset_stats();
     m_narrowphase.sat_solver().reset_stats();
 
-    for (auto& data : m_dynamic_actors)
+    for (auto& data: m_dynamic_actors)
         m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
 
-    for (auto& data : m_static_actors)
+    for (auto& data: m_static_actors)
         m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
 
-    m_broadphase.find_overlapping_pairs_SP([this](BaseActor* actor1, BaseActor* actor2) {
+    m_broadphase.find_overlapping_pairs([this](BaseActor* actor1, BaseActor* actor2) {
         collide(actor1, actor2);
     });
-
-/*
-    for (auto actor1 = m_dynamic_actors.begin(); actor1 != m_dynamic_actors.end(); ++actor1) {
-        auto* a1 = actor1->actor;
-        auto& shape1 = a1->shape();
-        for (auto actor2 = actor1 + 1; actor2 != m_dynamic_actors.end(); ++actor2) {
-            auto* a2 = actor2->actor;
-            auto& shape2 = a2->shape();
-            if (shape1.aabb().intersects(shape2.aabb()))
-                collide(a1, a2);
-        }
-    }
-
-    for (auto& actor : m_dynamic_actors) {
-        auto* a1 = actor.actor;
-        auto& shape1 = a1->shape();
-        for (auto& static_actor : m_static_actors) {
-            auto* a2 = static_actor.actor;
-            auto& shape2 = a2->shape();
-            if (shape1.aabb().intersects(shape2.aabb()))
-                collide(a1, a2);
-        }
-    }*/
 }
 
-void DynamicsWorld::apply_contacts() {
+void DynamicsWorld::apply_contacts()
+{
     m_stats.contact_count = m_pending_contacts.size();
 
     auto* debug_drawer = m_debug_drawer.get();
@@ -256,7 +256,7 @@ void DynamicsWorld::apply_contacts() {
         }
     }
 
-    for (auto [cache, p]: m_pending_contacts) {
+    for (auto[cache, p]: m_pending_contacts) {
         ConstraintGeom geom = {p->geom.p1, p->geom.p2, p->geom.normal};
 
         auto* actor1 = cache->actor1;
@@ -287,11 +287,11 @@ void DynamicsWorld::apply_contacts() {
         // TODO: implement policies
         float friction_ratio = actor1->friction() * actor2->friction();
 
-        nc.init_lambda  = p->normal_lambda * m_config.warmstarting_normal;
+        nc.init_lambda = p->normal_lambda * m_config.warmstarting_normal;
         fc1.init_lambda = p->friction1_lambda * m_config.warmstarting_friction;
         fc2.init_lambda = p->friction2_lambda * m_config.warmstarting_friction;
 
-        p->normal_constr_id    = m_solver->add_constraint(nc);
+        p->normal_constr_id = m_solver->add_constraint(nc);
 
         if (m_config.enable_cone_friction) {
             auto ids = m_solver->join_friction_cone(fc1, fc2, {friction_ratio, friction_ratio}, p->normal_constr_id);
@@ -328,15 +328,29 @@ void DynamicsWorld::apply_contacts() {
     }
 }
 
-void DynamicsWorld::cache_lambdas() {
-    for (auto [_, p] : m_pending_contacts) {
-        p->normal_lambda    = m_solver->get_lambda(p->normal_constr_id);
-        p->friction1_lambda = m_solver->get_lambda(p->friction1_constr_id);
-        p->friction2_lambda = m_solver->get_lambda(p->friction2_constr_id);
+void DynamicsWorld::apply_joints()
+{
+    for (auto* joint : m_joints) {
+        joint->set_warmstarting_ratio(m_config.warmstarting_joint);
+        joint->apply_constraints(m_solver.get());
     }
 }
 
-void DynamicsWorld::integrate_bodies() {
+void DynamicsWorld::cache_lambdas()
+{
+    for (auto[_, p]: m_pending_contacts) {
+        p->normal_lambda = m_solver->get_lambda(p->normal_constr_id);
+        p->friction1_lambda = m_solver->get_lambda(p->friction1_constr_id);
+        p->friction2_lambda = m_solver->get_lambda(p->friction2_constr_id);
+    }
+
+    for (auto* joint : m_joints) {
+        joint->cache_lambdas(m_solver.get());
+    }
+}
+
+void DynamicsWorld::integrate_bodies()
+{
     float dt = m_solver->time_interval();
 
     for (auto& data: m_dynamic_actors) {
@@ -346,7 +360,8 @@ void DynamicsWorld::integrate_bodies() {
     }
 }
 
-void DynamicsWorld::refresh_manifolds() {
+void DynamicsWorld::refresh_manifolds()
+{
     for (auto it = m_manifolds.begin(); it != m_manifolds.end();) {
         auto& cache = it->second;
         if (cache.touch_frame_id == m_frame_id && cache.manifold.size() > 0)
@@ -367,7 +382,8 @@ void DynamicsWorld::update_general_stats()
     m_stats.simulation_time += m_solver->time_interval();
 }
 
-void DynamicsWorld::update(float dt) {
+void DynamicsWorld::update(float dt)
+{
     if (m_debug_drawer)
         m_debug_drawer->clear();
 
@@ -386,6 +402,8 @@ void DynamicsWorld::update(float dt) {
     perform_collision_detection();
 
     apply_contacts();
+
+    apply_joints();
 
     if (m_config.enable_constraint_resolving) {
         m_solver->solve();

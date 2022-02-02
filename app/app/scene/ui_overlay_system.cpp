@@ -26,48 +26,43 @@ void UIOverlaySystem::update(float dt)
 
     auto treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen;
 
-    ImGui::Begin("Controls");
+    ImGui::Begin("Stats");
 
     // ImGui::SetNextItemOpen(true);
-    if (ImGui::CollapsingHeader("Stats", treeNodeFlags)) {
-        ImGui::Indent( 16.0f );
-
-        if (ImGui::CollapsingHeader("General", treeNodeFlags))
-        {
-            ImGui::Text("Simulation Time: %.1f s", world_stats.simulation_time);
-            ImGui::Text("CPU Frame Time: %.1f ms", ps->cpu_time.instantaneous() * 1000);
-            ImGui::Text("Static Actors: %d", world_stats.static_actor_count);
-            ImGui::Text("Dynamic Actors: %d", world_stats.dynamic_actor_count);
-        }
-
-        if (ImGui::CollapsingHeader("Narrowphase", treeNodeFlags))
-        {
-            ImGui::Text("Narrowphase Tests: %d", world_stats.np_test_count);
-            ImGui::Text("Collisions: %d", world_stats.collision_count);
-            ImGui::Text("Contacts: %d", world_stats.contact_count);
-
-            ImGui::Text("GJK Tests: %llu", gjk_stats.cum_test_count);
-            ImGui::Text("GJK Total Fails: %llu", gjk_stats.total_fail_count);
-            ImGui::Text("GJK Max Iterations: %d", gjk_stats.max_iteration_count);
-            ImGui::Text("GJK Avg Iterations: %f", float(gjk_stats.cum_iterations_count) / float(gjk_stats.cum_test_count));
-
-            ImGui::Text("EPA Tests: %llu", epa_stats.cum_test_count);
-            ImGui::Text("EPA Total Fails: %llu", epa_stats.total_fail_count);
-            ImGui::Text("EPA Max Iterations: %d", epa_stats.max_iteration_count);
-            ImGui::Text("EPA Avg Iterations: %f", float(epa_stats.cum_iterations_count) / float(epa_stats.cum_test_count));
-
-            ImGui::Text("SAT Tests: %llu", sat_stats.cum_test_count);
-            ImGui::Text("SAT Avg Projections: %f", float(sat_stats.cum_projection_count) / float(sat_stats.cum_test_count));
-        }
-
-        if (ImGui::CollapsingHeader("Constraints", treeNodeFlags))
-        {
-            ImGui::Text("Max solver error: %f", world_stats.max_constraint_solver_error.smoothed());
-            ImGui::Text("Avg solver error: %f", world_stats.avg_constraint_solver_error.smoothed());
-        }
-
-        ImGui::Indent( -16.f );
+    if (ImGui::CollapsingHeader("General", treeNodeFlags)) {
+        ImGui::Text("Simulation Time: %.1f s", world_stats.simulation_time);
+        ImGui::Text("CPU Frame Time: %.1f ms", ps->cpu_time.instantaneous() * 1000);
+        ImGui::Text("Static Actors: %d", world_stats.static_actor_count);
+        ImGui::Text("Dynamic Actors: %d", world_stats.dynamic_actor_count);
     }
+
+    if (ImGui::CollapsingHeader("Narrowphase", treeNodeFlags)) {
+        ImGui::Text("Narrowphase Tests: %d", world_stats.np_test_count);
+        ImGui::Text("Collisions: %d", world_stats.collision_count);
+        ImGui::Text("Contacts: %d", world_stats.contact_count);
+
+        ImGui::Text("GJK Tests: %llu", gjk_stats.cum_test_count);
+        ImGui::Text("GJK Total Fails: %llu", gjk_stats.total_fail_count);
+        ImGui::Text("GJK Max Iterations: %d", gjk_stats.max_iteration_count);
+        ImGui::Text("GJK Avg Iterations: %f", float(gjk_stats.cum_iterations_count) / float(gjk_stats.cum_test_count));
+
+        ImGui::Text("EPA Tests: %llu", epa_stats.cum_test_count);
+        ImGui::Text("EPA Total Fails: %llu", epa_stats.total_fail_count);
+        ImGui::Text("EPA Max Iterations: %d", epa_stats.max_iteration_count);
+        ImGui::Text("EPA Avg Iterations: %f", float(epa_stats.cum_iterations_count) / float(epa_stats.cum_test_count));
+
+        ImGui::Text("SAT Tests: %llu", sat_stats.cum_test_count);
+        ImGui::Text("SAT Avg Projections: %f", float(sat_stats.cum_projection_count) / float(sat_stats.cum_test_count));
+    }
+
+    if (ImGui::CollapsingHeader("Constraints", treeNodeFlags)) {
+        ImGui::Text("Max solver error: %f", world_stats.max_constraint_solver_error.smoothed());
+        ImGui::Text("Avg solver error: %f", world_stats.avg_constraint_solver_error.smoothed());
+    }
+
+    ImGui::End();
+
+    ImGui::Begin("Controls");
 
     if (ImGui::CollapsingHeader("Simulation", treeNodeFlags)) {
         ImGui::Checkbox("Pause", &ps->pause);
@@ -115,6 +110,7 @@ void UIOverlaySystem::update(float dt)
         ImGui::DragInt("Iterations", &solver_config.iteration_count, 0.5f, 1, 300);
         ImGui::DragFloat("WS Normal", &world_config.warmstarting_normal, 0.002f, 0.f, 1.f);
         ImGui::DragFloat("WS Friction", &world_config.warmstarting_friction, 0.002f, 0.f, 1.f);
+        ImGui::DragFloat("WS Joint", &world_config.warmstarting_joint, 0.002f, 0.f, 1.f);
         ImGui::DragFloat("SOR", &solver_config.sor, 0.001f, 0.f, 1.f);
         ImGui::InputFloat3("Gravity", world_config.gravity.data);
     }

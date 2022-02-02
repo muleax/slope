@@ -19,7 +19,14 @@ class PlaygroundApp : public App {
 public:
     ~PlaygroundApp() override = default;
 
-    void on_init() override {
+    template<class... Ts>
+    void register_demos()
+    {
+        (m_demos.push_back(std::make_unique<Ts>(m_spawner.get())), ...);
+    }
+
+    void on_init() override
+    {
         m_world = std::make_unique<World>();
         m_world->add_system<PhysicsSystem>();
         m_world->add_system<CameraSystem>();
@@ -54,97 +61,98 @@ public:
         m_spawner = std::make_unique<BodySpawner>(m_world.get());
 
         // create demos
-        m_demos.push_back(std::make_unique<TriangleStackDemo>(m_spawner.get()));
-        m_demos.push_back(std::make_unique<StackDemo>(m_spawner.get()));
-        m_demos.push_back(std::make_unique<StressTestDemo>(m_spawner.get()));
-        m_demos.push_back(std::make_unique<CollisionDemo>(m_spawner.get()));
-        m_demos.push_back(std::make_unique<TennisRacketDemo>(m_spawner.get()));
+        register_demos<TriangleStackDemo, StackDemo, StressTestDemo, CollisionDemo, TennisRacketDemo, SphericalJointDemo>();
 
         m_current_demo = m_demos[0].get();
         reset_demo();
     }
 
-    void update(float dt) override {
+    void update(float dt) override
+    {
         show_demos_ui();
         m_current_demo->update(dt);
         m_world->update(dt);
     }
 
-    void on_window_resize(int width, int height) override {
+    void on_window_resize(int width, int height) override
+    {
         auto& cam = m_world->modify<CameraComponent>(m_cam_entity)->camera;
         cam.set_aspect_ratio(static_cast<float>(width) / height);
     }
 
-    void on_key(Key key, int scancode, KeyAction action, int mods) override {
+    void on_key(Key key, int scancode, KeyAction action, int mods) override
+    {
         bool is_pressed = action == KeyAction::Press || action == KeyAction::Repeat;
 
         auto* cam_ctl = m_world->modify<CameraControllerComponent>(m_cam_entity);
 
         switch (key) {
-            case Key::A:
-                cam_ctl->move_left = is_pressed;
-                break;
-            case Key::D:
-                cam_ctl->move_right = is_pressed;
-                break;
-            case Key::W:
-                cam_ctl->move_fwd = is_pressed;
-                break;
-            case Key::S:
-                cam_ctl->move_bkwd = is_pressed;
-                break;
+        case Key::A:
+            cam_ctl->move_left = is_pressed;
+            break;
+        case Key::D:
+            cam_ctl->move_right = is_pressed;
+            break;
+        case Key::W:
+            cam_ctl->move_fwd = is_pressed;
+            break;
+        case Key::S:
+            cam_ctl->move_bkwd = is_pressed;
+            break;
 
-            case Key::LeftShift: {
-                auto* cam = m_world->modify<CameraControllerComponent>(m_cam_entity);
-                cam->velocity = is_pressed ? 1.f : 8.f;
-                break;
+        case Key::LeftShift: {
+            auto* cam = m_world->modify<CameraControllerComponent>(m_cam_entity);
+            cam->velocity = is_pressed ? 1.f : 8.f;
+            break;
+        }
+
+        case Key::F:
+            if (is_pressed)
+                fire_box();
+            break;
+
+        case Key::G:
+            if (is_pressed)
+                fire_sphere();
+            break;
+
+        case Key::H:
+            if (is_pressed)
+                fire_capsule();
+            break;
+
+        case Key::Space:
+            if (action == KeyAction::Press) {
+                auto* phyics_single = m_world->modify_singleton<PhysicsSingleton>();
+                phyics_single->pause = !phyics_single->pause;
             }
-
-            case Key::F:
-                    if (is_pressed)
-                        fire_box();
-                    break;
-
-            case Key::G:
-                if (is_pressed)
-                    fire_sphere();
-                break;
-
-            case Key::H:
-                if (is_pressed)
-                    fire_capsule();
-                break;
-
-                case Key::Space:
-                if (action == KeyAction::Press ) {
-                    auto* phyics_single = m_world->modify_singleton<PhysicsSingleton>();
-                    phyics_single->pause = !phyics_single->pause;
-                }
-                break;
-            default:
-                break;
+            break;
+        default:
+            break;
         }
     }
 
-    void on_cursor_move(double x_delta, double y_delta) override {
+    void on_cursor_move(double x_delta, double y_delta) override
+    {
         if (m_cam_move_mode) {
             auto* cam_ctl = m_world->modify<CameraControllerComponent>(m_cam_entity);
             cam_ctl->rotate(x_delta, -y_delta);
         }
     }
 
-    void on_mouse_button(MouseButton button, KeyAction action, KeyMod::Raw mods) override {
+    void on_mouse_button(MouseButton button, KeyAction action, KeyMod::Raw mods) override
+    {
         if (button == MouseButton::B_1) {
             m_cam_move_mode = (action == KeyAction::Press);
         }
     }
 
-    void show_demos_ui() {
+    void show_demos_ui()
+    {
         ImGui::Begin("Demos");
 
-        if (ImGui::BeginCombo("##demos_combo", m_current_demo->name()))
-        {
-            for (auto& demo : m_demos) {
+        if (ImGui::BeginCombo("##demos_combo", m_current_demo->name())) {
+            for (auto& demo: m_demos) {
                 bool is_selected = (m_current_demo == demo.get());
                 if (ImGui::Selectable(demo->name(), is_selected))
                     m_current_demo = demo.get();
@@ -162,7 +170,8 @@ public:
         ImGui::End();
     }
 
-    void reset_demo() {
+    void reset_demo()
+    {
         m_world->visit_entities([this](Entity e) {
             if (std::find(m_static_entities.begin(), m_static_entities.end(), e) == m_static_entities.end())
                 m_world->destroy_entity(e);
@@ -173,10 +182,11 @@ public:
         // TODO: use fini view instead
         physics_single->dynamics_world.clear();
 
-        m_current_demo->reset();
+        m_current_demo->init();
     }
 
-    void fire_box() {
+    void fire_box()
+    {
         static constexpr float BOX_SPEED = 25.f;
 
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
@@ -184,7 +194,8 @@ public:
         m_spawner->spawn_box(cam_tr->transform, vel, 5.f, Vec3{1.5f});
     }
 
-    void fire_sphere() {
+    void fire_sphere()
+    {
         static constexpr float SPHERE_SPEED = 15.f;
 
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
@@ -192,7 +203,8 @@ public:
         m_spawner->spawn_sphere(cam_tr->transform, vel, 1.f, 1.f);
     }
 
-    void fire_capsule() {
+    void fire_capsule()
+    {
         static constexpr float CAPSULE_SPEED = 20.f;
 
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);

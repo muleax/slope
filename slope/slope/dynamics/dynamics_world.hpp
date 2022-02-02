@@ -1,6 +1,7 @@
 #pragma once
 #include "slope/dynamics/constraint_solver.hpp"
 #include "slope/dynamics/actor.hpp"
+#include "slope/dynamics/joint.hpp"
 #include "slope/containers/vector.hpp"
 #include "slope/containers/unordered_map.hpp"
 #include "slope/collision/contact_manifold.hpp"
@@ -63,6 +64,7 @@ public:
         bool enable_cone_friction = false;
         float warmstarting_normal = 0.83f;
         float warmstarting_friction = 0.75f;
+        float warmstarting_joint = 0.8f;
         Vec3 gravity = {0.f, -9.81f, 0.f};
 
         NpBackendHint np_backend_hint = NpBackendHint::Mixed;
@@ -80,8 +82,14 @@ public:
 
     explicit DynamicsWorld(std::optional<Config> init_config = std::nullopt);
 
+    // TODO: reconsider actor ownership
     void                    add_actor(BaseActor* actor);
     void                    remove_actor(BaseActor* actor);
+
+    // TODO: reconsider joint ownership
+    void                    add_joint(Joint* joint);
+    void                    remove_joint(Joint* joint);
+
     void                    clear();
 
     void                    update(float dt);
@@ -129,6 +137,7 @@ private:
     void perform_collision_detection();
     void collide(BaseActor* actor1, BaseActor* actor2);
     void apply_contacts();
+    void apply_joints();
     void update_constraint_stats();
     void update_general_stats();
     void cache_lambdas();
@@ -142,6 +151,8 @@ private:
 
     Vector<ActorData<DynamicActor>> m_dynamic_actors;
     Vector<ActorData<StaticActor>> m_static_actors;
+
+    Vector<Joint*> m_joints;
 
     Broadphase<BaseActor> m_broadphase;
 

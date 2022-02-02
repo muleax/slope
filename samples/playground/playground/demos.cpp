@@ -25,7 +25,7 @@ void Demo::create_floor()
     pc->actor->set_transform(tc->transform);
 }
 
-void StackDemo::reset()
+void StackDemo::init()
 {
     create_floor();
 
@@ -37,7 +37,7 @@ void StackDemo::reset()
     }
 }
 
-void TriangleStackDemo::reset()
+void TriangleStackDemo::init()
 {
     create_floor();
 
@@ -63,7 +63,7 @@ void TriangleStackDemo::reset()
     }
 }
 
-void StressTestDemo::reset()
+void StressTestDemo::init()
 {
     create_floor();
 
@@ -90,7 +90,7 @@ void StressTestDemo::reset()
     }
 }
 
-void CollisionDemo::reset()
+void CollisionDemo::init()
 {
     auto& config = physics_config();
     config.gravity.set_zero();
@@ -166,7 +166,7 @@ void CollisionDemo::update(float dt)
     }
 }
 
-void TennisRacketDemo::reset()
+void TennisRacketDemo::init()
 {
     auto& config = physics_config();
     config.gravity.set_zero();
@@ -176,4 +176,44 @@ void TennisRacketDemo::reset()
 
     Vec3 localInertia = {1.666666f, 0.666667f, 5.666666f};
     actor->body().set_local_inertia(localInertia);
+}
+
+void SphericalJointDemo::init()
+{
+    static constexpr int CHAIN_LENGTH = 12;
+
+    create_floor();
+
+    auto& config = physics_config();
+    config.solver_config.iteration_count = 30;
+
+    m_joints.resize(CHAIN_LENGTH);
+
+    auto& dyn_world = w()->modify_singleton<PhysicsSingleton>()->dynamics_world;
+
+    float y = 14.f;
+    float x = 0.f;
+
+    float offset = 0.9f;
+
+    RigidBody* prev_body = nullptr;
+    for (int i = 0; i < CHAIN_LENGTH; i++) {
+        auto new_box = m_spawner->spawn_box(Mat44::translate({x, y, 0.f}), {}, 1.f, Vec3{1.2f, 0.5f, 0.5f});
+
+        auto& joint = m_joints[i];
+        joint.emplace(&new_box->body(), prev_body);
+        joint->set_damping(0.5f);
+        joint->set_anchor1({ offset, 0.f, 0.f });
+        joint->set_anchor2(prev_body ? Vec3{-offset, 0.f, 0.f} : Vec3{x + offset, y, 0.f});
+        dyn_world.add_joint(&*joint);
+
+        prev_body = &new_box->body();
+
+        x -= 2.f * offset;
+    }
+}
+
+void SphericalJointDemo::fini()
+{
+    m_joints.clear();
 }
