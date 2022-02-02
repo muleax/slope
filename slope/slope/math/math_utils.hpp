@@ -2,6 +2,7 @@
 #include "slope/debug/assert.hpp"
 #include <cmath>
 #include <limits>
+#include <cstdint>
 
 namespace slope {
 
