@@ -6,16 +6,16 @@
 namespace slope {
 
 struct AABB {
-    Vec3 min = Vec3{FLOAT_MAX};
-    Vec3 max = Vec3{-FLOAT_MAX};
+    vec3 min = vec3{FLOAT_MAX};
+    vec3 max = vec3{-FLOAT_MAX};
 
     AABB() = default;
-    AABB(const Vec3& in_min, const Vec3& in_max) : min(in_min), max(in_max) {}
-    explicit AABB(const Vec3& point) : min(point), max(point) {}
+    AABB(const vec3& in_min, const vec3& in_max) : min(in_min), max(in_max) {}
+    explicit AABB(const vec3& point) : min(point), max(point) {}
 
-    void reset(const Vec3& min, const Vec3& max);
-    void reset(const Vec3& point);
-    void extend(const Vec3& v);
+    void reset(const vec3& min, const vec3& max);
+    void reset(const vec3& point);
+    void extend(const vec3& v);
     void combine(const AABB& other);
     void combine(const AABB& a, const AABB& b);
 
@@ -26,16 +26,16 @@ struct AABB {
     float volume() const;
 };
 
-inline void AABB::reset(const Vec3& in_min, const Vec3& in_max) {
+inline void AABB::reset(const vec3& in_min, const vec3& in_max) {
     min = in_min;
     max = in_max;
 }
 
-inline void AABB::reset(const Vec3& point) {
+inline void AABB::reset(const vec3& point) {
     reset(point, point);
 }
 
-inline void AABB::extend(const Vec3& point) {
+inline void AABB::extend(const vec3& point) {
     SL_ASSERT(min.x <= max.x && min.y <= max.y && min.z <= max.z);
 
     for (int i = 0; i < 3; i++) {

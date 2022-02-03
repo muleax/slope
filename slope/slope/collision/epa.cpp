@@ -43,15 +43,15 @@ void EPASolver::add_face(uint32_t a_idx, uint32_t b_idx, uint32_t c_idx)
     auto& b = m_points[b_idx];
     auto& c = m_points[c_idx];
 
-    Vec3 ab = b - a;
-    Vec3 ac = c - a;
+    vec3 ab = b - a;
+    vec3 ac = c - a;
 
-    Vec3 normal_dir = ab.cross(ac);
+    vec3 normal_dir = ab.cross(ac);
     float normal_dir_len = normal_dir.length();
     if (normal_dir_len < NORMAL_EPSILON)
         return;
 
-    Vec3 normal = normal_dir / normal_dir_len;
+    vec3 normal = normal_dir / normal_dir_len;
 
     if (normal.dot(m_inner_point - a) > 0.f)
         normal = -normal;
@@ -62,7 +62,7 @@ void EPASolver::add_face(uint32_t a_idx, uint32_t b_idx, uint32_t c_idx)
     std::push_heap(m_heap.begin(), m_heap.end());
 }
 
-std::optional<Vec3> EPASolver::find_penetration_axis(
+std::optional<vec3> EPASolver::find_penetration_axis(
     const CollisionShape* shape1, const CollisionShape* shape2, const GJKSolver::Simplex& simplex)
 {
     m_points.clear();

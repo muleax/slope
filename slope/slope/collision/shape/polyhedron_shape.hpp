@@ -11,29 +11,29 @@ class PolyhedronShape : public TypedCollisionShape<ShapeKind::Polyhedron> {
 public:
     explicit PolyhedronShape(std::shared_ptr<ConvexPolyhedron> geometry);
 
-    void        set_transform(const Mat44& matrix) final;
-    Vec3        support(const Vec3& axis, float bloat, bool normalized) const final;
+    void        set_transform(const mat44& matrix) final;
+    vec3        support(const vec3& axis, float bloat, bool normalized) const final;
 
     // Polyhedra-specific interface
-    float       get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const;
-    Interval    project(const Vec3& axis) const;
+    float       get_support_face(const vec3& axis, Vector<vec3>& out_support, vec3& out_face_normal) const;
+    Interval    project(const vec3& axis) const;
     const auto& principal_face_axes() const { return m_principal_face_axes; };
     const auto& principal_edge_axes() const { return m_principal_edge_axes; };
 
-    Vec3        world_face_normal(const ConvexPolyhedron::Face& face) const;
+    vec3        world_face_normal(const ConvexPolyhedron::Face& face) const;
 
 private:
     std::shared_ptr<ConvexPolyhedron> m_geometry;
-    Vector<Vec3> m_world_vertices;
-    Vector<Vec3> m_principal_face_axes;
-    Vector<Vec3> m_principal_edge_axes;
+    Vector<vec3> m_world_vertices;
+    Vector<vec3> m_principal_face_axes;
+    Vector<vec3> m_principal_edge_axes;
 };
 
-inline Vec3 PolyhedronShape::world_face_normal(const ConvexPolyhedron::Face& face) const {
+inline vec3 PolyhedronShape::world_face_normal(const ConvexPolyhedron::Face& face) const {
     return m_principal_face_axes[face.normal] * face.normal_direction;
 }
 
-inline Interval PolyhedronShape::project(const Vec3& axis) const {
+inline Interval PolyhedronShape::project(const vec3& axis) const {
     SL_ASSERT(m_world_vertices.size());
 
     // TODO: optimize with hill climbing
@@ -44,11 +44,11 @@ inline Interval PolyhedronShape::project(const Vec3& axis) const {
     return itv;
 }
 
-inline Vec3 PolyhedronShape::support(const Vec3& axis, float bloat, bool normalized) const
+inline vec3 PolyhedronShape::support(const vec3& axis, float bloat, bool normalized) const
 {
     // TODO: optimize with hill climbing
     float max_dot = -FLOAT_MAX;
-    const Vec3* best_point = nullptr;
+    const vec3* best_point = nullptr;
     for (auto& p : m_world_vertices) {
         float dot = axis.dot(p);
         if (dot > max_dot) {

@@ -24,7 +24,7 @@ public:
         uint32_t max_iteration_count = 0;
     };
 
-    std::optional<Vec3> find_penetration_axis(const CollisionShape* shape1, const CollisionShape* shape2, const Simplex& simplex);
+    std::optional<vec3> find_penetration_axis(const CollisionShape* shape1, const CollisionShape* shape2, const Simplex& simplex);
 
     Config&             config() { return m_config; }
     const Stats&        stats() const { return m_stats; }
@@ -35,7 +35,7 @@ private:
         uint32_t a;
         uint32_t b;
         uint32_t c;
-        Vec3 normal;
+        vec3 normal;
         float dist = FLOAT_MAX;
         bool obsolete = false;
 
@@ -47,10 +47,10 @@ private:
 
     void collect_stats(uint32_t iteration_count, bool fail);
 
-    Vector<Vec3>        m_points;
+    Vector<vec3>        m_points;
     Vector<Face>        m_heap;
     Vector<uint64_t>    m_edges;
-    Vec3                m_inner_point;
+    vec3                m_inner_point;
 
     Config              m_config;
     Stats               m_stats;

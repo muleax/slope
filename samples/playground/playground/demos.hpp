@@ -66,7 +66,7 @@ public:
     const char* name() override { return "Contact Generation"; }
 
 private:
-    Vec3 m_control_euler;
+    vec3 m_control_euler;
     DynamicActor* m_control_actor = nullptr;
 };
 

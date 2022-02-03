@@ -6,9 +6,9 @@
 namespace slope {
 
 struct ConstraintGeom {
-    Vec3 p1;
-    Vec3 p2;
-    Vec3 axis;
+    vec3 p1;
+    vec3 p2;
+    vec3 axis;
 
     float pos_error() const { return axis.dot(p1 - p2); }
 };
@@ -60,8 +60,8 @@ struct Constraint {
     RigidBody*  body1 = nullptr;
     RigidBody*  body2 = nullptr;
 
-    Vec3        jacobian1[2];
-    Vec3        jacobian2[2];
+    vec3        jacobian1[2];
+    vec3        jacobian2[2];
 
     float       min_bound = -FLOAT_MAX;
     float       max_bound = FLOAT_MAX;
@@ -95,8 +95,8 @@ public:
 
     ConstraintId    add_constraint(const Constraint& c);
     ConstraintId    join_friction_1d(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
-    ConstraintIds   join_friction_2d(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id);
-    ConstraintIds   join_friction_cone(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id);
+    ConstraintIds   join_friction_2d(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id);
+    ConstraintIds   join_friction_cone(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id);
 
     virtual void    solve();
     void            clear();
@@ -105,15 +105,15 @@ public:
 
 protected:
     struct alignas(16) ConstraintData {
-        Vec3    jacobian11;
-        Vec3    jacobian12;
-        Vec3    jacobian21;
-        Vec3    jacobian22;
+        vec3    jacobian11;
+        vec3    jacobian12;
+        vec3    jacobian21;
+        vec3    jacobian22;
 
-        Vec3    inv_m_j11;
-        Vec3    inv_m_j12;
-        Vec3    inv_m_j21;
-        Vec3    inv_m_j22;
+        vec3    inv_m_j11;
+        vec3    inv_m_j12;
+        vec3    inv_m_j21;
+        vec3    inv_m_j22;
 
         float   min_bound;
         float   max_bound;
@@ -132,14 +132,14 @@ protected:
     };
 
     struct alignas(16) BodyData {
-        Vec3        inv_m_f1;
-        Vec3        inv_m_f2;
+        vec3        inv_m_f1;
+        vec3        inv_m_f2;
         float       _pad[2] = {};
     };
 
     struct BodyExtraData {
-        Vec3        v_delta1;
-        Vec3        v_delta2;
+        vec3        v_delta1;
+        vec3        v_delta2;
         RigidBody*  body = nullptr;
     };
 

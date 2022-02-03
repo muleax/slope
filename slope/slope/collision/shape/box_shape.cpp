@@ -2,13 +2,13 @@
 
 namespace slope {
 
-BoxShape::BoxShape(const Vec3& dimensions) : m_half_dimensions(dimensions * 0.5f) {}
+BoxShape::BoxShape(const vec3& dimensions) : m_half_dimensions(dimensions * 0.5f) {}
 
-void BoxShape::set_transform(const Mat44& matrix)
+void BoxShape::set_transform(const mat44& matrix)
 {
     m_transform = matrix;
 
-    Vec3 dv;
+    vec3 dv;
     for (int i = 0; i < 3; i++) {
         m_principal_axes[i] = matrix.apply_to_unit_axis(i);
         m_extents[i] = m_principal_axes[i] * m_half_dimensions[i];
@@ -20,7 +20,7 @@ void BoxShape::set_transform(const Mat44& matrix)
     m_aabb.reset(matrix.translation() - dv, matrix.translation() + dv);
 }
 
-float BoxShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const {
+float BoxShape::get_support_face(const vec3& axis, Vector<vec3>& out_support, vec3& out_face_normal) const {
     int best_axis = -1;
     float best_proximity = -FLOAT_MAX;
     float best_sgn = 0.f;
@@ -36,7 +36,7 @@ float BoxShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Ve
         }
     }
 
-    Vec3 offset = m_transform.translation() + m_extents[best_axis] * best_sgn;
+    vec3 offset = m_transform.translation() + m_extents[best_axis] * best_sgn;
     auto u = best_sgn * m_extents[(best_axis + 1) % 3];
     auto v = m_extents[(best_axis + 2) % 3];
 

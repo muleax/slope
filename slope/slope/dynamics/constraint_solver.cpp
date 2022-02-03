@@ -531,14 +531,14 @@ Constraint Constraint::generic(
     Constraint c;
     c.body1 = body1;
 
-    Vec3 r1 = geom.p1 - body1->transform().translation();
+    vec3 r1 = geom.p1 - body1->transform().translation();
     c.jacobian1[0] = -geom.axis;
     c.jacobian1[1] = -r1.cross(geom.axis);
 
     if (body2) {
         c.body2 = body2;
 
-        Vec3 r2 = geom.p2 - body2->transform().translation();
+        vec3 r2 = geom.p2 - body2->transform().translation();
         c.jacobian2[0] = geom.axis;
         c.jacobian2[1] = r2.cross(geom.axis);
     }
@@ -619,7 +619,7 @@ ConstraintId ConstraintSolver::join_friction_1d(const Constraint& c, float frict
     return constr_id;
 }
 
-ConstraintIds ConstraintSolver::join_friction_2d(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id)
+ConstraintIds ConstraintSolver::join_friction_2d(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id)
 {
     auto setup_constraint = [this, normal_constr_id](ConstraintData* data, const Constraint& c, float friction_ratio) {
         data->cfm_inv_dt = c.cfm * m_inv_dt;
@@ -638,7 +638,7 @@ ConstraintIds ConstraintSolver::join_friction_2d(const Constraint& c1, const Con
     return { constr1_id, constr2_id };
 }
 
-ConstraintIds ConstraintSolver::join_friction_cone(const Constraint& c1, const Constraint& c2, Vec2 friction_ratio, ConstraintId normal_constr_id)
+ConstraintIds ConstraintSolver::join_friction_cone(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id)
 {
     auto setup_constraint = [this, normal_constr_id](ConstraintData* data, const Constraint& c, float friction_ratio) {
         data->cfm_inv_dt = c.cfm * m_inv_dt;

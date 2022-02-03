@@ -5,44 +5,44 @@
 namespace slope {
 
 struct ContactGeom {
-    Vec3 p1;
-    Vec3 p2;
-    Vec3 normal;
+    vec3 p1;
+    vec3 p2;
+    vec3 normal;
 };
 
 struct Plane {
-    Vec3 normal;
+    vec3 normal;
     float dot;
 
-    Plane(const Vec3& normal, float dot) : normal(normal), dot(dot) {}
-    Plane(const Vec3& normal, const Vec3& point) : normal(normal), dot(normal.dot(point)) {}
+    Plane(const vec3& normal, float dot) : normal(normal), dot(dot) {}
+    Plane(const vec3& normal, const vec3& point) : normal(normal), dot(normal.dot(point)) {}
 
-    std::optional<float>    intersect_ray(const Vec3& ray_beg, const Vec3& ray_dir) const;
-    float                   distance(const Vec3& p) const;
+    std::optional<float>    intersect_ray(const vec3& ray_beg, const vec3& ray_dir) const;
+    float                   distance(const vec3& p) const;
 };
 
 struct LineSegment {
-    Vec3 begin;
-    Vec3 end;
+    vec3 begin;
+    vec3 end;
 
-    const Vec3* data() const { return &begin; }
-    Vec3* data() { return &begin; }
+    const vec3* data() const { return &begin; }
+    vec3* data() { return &begin; }
 
-    const Vec3& operator [](int i) const { return data()[i]; }
-    Vec3& operator [](int i) { return data()[i]; }
+    const vec3& operator [](int i) const { return data()[i]; }
+    vec3& operator [](int i) { return data()[i]; }
 
-    void closest_point(const Vec3& other, float& t, Vec3& p) const;
-    void closest_point(const LineSegment& other, float& t1, float& t2, Vec3& p1, Vec3& p2) const;
+    void closest_point(const vec3& other, float& t, vec3& p) const;
+    void closest_point(const LineSegment& other, float& t1, float& t2, vec3& p1, vec3& p2) const;
 };
 
-Vec3 find_orthogonal(const Vec3& axis);
+vec3 find_orthogonal(const vec3& axis);
 
-inline void find_tangent(Vec3& out_u, Vec3& out_v, const Vec3& normal) {
+inline void find_tangent(vec3& out_u, vec3& out_v, const vec3& normal) {
     out_u = find_orthogonal(normal).normalized();
     out_v = out_u.cross(normal);
 }
 
-inline std::optional<float> Plane::intersect_ray(const Vec3& ray_beg, const Vec3& ray_dir) const {
+inline std::optional<float> Plane::intersect_ray(const vec3& ray_beg, const vec3& ray_dir) const {
     float div = dot - ray_beg.dot(normal);
     float rcp = ray_dir.dot(normal);
     if (div * rcp < 0.f)
@@ -54,7 +54,7 @@ inline std::optional<float> Plane::intersect_ray(const Vec3& ray_beg, const Vec3
     return div / rcp;
 }
 
-inline float Plane::distance(const Vec3& p) const
+inline float Plane::distance(const vec3& p) const
 {
     return normal.dot(p) - dot;
 }

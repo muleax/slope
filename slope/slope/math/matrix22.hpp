@@ -3,155 +3,107 @@
 
 namespace slope {
 
-class Mat22 {
+class mat22 {
 public:
-    constexpr Mat22()
-        : _11(1.f), _12(0.f)
-        , _21(0.f), _22(1.f) {}
+    constexpr               mat22();
+    constexpr               mat22(float _11, float _12, float _21, float _22);
+    constexpr               mat22(const vec2& r0, const vec2& r1) : rows{ r0, r1 } {}
 
-    constexpr Mat22(float _11, float _12, float _21, float _22)
-        : _11(_11), _12(_12)
-        , _21(_21), _22(_22) {}
+    constexpr mat22         operator*(const mat22& rhs) const;
+    constexpr mat22&        operator*=(const mat22& value) { return *this = *this * value; }
 
-    constexpr Mat22(const Vec2& r0, const Vec2& r1) : rows{ r0, r1 } {}
+    constexpr mat22         operator+(const mat22& rhs) const;
+    constexpr mat22         operator-(const mat22& rhs) const;
+    constexpr mat22&        operator+=(const mat22& value) { return *this = *this + value; }
+    constexpr mat22&        operator-=(const mat22& value) { return *this = *this - value; }
 
-    constexpr Mat22 operator-() const {
-        return { -_11, -_12, -_21, -_22 };
-    }
+    friend constexpr mat22  operator*(float lhs, const mat22& rhs);
+    constexpr mat22         operator*(float rhs) const  { return rhs * *this; }
+    constexpr mat22         operator/(float rhs) const { return *this * (1.f / rhs); }
+    constexpr mat22&        operator*=(float value) { return *this = *this * value; }
+    constexpr mat22&        operator/=(float value) { return *this = *this / value; }
 
-    constexpr Mat22 operator+(const Mat22& rhs) const {
-        return {
-            _11 + rhs._11, _12 + rhs._12,
-            _21 + rhs._21, _22 + rhs._22 };
-    }
+    constexpr vec2          operator*(const vec2& rhs) const;
+    friend constexpr vec2   operator*(const vec2& lhs, const mat22& rhs);
 
-    constexpr Mat22 operator-(const Mat22& rhs) const {
-        return {
-            _11 - rhs._11, _12 - rhs._12,
-            _21 - rhs._21, _22 - rhs._22 };
-    }
+    constexpr bool          operator==(const mat22& value) const;
+    constexpr bool          operator!=(const mat22& value) const { return !(*this == value); }
 
-    constexpr Mat22 operator*(const Mat22& rhs) const {
-        return {
-            _11 * rhs._11 + _12 * rhs._21, _11 * rhs._12 + _12 * rhs._22,
-            _21 * rhs._11 + _22 * rhs._21, _21 * rhs._12 + _22 * rhs._22 };
-    }
+    constexpr vec2&         operator[](size_t index) { return rows[index]; }
+    constexpr const vec2&   operator[](size_t index) const { return rows[index]; }
 
-    constexpr Vec2 operator*(const Vec2& rhs) const {
-        return {_11 * rhs.x + _12 * rhs.y, _21 * rhs.x + _22 * rhs.y };
-    }
+    constexpr float         determinant() const { return _00 * _11 - _01 * _10; }
 
-    constexpr Mat22 operator*(float rhs) const {
-        return {
-            _11 * rhs, _12 * rhs,
-            _21 * rhs, _22 * rhs };
-    }
+    mat22                   transposed() const;
+    mat22                   inverted(const mat22& value) const;
 
-    friend constexpr Vec2 operator*(const Vec2& lhs, const Mat22& rhs) {
-        return {
-            lhs.x * rhs._11 + lhs.y * rhs._21,
-            lhs.x * rhs._12 + lhs.y * rhs._22 };
-    }
-
-    friend constexpr Mat22 operator*(float lhs, const Mat22& rhs) {
-        return rhs * lhs;
-    }
-
-    constexpr Mat22 operator/(float rhs) const {
-        return *this * (1.f / rhs);
-    }
-
-    constexpr Mat22& operator+=(const Mat22& value) {
-        return *this = *this + value;
-    }
-
-    constexpr Mat22& operator-=(const Mat22& value) {
-        return *this = *this - value;
-    }
-
-    constexpr Mat22& operator*=(const Mat22& value) {
-        return *this = *this * value;
-    }
-
-    constexpr Mat22& operator*=(float value) {
-        return *this = *this * value;
-    }
-
-    constexpr Mat22& operator/=(float value) {
-        return *this = *this / value;
-    }
-
-    constexpr Vec2& operator[](size_t index) {
-        return rows[index];
-    }
-
-    constexpr const Vec2& operator[](size_t index) const {
-        return rows[index];
-    }
-
-    constexpr bool operator==(const Mat22& value) const {
-        return _11 == value._11 && _12 == value._12 && _21 == value._21 && _22 == value._22;
-    }
-
-    constexpr bool operator!=(const Mat22& value) const {
-        return !(*this == value);
-    }
-
-    constexpr float* begin() {
-        return data;
-    }
-
-    constexpr const float* begin() const {
-        return data;
-    }
-
-    constexpr float* end() {
-        return data + 4;
-    }
-
-    constexpr const float* end() const {
-        return data + 4;
-    }
-
-    float constexpr determinant() const {
-        return _11 * _22 - _12 * _21;
-    }
-
-    constexpr Mat22 transposed() const {
-        return { _11, _21, _12, _22 };
-    }
-
-    constexpr Mat22 inverted(const Mat22& value) const {
-        float det = determinant();
-
-        if (slope::equal(det, 0.f)) {
-            return {};
-        }
-
-        float multiplier = 1.f / det;
-        return { value._22 * multiplier, -value._12 * multiplier,
-                 -value._21 * multiplier, value._11 * multiplier };
-    }
-
-    constexpr bool equal(const Mat22& rhs, float epsilon = EQUALITY_EPSILON) const {
-        return slope::equal(_11, rhs._11, epsilon) && slope::equal(_12, rhs._12, epsilon) &&
-                slope::equal(_21, rhs._21, epsilon) && slope::equal(_22, rhs._22, epsilon);
-    }
-
-    bool isfinite() const {
-        return std::isfinite(_11) && std::isfinite(_12) &&
-               std::isfinite(_21) && std::isfinite(_22);
-    }
+    bool                    is_finite() const;
+    bool                    equal(const mat22& rhs, float epsilon = EQUALITY_EPSILON) const;
 
     union {
         struct {
-            float _11, _12;
-            float _21, _22;
+            float _00, _01;
+            float _10, _11;
         };
 
-        Vec2    rows[2];
+        vec2    rows[2];
         float   data[4];
     };
 };
 
-} // namespace kw
+constexpr mat22::mat22()
+    : _00(1.f), _01(0.f)
+    , _10(0.f), _11(1.f) {}
+
+constexpr mat22::mat22(float _11, float _12, float _21, float _22)
+    : _00(_11), _01(_12)
+    , _10(_21), _11(_22) {}
+
+constexpr mat22 mat22::operator+(const mat22& rhs) const
+{
+    return {
+        _00 + rhs._00, _01 + rhs._01,
+        _10 + rhs._10, _11 + rhs._11};
+}
+
+constexpr mat22 mat22::operator-(const mat22& rhs) const
+{
+    return {
+        _00 - rhs._00, _01 - rhs._01,
+        _10 - rhs._10, _11 - rhs._11};
+}
+
+constexpr mat22 mat22::operator*(const mat22& rhs) const
+{
+    return {
+        _00 * rhs._00 + _01 * rhs._10, _00 * rhs._01 + _01 * rhs._11,
+        _10 * rhs._00 + _11 * rhs._10, _10 * rhs._01 + _11 * rhs._11};
+}
+
+constexpr mat22 operator*(float lhs, const mat22& rhs)
+{
+    return {
+        rhs._00 * lhs, rhs._01 * lhs,
+        rhs._10 * lhs, rhs._11 * lhs};
+}
+
+constexpr vec2 operator*(const vec2& lhs, const mat22& rhs)
+{
+    return {
+        lhs.x * rhs._00 + lhs.y * rhs._10,
+        lhs.x * rhs._01 + lhs.y * rhs._11};
+}
+
+constexpr vec2 mat22::operator*(const vec2& rhs) const
+{
+    return {
+        _00 * rhs.x + _01 * rhs.y,
+        _10 * rhs.x + _11 * rhs.y};
+}
+
+constexpr bool mat22::operator==(const mat22& value) const
+{
+    return _00 == value._00 && _01 == value._01 && _10 == value._10 && _11 == value._11;
+}
+
+} // slope

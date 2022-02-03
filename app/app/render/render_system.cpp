@@ -14,7 +14,7 @@ REGISTER_COMPONENT(DebugDrawComponent);
 REGISTER_COMPONENT(LightSourceComponent);
 
 void RenderSystem::draw_mesh_instanced(
-        RenderComponent* rc, const CameraComponent* cam, const RenderSingleton* rs, const Vec3& light_pos) {
+        RenderComponent* rc, const CameraComponent* cam, const RenderSingleton* rs, const vec3& light_pos) {
 
     auto& material = *rc->material;
     material.use();

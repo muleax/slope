@@ -40,14 +40,14 @@ void RigidBody::apply_gyroscopic_torque(float dt)
     // TODO: optimize
     auto& w = m_ang_velocity;
 
-    Mat44 I = m_inv_transform * m_local_inertia * m_transform;
+    mat44 I = m_inv_transform * m_local_inertia * m_transform;
 
     auto Iw = I.apply_normal(w);
 
-    Vec3 g = dt * w.cross(Iw);
+    vec3 g = dt * w.cross(Iw);
 
-    auto w_cross = Mat44{ Mat33::cross(w) };
-    auto Iw_cross = Mat44{ Mat33::cross(Iw) };
+    auto w_cross = mat44{mat33::cross(w) };
+    auto Iw_cross = mat44{mat33::cross(Iw) };
     auto dgdw = I + dt * (I * w_cross - Iw_cross);
 
     auto dw = -dgdw.inverted().apply_normal(g);
@@ -61,22 +61,19 @@ void RigidBody::integrate(float dt)
     m_velocity = predict_velocity(dt);
     m_ang_velocity = predict_ang_velocity(dt);
 
-    Vec3 new_pos = m_transform.translation() + m_velocity * dt;
+    vec3 new_pos = m_transform.translation() + m_velocity * dt;
 
     float ang_vel_magnitude = m_ang_velocity.length();
 
     if (ang_vel_magnitude > ANG_VEL_EPSILON) {
-        m_transform.set_translation(Vec3::zero());
+        m_transform.set_translation(vec3::zero());
 
-        Vec3 rot_axis = m_ang_velocity / ang_vel_magnitude;
+        vec3 rot_axis = m_ang_velocity / ang_vel_magnitude;
         float angle = ang_vel_magnitude * dt;
-        m_transform *= Mat44::rotation(rot_axis, angle);
+        m_transform *= mat44::rotation(rot_axis, angle);
 
         // TODO: optimize normalization
-        m_transform.as_vec3(2) = m_transform.as_vec3(2).normalized();
-        m_transform.as_vec3(0) = m_transform.as_vec3(1).cross(m_transform.as_vec3(2));
-        m_transform.as_vec3(0) = m_transform.as_vec3(0).normalized();
-        m_transform.as_vec3(1) = m_transform.as_vec3(2).cross(m_transform.as_vec3(0));
+        m_transform.normalize_rotation();
 
     } else {
         m_ang_velocity.set_zero();

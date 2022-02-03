@@ -12,16 +12,16 @@ public:
         uint64_t cum_projection_count = 0;
     };
 
-    std::optional<Vec3> find_penetration_axis(const PolyhedronShape* shape1, const PolyhedronShape* shape2);
-    std::optional<Vec3> find_penetration_axis(const PolyhedronShape* shape1, const BoxShape* shape2);
-    std::optional<Vec3> find_penetration_axis(const BoxShape* shape1, const BoxShape* shape2);
+    std::optional<vec3> find_penetration_axis(const PolyhedronShape* shape1, const PolyhedronShape* shape2);
+    std::optional<vec3> find_penetration_axis(const PolyhedronShape* shape1, const BoxShape* shape2);
+    std::optional<vec3> find_penetration_axis(const BoxShape* shape1, const BoxShape* shape2);
 
     const Stats&        stats() const { return m_stats; }
     void                reset_stats();
 
 private:
     template <class Shape1, class Shape2>
-    std::optional<Vec3> find_penetration_axis_impl(const Shape1* shape1, const Shape2* shape2);
+    std::optional<vec3> find_penetration_axis_impl(const Shape1* shape1, const Shape2* shape2);
 
     Stats m_stats;
 };

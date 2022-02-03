@@ -17,12 +17,12 @@ public:
     explicit CollisionShape(ShapeKind kind) : m_kind(kind) {}
     virtual ~CollisionShape() = default;
 
-    virtual void    set_transform(const Mat44& matrix) = 0;
-    virtual Vec3    support(const Vec3& axis, float bloat, bool normalized) const = 0;
+    virtual void    set_transform(const mat44& matrix) = 0;
+    virtual vec3    support(const vec3& axis, float bloat, bool normalized) const = 0;
 
-    const Mat44&    transform() const { return m_transform; }
+    const mat44&    transform() const { return m_transform; }
     const AABB&     aabb() const { return m_aabb; }
-    Vec3            support_diff(const CollisionShape* other, const Vec3& axis, float bloat, bool normalized) const;
+    vec3            support_diff(const CollisionShape* other, const vec3& axis, float bloat, bool normalized) const;
 
     ShapeKind       kind() const { return m_kind; }
 
@@ -34,7 +34,7 @@ public:
     T*              cast();
 
 protected:
-    Mat44 m_transform;
+    mat44 m_transform;
     AABB m_aabb;
     ShapeKind m_kind;
 };
@@ -46,7 +46,7 @@ public:
     TypedCollisionShape() : CollisionShape(Kind) {}
 };
 
-inline Vec3 CollisionShape::support_diff(const CollisionShape* other, const Vec3& axis, float bloat, bool normalized) const
+inline vec3 CollisionShape::support_diff(const CollisionShape* other, const vec3& axis, float bloat, bool normalized) const
 {
     return support(axis, bloat, normalized) - other->support(-axis, bloat, normalized);
 }

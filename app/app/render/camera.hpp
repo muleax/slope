@@ -8,7 +8,7 @@ class Camera {
 public:
     Camera();
 
-    void set_transform(const Mat44& value);
+    void set_transform(const mat44& value);
     void set_fov(float value);
     void set_near_plane(float value);
     void set_far_plane(float value);
@@ -16,16 +16,16 @@ public:
 
     void rebuild();
 
-    const Mat44& view_proj() const { return m_view_proj; }
+    const mat44& view_proj() const { return m_view_proj; }
 
 private:
-    Mat44 m_transform;
+    mat44 m_transform;
     float m_fov = 1.57f;
     float m_near_plane = 0.01f;
     float m_far_plane = 1000.f;
     float m_aspect_ratio = 1.f;
 
-    Mat44 m_view_proj;
+    mat44 m_view_proj;
 };
 
 struct CameraComponent : public Component<CameraComponent> {

@@ -22,12 +22,12 @@ public:
     void set(Location loc, bool value) const;
     void set(Location loc, int value) const;
     void set(Location loc, float value) const;
-    void set(Location loc, const Vec2& value) const;
-    void set(Location loc, const Vec3& value) const;
-    void set(Location loc, const Vec4& value) const;
-    void set(Location loc, const Mat22& value) const;
-    void set(Location loc, const Mat33& value) const;
-    void set(Location loc, const Mat44& value) const;
+    void set(Location loc, const vec2& value) const;
+    void set(Location loc, const vec3& value) const;
+    void set(Location loc, const vec4& value) const;
+    void set(Location loc, const mat22& value) const;
+    void set(Location loc, const mat33& value) const;
+    void set(Location loc, const mat44& value) const;
 
     template<class T>
     void set(const char* name, const T& value) const { set(location(name), value); }

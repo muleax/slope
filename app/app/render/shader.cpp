@@ -135,32 +135,32 @@ void Shader::set(Location loc, float value) const
     glUniform1f(loc, value);
 }
 
-void Shader::set(Location loc, const Vec2& value) const
+void Shader::set(Location loc, const vec2& value) const
 {
     glUniform2fv(loc, 1, value.data);
 }
 
-void Shader::set(Location loc, const Vec3& value) const
+void Shader::set(Location loc, const vec3& value) const
 {
     glUniform3fv(loc, 1, value.data);
 }
 
-void Shader::set(Location loc, const Vec4& value) const
+void Shader::set(Location loc, const vec4& value) const
 {
     glUniform4fv(loc, 1, value.data);
 }
 
-void Shader::set(Location loc, const Mat22& mat) const
+void Shader::set(Location loc, const mat22& mat) const
 {
     glUniformMatrix2fv(loc, 1, GL_FALSE, mat.data);
 }
 
-void Shader::set(Location loc, const Mat33& mat) const
+void Shader::set(Location loc, const mat33& mat) const
 {
     glUniformMatrix3fv(loc, 1, GL_FALSE, mat.data);
 }
 
-void Shader::set(Location loc, const Mat44& mat) const
+void Shader::set(Location loc, const mat44& mat) const
 {
     glUniformMatrix4fv(loc, 1, GL_FALSE, mat.data);
 }

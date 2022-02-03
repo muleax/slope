@@ -8,8 +8,8 @@ class CapsuleShape : public TypedCollisionShape<ShapeKind::Capsule> {
 public:
     CapsuleShape(float radius, float height);
 
-    Vec3        support(const Vec3& axis, float bloat, bool normalized) const final;
-    void        set_transform(const Mat44& matrix) final;
+    vec3        support(const vec3& axis, float bloat, bool normalized) const final;
+    void        set_transform(const mat44& matrix) final;
 
     float       radius() const { return m_radius; }
     float       height() const { return m_height; }
@@ -21,9 +21,9 @@ private:
     LineSegment m_segment;
 };
 
-inline Vec3 CapsuleShape::support(const Vec3& axis, float bloat, bool normalized) const
+inline vec3 CapsuleShape::support(const vec3& axis, float bloat, bool normalized) const
 {
-    Vec3 norm_axis = normalized ? axis : axis.normalized();
+    vec3 norm_axis = normalized ? axis : axis.normalized();
     int support_end = axis.dot(m_segment[0]) > axis.dot(m_segment[1]) ? 0 : 1;
     return m_segment[support_end] + norm_axis * (m_radius + bloat);
 }

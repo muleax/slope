@@ -12,10 +12,10 @@ namespace slope::app {
 class Mesh {
 public:
     struct Vertex {
-        Vec3 position;
-        Vec3 normal;
-        Vec4 color;
-        Vec2 tex_coords;
+        vec3 position;
+        vec3 normal;
+        vec4 color;
+        vec2 tex_coords;
     };
 
     Mesh(VectorView<Vertex> vertices, VectorView<uint32_t> indices);
@@ -56,11 +56,11 @@ public:
 
     using Shader::Shader;
 
-    void set_view_projection(const Mat44& value) const { set(m_view_proj_loc, value); }
-    void set_ligh_position(const Vec3& value) const { set(m_light_pos_loc, value); }
+    void set_view_projection(const mat44& value) const { set(m_view_proj_loc, value); }
+    void set_ligh_position(const vec3& value) const { set(m_light_pos_loc, value); }
 
     void set_ambient_strength(float value) const { set(m_ambient_strength_loc, value); }
-    void set_color(const Vec3& value) const { set(m_color_loc, value); }
+    void set_color(const vec3& value) const { set(m_color_loc, value); }
 
 private:
     void cache_attribute_locations() override;
@@ -76,7 +76,7 @@ public:
     MeshRenderer();
     ~MeshRenderer();
 
-    void draw(const Mesh& mesh, const Mat44* instancing_data, size_t instance_count) const;
+    void draw(const Mesh& mesh, const mat44* instancing_data, size_t instance_count) const;
 
 private:
     RenderHandle m_instancing_buffer = 0;

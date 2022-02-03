@@ -8,7 +8,7 @@ REGISTER_COMPONENT(CameraComponent);
 REGISTER_COMPONENT(CameraControllerComponent);
 
 // helper
-static Mat44 perspective_rh(float fov_y, float aspect, float z_near, float z_far) {
+static mat44 perspective_rh(float fov_y, float aspect, float z_near, float z_far) {
     SL_ASSERT(std::isfinite(fov_y));
     SL_ASSERT(std::isfinite(aspect));
     SL_ASSERT(std::isfinite(z_near));
@@ -18,17 +18,17 @@ static Mat44 perspective_rh(float fov_y, float aspect, float z_near, float z_far
     SL_ASSERT(!equal(z_near, z_far));
 
     float tan_half_fov_y = std::tan(fov_y * 0.5f);
-    return Mat44(1.f / (aspect * tan_half_fov_y), 0.f,                  0.f,                               0.f,
-                 0.f,                             1.f / tan_half_fov_y, 0.f,                               0.f,
-                 0.f,                             0.f,                  z_far / (z_near - z_far),          -1.f,
-                 0.f,                             0.f,                  z_far * z_near / (z_near - z_far), 0.f);
+    return mat44(1.f / (aspect * tan_half_fov_y), 0.f, 0.f, 0.f,
+                 0.f,                             1.f / tan_half_fov_y, 0.f, 0.f,
+                 0.f, 0.f,                  z_far / (z_near - z_far), -1.f,
+                 0.f, 0.f,                  z_far * z_near / (z_near - z_far), 0.f);
 }
 
 Camera::Camera() {
     rebuild();
 }
 
-void Camera::set_transform(const Mat44& value) {
+void Camera::set_transform(const mat44& value) {
     m_transform = value;
 }
 
@@ -59,7 +59,7 @@ void CameraSystem::update(float dt) {
         auto* cam = w().modify<CameraComponent>(e);
         auto* ctl = w().modify<CameraControllerComponent>(e);
 
-        Vec3 vel_dir;
+        vec3 vel_dir;
         if (ctl->move_fwd && !ctl->move_bkwd) {
             vel_dir.z = -1.f;
         } else if (!ctl->move_fwd && ctl->move_bkwd) {
@@ -73,13 +73,13 @@ void CameraSystem::update(float dt) {
         }
 
         // TODO: optimize
-        auto pitch_rot = Mat44::rotation({1.f, 0.f, 0.f}, ctl->pitch);
-        auto yaw_rot = Mat44::rotation({0.f, 1.f, 0.f}, -ctl->yaw);
+        auto pitch_rot = mat44::rotation({1.f, 0.f, 0.f}, ctl->pitch);
+        auto yaw_rot = mat44::rotation({0.f, 1.f, 0.f}, -ctl->yaw);
         auto rot = pitch_rot * yaw_rot;
 
-        Vec3 new_pos = tc->transform.translation() + rot.apply_normal(vel_dir) * (ctl->velocity * dt);
+        vec3 new_pos = tc->transform.translation() + rot.apply_normal(vel_dir) * (ctl->velocity * dt);
 
-        tc->transform = rot * Mat44::translate(new_pos);
+        tc->transform = rot * mat44::translate(new_pos);
 
         cam->camera.set_transform(tc->transform);
         cam->camera.rebuild();

@@ -3,177 +3,46 @@
 
 namespace slope {
 
-class Vec2 {
+class vec2 {
 public:
-    constexpr Vec2() : x(0.f), y(0.f) {}
+    static constexpr vec2   zero() { return {}; }
 
-    explicit constexpr Vec2(float all) : x(all), y(all) {}
+    constexpr               vec2() : x(0.f), y(0.f) {}
+    explicit constexpr      vec2(float all) : x(all), y(all) {}
+    constexpr               vec2(float x, float y) : x(x), y(y) {}
 
-    constexpr Vec2(float x, float y) : x(x), y(y) {}
+    constexpr vec2          operator+(const vec2& rhs) const { return {x + rhs.x, y + rhs.y }; }
+    constexpr vec2          operator-(const vec2& rhs) const { return {x - rhs.x, y - rhs.y }; }
+    constexpr vec2&         operator+=(const vec2& value);
+    constexpr vec2&         operator-=(const vec2& value);
 
-    constexpr Vec2 operator+(const Vec2& rhs) const {
-        return { x + rhs.x, y + rhs.y };
-    }
+    friend constexpr vec2   operator*(float lhs, const vec2& rhs) { return { lhs * rhs.x, lhs * rhs.y }; }
+    constexpr vec2          operator*(float rhs) const { return rhs * *this; }
+    constexpr vec2          operator/(float rhs) const { return {x / rhs, y / rhs }; }
+    constexpr vec2&         operator*=(float value);
+    constexpr vec2&         operator/=(float value);
 
-    constexpr Vec2 operator-(const Vec2& rhs) const {
-        return { x - rhs.x, y - rhs.y };
-    }
+    constexpr vec2          operator-() const { return {-x, -y }; }
 
-    constexpr Vec2 operator*(const Vec2& rhs) const {
-        return { x * rhs.x, y * rhs.y };
-    }
+    constexpr bool          operator==(const vec2& value) const { return x == value.x && y == value.y; }
+    constexpr bool          operator!=(const vec2& value) const { return x != value.x || y != value.y; }
 
-    constexpr Vec2 operator/(const Vec2& rhs) const {
-        return { x / rhs.x, y / rhs.y };
-    }
+    constexpr float&        operator[](size_t index) { return data[index]; }
+    constexpr const float&  operator[](size_t index) const { return data[index]; }
 
-    constexpr Vec2& operator+=(const Vec2& value) {
-        x += value.x;
-        y += value.y;
+    void                    set_zero();
 
-        return *this;
-    }
+    constexpr float         dot(const vec2& rhs) const { return x * rhs.x + y * rhs.y; }
+    constexpr float         length_squared() const { return sqr(x) + sqr(y); }
+    float                   length() const { return std::sqrt(length_squared()); }
+    constexpr float         square_distance(const vec2& rhs) const;
+    float                   distance(const vec2& rhs) const;
+    vec2                    normalized() const;
 
-    constexpr Vec2& operator-=(const Vec2& value) {
-        x -= value.x;
-        y -= value.y;
-
-        return *this;
-    }
-
-    constexpr Vec2& operator*=(const Vec2& value) {
-        x *= value.x;
-        y *= value.y;
-
-        return *this;
-    }
-
-    constexpr Vec2& operator/=(const Vec2& value) {
-        x /= value.x;
-        y /= value.y;
-
-        return *this;
-    }
-
-    constexpr Vec2& operator*=(float value) {
-        x *= value;
-        y *= value;
-
-        return *this;
-    }
-
-    constexpr Vec2& operator/=(float value) {
-        float rcp = 1.f / value;
-        x *= rcp;
-        y *= rcp;
-
-        return *this;
-    }
-
-    constexpr float& operator[](size_t index) {
-        return data[index];
-    }
-
-    constexpr const float& operator[](size_t index) const {
-        return data[index];
-    }
-
-    constexpr Vec2 operator-() const {
-        return { -x, -y };
-    }
-
-    constexpr Vec2 operator*(float rhs) const {
-        return { x * rhs, y * rhs };
-    }
-
-    constexpr Vec2 operator/(float rhs) const {
-        return { x / rhs, y / rhs };
-    }
-
-    constexpr bool operator==(const Vec2& value) const {
-        return x == value.x && y == value.y;
-    }
-
-    constexpr bool operator!=(const Vec2& value) const {
-        return x != value.x || y != value.y;
-    }
-
-    friend constexpr Vec2 operator*(float lhs, const Vec2& rhs) {
-        return rhs * lhs;
-    }
-
-    float* begin() {
-        return data;
-    }
-
-    const float* begin() const {
-        return data;
-    }
-
-    float* end() {
-        return data + 2;
-    }
-
-    const float *end() const {
-        return data + 2;
-    }
-
-    constexpr float dot(const Vec2& rhs) const {
-        return x * rhs.x + y * rhs.y;
-    }
-
-    constexpr float length_squared() const {
-        return sqr(x) + sqr(y);
-    }
-
-    float length() const {
-        return std::sqrt(length_squared());
-    }
-
-    constexpr float square_distance(const Vec2& rhs) const {
-        return sqr(x - rhs.x) + sqr(y - rhs.y);
-    }
-
-    float distance(const Vec2& rhs) const {
-        return std::sqrt(square_distance(rhs));
-    }
-
-    bool isfinite() const {
-        return std::isfinite(x) && std::isfinite(y);
-    }
-
-    constexpr bool equal(const Vec2& rhs, float epsilon = EQUALITY_EPSILON) const {
-        return slope::equal(x, rhs.x, epsilon) && slope::equal(y, rhs.y, epsilon);
-    }
-
-    constexpr bool equal(float rhs, float epsilon = EQUALITY_EPSILON) const {
-        return slope::equal(x, rhs, epsilon) && slope::equal(y, rhs, epsilon);
-    }
-
-    Vec2 normalized() const;
-
-    constexpr Vec2 reflected(const Vec2& normal) const;
-
-    Vec2 abs() const;
-
-    constexpr void lerp(const Vec2& from, const Vec2& to, float t);
-
-    constexpr void clamp(const Vec2& value, float min, float max);
-
-    constexpr void clamp(const Vec2& value, const Vec2& min, const Vec2& max);
-
-    void min(const Vec2& lhs, const Vec2& rhs);
-
-    void max(const Vec2& lhs, const Vec2& rhs);
-
-    void set_zero() {
-        x = 0.f;
-        y = 0.f;
-    }
-
-    bool is_zero() const {
-        return x == 0.f && y == 0.f;
-    }
+    bool                    is_zero() const { return x == 0.f && y == 0.f; }
+    bool                    is_finite() const { return std::isfinite(x) && std::isfinite(y); }
+    constexpr bool          equal(const vec2& rhs, float epsilon = EQUALITY_EPSILON) const;
+    constexpr bool          equal(float rhs, float epsilon = EQUALITY_EPSILON) const;
 
     union {
         struct {
@@ -184,53 +53,80 @@ public:
     };
 };
 
-inline Vec2 normalize(const Vec2& value) {
-    float multiplier = 1.f / value.length();
-    return { value.x * multiplier, value.y * multiplier };
-}
-
-inline Vec2 Vec2::normalized() const {
-    return normalize(*this);
-}
-
-constexpr Vec2 reflect(const Vec2& value, const Vec2& normal) {
-    return value - (2.f * value.dot(normal)) * normal;
-}
-
-constexpr Vec2 Vec2::reflected(const Vec2& normal) const {
-    return reflect(*this, normal);
-}
-
-inline Vec2 abs(const Vec2& value) {
-    return { std::abs(value.x), std::abs(value.y) };
-}
-
-inline Vec2 Vec2::abs() const {
-    return slope::abs(*this);
-}
-
-constexpr Vec2 lerp(const Vec2& from, const Vec2& to, float factor) {
+constexpr vec2 lerp(const vec2& from, const vec2& to, float factor)
+{
     return from + (to - from) * factor;
 }
 
-constexpr void Vec2::lerp(const Vec2& from, const Vec2& to, float t) {
-    *this = slope::lerp(from, to, t);
-}
-
-inline Vec2 min(const Vec2& lhs, const Vec2& rhs) {
+inline vec2 min(const vec2& lhs, const vec2& rhs)
+{
     return { std::fmin(lhs.x, rhs.x), std::fmin(lhs.y, rhs.y) };
 }
 
-inline void Vec2::min(const Vec2& lhs, const Vec2& rhs) {
-    *this = slope::min(lhs, rhs);
-}
-
-inline Vec2 max(const Vec2& lhs, const Vec2& rhs) {
+inline vec2 max(const vec2& lhs, const vec2& rhs)
+{
     return { std::fmax(lhs.x, rhs.x), std::fmax(lhs.y, rhs.y) };
 }
 
-inline void Vec2::max(const Vec2& lhs, const Vec2& rhs) {
-    *this = slope::max(lhs, rhs);
+constexpr vec2& vec2::operator+=(const vec2& value)
+{
+    x += value.x;
+    y += value.y;
+    return *this;
+}
+
+constexpr vec2& vec2::operator-=(const vec2& value)
+{
+    x -= value.x;
+    y -= value.y;
+    return *this;
+}
+
+constexpr vec2& vec2::operator*=(float value)
+{
+    x *= value;
+    y *= value;
+    return *this;
+}
+
+constexpr vec2& vec2::operator/=(float value)
+{
+    float rcp = 1.f / value;
+    x *= rcp;
+    y *= rcp;
+    return *this;
+}
+
+inline void vec2::set_zero()
+{
+    x = 0.f;
+    y = 0.f;
+}
+
+constexpr bool vec2::equal(const vec2& rhs, float epsilon) const
+{
+    return slope::equal(x, rhs.x, epsilon) && slope::equal(y, rhs.y, epsilon);
+}
+
+constexpr bool vec2::equal(float rhs, float epsilon) const
+{
+    return slope::equal(x, rhs, epsilon) && slope::equal(y, rhs, epsilon);
+}
+
+inline vec2 vec2::normalized() const
+{
+    float multiplier = 1.f / length();
+    return { x * multiplier, y * multiplier};
+}
+
+constexpr float vec2::square_distance(const vec2& rhs) const
+{
+    return sqr(x - rhs.x) + sqr(y - rhs.y);
+}
+
+inline float vec2::distance(const vec2& rhs) const
+{
+    return std::sqrt(square_distance(rhs));
 }
 
 } // slope

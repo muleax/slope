@@ -7,7 +7,7 @@ namespace slope::app {
 
 class DebugDrawerImpl : public DebugDrawer {
 public:
-    void draw_line(const Vec3& a, const Vec3& b, const Vec3& color) final {
+    void draw_line(const vec3& a, const vec3& b, const vec3& color) final {
         m_lines_points.push_back({a, color});
         m_lines_points.push_back({b, color});
     }

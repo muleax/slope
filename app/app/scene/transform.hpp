@@ -5,7 +5,7 @@
 namespace slope::app {
 
 struct TransformComponent : public Component<TransformComponent> {
-    Mat44 transform;
+    mat44 transform;
 };
 
 } // slope::app

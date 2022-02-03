@@ -8,18 +8,18 @@ namespace slope {
 class FaceClipper {
 public:
     void clip_convex_face_by_halfspace(
-        Vector<Vec3>& out_clipped_face,
-        const Vector<Vec3>& face, const Plane& hs_plane);
+        Vector<vec3>& out_clipped_face,
+        const Vector<vec3>& face, const Plane& hs_plane);
 
     void clip_convex_face_by_convex_prism(
-        Vector<Vec3>& out_clipped_face,
-        const Vector<Vec3>& face, const Vector<Vec3>& prism_base, const Vec3& prism_axis);
+        Vector<vec3>& out_clipped_face,
+        const Vector<vec3>& face, const Vector<vec3>& prism_base, const vec3& prism_axis);
 
     LineSegment clip_segment_by_convex_prism(
-        const LineSegment& segment, const Vector<Vec3>& prism_base, const Vec3& prism_axis);
+        const LineSegment& segment, const Vector<vec3>& prism_base, const vec3& prism_axis);
 
 private:
-    Vector<Vec3> m_buffer;
+    Vector<vec3> m_buffer;
 };
 
 } // slope

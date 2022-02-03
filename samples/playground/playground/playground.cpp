@@ -48,13 +48,13 @@ public:
         auto le = m_world->create_entity();
         m_static_entities.push_back(le);
         m_world->create<LightSourceComponent>(le);
-        m_world->create<TransformComponent>(le)->transform = Mat44::translate({50.f, 100.f, 70.f});
+        m_world->create<TransformComponent>(le)->transform = mat44::translate({50.f, 100.f, 70.f});
 
         // create camera
-        Vec3 eye = {4.f, 5.f, 10.f};
+        vec3 eye = {4.f, 5.f, 10.f};
         m_cam_entity = m_world->create_entity();
         m_static_entities.push_back(m_cam_entity);
-        m_world->create<TransformComponent>(m_cam_entity)->transform = Mat44::translate(eye);
+        m_world->create<TransformComponent>(m_cam_entity)->transform = mat44::translate(eye);
         m_world->create<CameraControllerComponent>(m_cam_entity);
         m_world->create<CameraComponent>(m_cam_entity);
 
@@ -191,7 +191,7 @@ public:
 
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
         auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -BOX_SPEED});
-        m_spawner->spawn_box(cam_tr->transform, vel, 5.f, Vec3{1.5f});
+        m_spawner->spawn_box(cam_tr->transform, vel, 5.f, vec3{1.5f});
     }
 
     void fire_sphere()
@@ -209,7 +209,7 @@ public:
 
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
         auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -CAPSULE_SPEED});
-        Vec3 ang_vel = cam_tr->transform.apply_normal({0.f, 8.f, 0.f});
+        vec3 ang_vel = cam_tr->transform.apply_normal({0.f, 8.f, 0.f});
         m_spawner->spawn_capsule(cam_tr->transform, vel, ang_vel, 1.f, 1.f, 2.f);
     }
 

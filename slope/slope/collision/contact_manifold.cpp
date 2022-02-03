@@ -4,13 +4,13 @@ namespace slope {
 
 namespace {
 
-void reset_point(ManifoldPoint& point, const ContactGeom& new_geom, const Vec3& local_point, float penetration) {
+void reset_point(ManifoldPoint& point, const ContactGeom& new_geom, const vec3& local_point, float penetration) {
     point.geom = new_geom;
     point.local_point = local_point;
     point.penetration = penetration;
 }
 
-float evaluate_area(Vec3 p0, Vec3 p1, Vec3 p2, Vec3 p3) {
+float evaluate_area(vec3 p0, vec3 p1, vec3 p2, vec3 p3) {
     auto v0 = (p0 - p1).cross(p2 - p3);
     auto v1 = (p0 - p2).cross(p1 - p3);
     auto v2 = (p0 - p3).cross(p1 - p2);
@@ -86,7 +86,7 @@ void ContactManifold::add_contact(const ContactGeom& new_geom) {
         }
     }
 
-    Vec3 pts[] = {
+    vec3 pts[] = {
             m_points[0].local_point,
             m_points[1].local_point,
             m_points[2].local_point,

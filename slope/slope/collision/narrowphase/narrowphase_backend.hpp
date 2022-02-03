@@ -41,8 +41,8 @@ struct NpContext {
     SATSolver sat_solver;
 
     FaceClipper face_clipper;
-    Vector<Vec3> support_face[2];
-    Vector<Vec3> clipped_face;
+    Vector<vec3> support_face[2];
+    Vector<vec3> clipped_face;
 };
 
 // Derive specialization in order to support collision pair

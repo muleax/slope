@@ -28,9 +28,9 @@ public:
     void                    set_friction(float value) { m_friction = value; }
     float                   friction() const { return m_friction; }
 
-    virtual void            set_transform(const Mat44& transform) = 0;
-    virtual const           Mat44& transform() = 0;
-    virtual const           Mat44& inv_transform() = 0;
+    virtual void            set_transform(const mat44& transform) = 0;
+    virtual const           mat44& transform() = 0;
+    virtual const           mat44& inv_transform() = 0;
 
     ActorKind               kind() const { return m_kind; }
 
@@ -56,20 +56,20 @@ public:
 
 class StaticActor : public TypedActor<ActorKind::Static> {
 public:
-    void            set_transform(const Mat44& transform) final;
-    const Mat44&    transform() final { return m_transform; }
-    const Mat44&    inv_transform() final { return m_inv_transform; }
+    void            set_transform(const mat44& transform) final;
+    const mat44&    transform() final { return m_transform; }
+    const mat44&    inv_transform() final { return m_inv_transform; }
 
 private:
-    Mat44 m_transform;
-    Mat44 m_inv_transform;
+    mat44 m_transform;
+    mat44 m_inv_transform;
 };
 
 class DynamicActor : public TypedActor<ActorKind::Dynamic> {
 public:
-    void                set_transform(const Mat44& transform) final;
-    const Mat44&        transform() final { return m_body.transform(); }
-    const Mat44&        inv_transform() final { return m_body.inv_transform(); }
+    void                set_transform(const mat44& transform) final;
+    const mat44&        transform() final { return m_body.transform(); }
+    const mat44&        inv_transform() final { return m_body.inv_transform(); }
 
     const RigidBody&    body() const { return m_body; }
     RigidBody&          body() { return m_body; }
@@ -109,7 +109,7 @@ void BaseActor::set_shape(Args&&... args) {
     set_shape(std::make_unique<T>(std::forward<Args>(args)...));
 }
 
-inline void StaticActor::set_transform(const Mat44& transform) {
+inline void StaticActor::set_transform(const mat44& transform) {
     m_transform = transform;
     m_inv_transform = transform.inverted_orthonormal();
 
@@ -117,7 +117,7 @@ inline void StaticActor::set_transform(const Mat44& transform) {
         m_shape->set_transform(transform);
 }
 
-inline void DynamicActor::set_transform(const Mat44& transform) {
+inline void DynamicActor::set_transform(const mat44& transform) {
     m_body.set_transform(transform);
 
     if (m_shape)

@@ -16,13 +16,13 @@ public:
         uint32_t            normal_id;
     };
 
-    const Vector<Vec3>&     vertices() const { return m_vertices; }
-    const Vector<Vec3>&     normals() const { return m_normals; }
+    const Vector<vec3>&     vertices() const { return m_vertices; }
+    const Vector<vec3>&     normals() const { return m_normals; }
     const Vector<Triangle>& triangles() const { return m_triangles; }
 
 private:
-    Vector<Vec3>        m_vertices;
-    Vector<Vec3>        m_normals;
+    Vector<vec3>        m_vertices;
+    Vector<vec3>        m_normals;
     Vector<Triangle>    m_triangles;
 
     friend class TrimeshFactory;
@@ -33,8 +33,8 @@ public:
     using GeomPtr = std::shared_ptr<Trimesh>;
 
     void        clear();
-    uint32_t    add_vertex(const Vec3& vertex);
-    uint32_t    add_normal(const Vec3& normal);
+    uint32_t    add_vertex(const vec3& vertex);
+    uint32_t    add_normal(const vec3& normal);
     uint32_t    add_tri(const Trimesh::Triangle& tri);
 
     GeomPtr     build() const { return std::make_shared<Trimesh>(m_result); }
@@ -54,17 +54,17 @@ public:
         float       normal_direction;
     };
 
-    const Vector<Vec3>& vertices() const { return m_vertices; }
+    const Vector<vec3>& vertices() const { return m_vertices; }
     const Vector<Face>& faces() const { return m_faces; }
-    Vec3                face_normal(const Face& face) const;
-    const Vector<Vec3>& edge_dirs() const { return m_edge_dirs; }
-    const Vector<Vec3>& face_normals() const { return m_face_normals; }
+    vec3                face_normal(const Face& face) const;
+    const Vector<vec3>& edge_dirs() const { return m_edge_dirs; }
+    const Vector<vec3>& face_normals() const { return m_face_normals; }
     uint32_t            vertex_index(const Face& face, uint32_t vert_id) const;
 
 private:
-    Vector<Vec3>        m_vertices;
-    Vector<Vec3>        m_face_normals;
-    Vector<Vec3>        m_edge_dirs;
+    Vector<vec3>        m_vertices;
+    Vector<vec3>        m_face_normals;
+    Vector<vec3>        m_edge_dirs;
     Vector<uint32_t>    m_face_indices;
     Vector<Face>        m_faces;
 
@@ -76,19 +76,19 @@ public:
     using GeomPtr = std::shared_ptr<ConvexPolyhedron>;
 
     void        clear();
-    uint32_t    add_vertex(const Vec3& vertex);
+    uint32_t    add_vertex(const vec3& vertex);
     uint32_t    add_face(VectorView<uint32_t> indices);
 
     GeomPtr     build() { return std::make_shared<ConvexPolyhedron>(m_result); }
 
-    GeomPtr     convex_hull(const Vector<Vec3>& vertices);
-    GeomPtr     box(Vec3 dimensions, Vec3 offset = {});
+    GeomPtr     convex_hull(const Vector<vec3>& vertices);
+    GeomPtr     box(vec3 dimensions, vec3 offset = {});
 
 private:
     ConvexPolyhedron m_result;
 };
 
-inline Vec3 ConvexPolyhedron::face_normal(const Face& face) const {
+inline vec3 ConvexPolyhedron::face_normal(const Face& face) const {
     return m_face_normals[face.normal] * face.normal_direction;
 }
 

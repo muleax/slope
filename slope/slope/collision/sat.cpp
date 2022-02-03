@@ -32,16 +32,16 @@ void SATSolver::reset_stats()
 }
 
 template <class Shape1, class Shape2>
-std::optional<Vec3> SATSolver::find_penetration_axis_impl(const Shape1* shape1, const Shape2* shape2)
+std::optional<vec3> SATSolver::find_penetration_axis_impl(const Shape1* shape1, const Shape2* shape2)
 {
     const float EDGE_CROSS_EPSILON = 1e-12f;
 
     m_stats.cum_test_count++;
 
     IntervalPenetration min_pen;
-    Vec3 min_pen_axis;
+    vec3 min_pen_axis;
 
-    auto sat_test = [this, &min_pen_axis, &min_pen, shape1, shape2](const Vec3& axis) -> bool {
+    auto sat_test = [this, &min_pen_axis, &min_pen, shape1, shape2](const vec3& axis) -> bool {
         m_stats.cum_projection_count++;
 
         Interval itv1 = shape1->project(axis);
@@ -85,17 +85,17 @@ std::optional<Vec3> SATSolver::find_penetration_axis_impl(const Shape1* shape1, 
     return min_pen_axis * min_pen.direction;
 }
 
-std::optional<Vec3> SATSolver::find_penetration_axis(const PolyhedronShape* shape1, const PolyhedronShape* shape2)
+std::optional<vec3> SATSolver::find_penetration_axis(const PolyhedronShape* shape1, const PolyhedronShape* shape2)
 {
     return find_penetration_axis_impl(shape1, shape2);
 }
 
-std::optional<Vec3> SATSolver::find_penetration_axis(const PolyhedronShape* shape1, const BoxShape* shape2)
+std::optional<vec3> SATSolver::find_penetration_axis(const PolyhedronShape* shape1, const BoxShape* shape2)
 {
     return find_penetration_axis_impl(shape1, shape2);
 }
 
-std::optional<Vec3> SATSolver::find_penetration_axis(const BoxShape* shape1, const BoxShape* shape2)
+std::optional<vec3> SATSolver::find_penetration_axis(const BoxShape* shape1, const BoxShape* shape2)
 {
     return find_penetration_axis_impl(shape1, shape2);
 }

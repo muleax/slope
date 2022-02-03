@@ -35,9 +35,9 @@ public:
     : m_world(world)
     , m_dynamics_world(&m_world->modify_singleton<PhysicsSingleton>()->dynamics_world) {}
 
-    DynamicActor*   spawn_box(const Mat44& tr, const Vec3& velocity, float mass, const Vec3& size);
-    DynamicActor*   spawn_sphere(const Mat44& tr, const Vec3& velocity, float mass, float radius);
-    DynamicActor*   spawn_capsule(const Mat44& tr, const Vec3& velocity, const Vec3& ang_velocity, float mass, float radius, float height);
+    DynamicActor*   spawn_box(const mat44& tr, const vec3& velocity, float mass, const vec3& size);
+    DynamicActor*   spawn_sphere(const mat44& tr, const vec3& velocity, float mass, float radius);
+    DynamicActor*   spawn_capsule(const mat44& tr, const vec3& velocity, const vec3& ang_velocity, float mass, float radius, float height);
 
     World*          world() { return m_world; }
     DynamicsWorld*  dynamics_world() { return m_dynamics_world; }
@@ -52,13 +52,13 @@ private:
     template<class T, class F>
     std::shared_ptr<Mesh> get_mesh(Vector<MeshData<T>>& container, T dimensions, F&& ctor);
 
-    Vector<MeshData<Vec3>> m_box_meshes;
+    Vector<MeshData<vec3>> m_box_meshes;
     std::shared_ptr<Material> m_box_material;
 
     Vector<MeshData<float>> m_sphere_meshes;
     std::shared_ptr<Material> m_sphere_material;
 
-    Vector<MeshData<Vec2>> m_capsule_meshes;
+    Vector<MeshData<vec2>> m_capsule_meshes;
     std::shared_ptr<Material> m_capsule_material;
 
     MeshFactory m_mesh_factory;

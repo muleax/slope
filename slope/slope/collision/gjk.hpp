@@ -7,7 +7,7 @@ namespace slope {
 
 class GJKSolver {
 public:
-    using Simplex = Array<Vec3, 4>;
+    using Simplex = Array<vec3, 4>;
 
     struct Config {
         uint32_t max_iteration_count = 30;
@@ -28,10 +28,10 @@ public:
     void            reset_stats();
 
 private:
-    Vec3 update_point(Vec3 a);
-    Vec3 update_line(Vec3 b, Vec3 a);
-    Vec3 update_triangle(Vec3 c, Vec3 b, Vec3 a);
-    std::optional<Vec3> update_tetrahedron(Vec3 d, Vec3 c, Vec3 b, Vec3 a);
+    vec3 update_point(vec3 a);
+    vec3 update_line(vec3 b, vec3 a);
+    vec3 update_triangle(vec3 c, vec3 b, vec3 a);
+    std::optional<vec3> update_tetrahedron(vec3 d, vec3 c, vec3 b, vec3 a);
 
     void collect_stats(uint32_t iteration_count, bool fail);
 

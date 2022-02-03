@@ -21,7 +21,7 @@ void SphericalJoint::apply_constraints(ConstraintSolver* solver)
     if (m_damping > 0.f) {
         auto& damping_cache = m_cache[3];
 
-        Vec3 dw = m_body1->ang_velocity();
+        vec3 dw = m_body1->ang_velocity();
         if (m_body2)
             dw -= m_body2->ang_velocity();
 

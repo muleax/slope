@@ -11,9 +11,9 @@ using namespace slope;
 
 struct MeshData {
     struct Vertex {
-        Vec3 position;
-        Vec3 normal;
-        Vec2 tex_coords;
+        vec3 position;
+        vec3 normal;
+        vec2 tex_coords;
     };
 
     struct Face {

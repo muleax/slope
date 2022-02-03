@@ -183,7 +183,7 @@ void App::update_window_size() {
     }
 }
 
-void App::set_background_color(const Vec3& rgb) {
+void App::set_background_color(const vec3& rgb) {
     glClearColor(rgb.x, rgb.y, rgb.z, 0.f);
 }
 

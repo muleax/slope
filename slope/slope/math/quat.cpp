@@ -4,15 +4,17 @@
 
 namespace slope {
 
-Quat Quat::rotation(const Vec3& axis, float angle) {
+quat quat::rotation(const vec3& axis, float angle)
+{
     SL_ASSERT(axis.is_finite());
     SL_ASSERT(std::isfinite(angle));
     SL_ASSERT(slope::equal(axis.length(), 1.f));
 
-    return { std::sin(0.5f * angle) * axis, std::cos(0.5f * angle) };
+    return {std::sin(0.5f * angle) * axis, std::cos(0.5f * angle)};
 }
 
-Quat Quat::shortest_arc(const Vec3& from, const Vec3& to, const Vec3& spin_axis) {
+quat quat::shortest_arc(const vec3& from, const vec3& to, const vec3& spin_axis)
+{
     SL_ASSERT(from.isfinite());
     SL_ASSERT(to.isfinite());
     SL_ASSERT(spin_axis.isfinite());
@@ -24,19 +26,20 @@ Quat Quat::shortest_arc(const Vec3& from, const Vec3& to, const Vec3& spin_axis)
     if (slope::equal(dot_product, 1.f)) {
         return {};
     } else if (slope::equal(dot_product, -1.f)) {
-        return { spin_axis, 0.f };
+        return {spin_axis, 0.f};
     } else {
-        return Quat(from.cross(to), dot_product + 1.f).normalized();
+        return quat(from.cross(to), dot_product + 1.f).normalized();
     }
 }
 
-Quat::Quat(const Mat33& matrix) {
+quat::quat(const mat33& matrix)
+{
     SL_ASSERT(isfinite(matrix));
 
-    float a = matrix._11 - matrix._22 - matrix._33;
-    float b = matrix._22 - matrix._11 - matrix._33;
-    float c = matrix._33 - matrix._11 - matrix._22;
-    float d = matrix._11 + matrix._22 + matrix._33;
+    float a = matrix._00 - matrix._11 - matrix._22;
+    float b = matrix._11 - matrix._00 - matrix._22;
+    float c = matrix._22 - matrix._00 - matrix._11;
+    float d = matrix._00 + matrix._11 + matrix._22;
 
     int greatest_index = 3;
     float greatest_index_value = d;
@@ -60,42 +63,72 @@ Quat::Quat(const Mat33& matrix) {
     float multiplier = 0.25f / greatest_value;
 
     switch (greatest_index) {
-        case 0:
-            x = greatest_value;
-            y = (matrix._12 + matrix._21) * multiplier;
-            z = (matrix._31 + matrix._13) * multiplier;
-            w = (matrix._23 - matrix._32) * multiplier;
-            break;
-        case 1:
-            x = (matrix._12 + matrix._21) * multiplier;
-            y = greatest_value;
-            z = (matrix._23 + matrix._32) * multiplier;
-            w = (matrix._31 - matrix._13) * multiplier;
-            break;
-        case 2:
-            x = (matrix._31 + matrix._13) * multiplier;
-            y = (matrix._23 + matrix._32) * multiplier;
-            z = greatest_value;
-            w = (matrix._12 - matrix._21) * multiplier;
-            break;
-        case 3:
-            x = (matrix._23 - matrix._32) * multiplier;
-            y = (matrix._31 - matrix._13) * multiplier;
-            z = (matrix._12 - matrix._21) * multiplier;
-            w = greatest_value;
-            break;
-        default:
-            x = 0.f;
-            y = 0.f;
-            z = 0.f;
-            w = 1.f;
+    case 0:
+        x = greatest_value;
+        y = (matrix._01 + matrix._10) * multiplier;
+        z = (matrix._20 + matrix._02) * multiplier;
+        w = (matrix._12 - matrix._21) * multiplier;
+        break;
+    case 1:
+        x = (matrix._01 + matrix._10) * multiplier;
+        y = greatest_value;
+        z = (matrix._12 + matrix._21) * multiplier;
+        w = (matrix._20 - matrix._02) * multiplier;
+        break;
+    case 2:
+        x = (matrix._20 + matrix._02) * multiplier;
+        y = (matrix._12 + matrix._21) * multiplier;
+        z = greatest_value;
+        w = (matrix._01 - matrix._10) * multiplier;
+        break;
+    case 3:
+        x = (matrix._12 - matrix._21) * multiplier;
+        y = (matrix._20 - matrix._02) * multiplier;
+        z = (matrix._01 - matrix._10) * multiplier;
+        w = greatest_value;
+        break;
+    default:
+        x = 0.f;
+        y = 0.f;
+        z = 0.f;
+        w = 1.f;
     }
 }
 
-Quat::Quat(const Mat44& matrix)
-        : Quat(Mat33(
-                matrix._11, matrix._12, matrix._13,
-                matrix._21, matrix._22, matrix._23,
-                matrix._31, matrix._32, matrix._33)) {}
+quat::quat(const mat44& matrix)
+    : quat(mat33(
+    matrix._00, matrix._01, matrix._02,
+    matrix._10, matrix._11, matrix._12,
+    matrix._20, matrix._21, matrix._22)) {}
+
+quat slerp(const quat& from, quat to, float factor)
+{
+    float cos_a = from.x * to.x + from.y * to.y + from.z * to.z + from.w * to.w;
+
+    if (cos_a < 0.f) {
+        cos_a = -cos_a;
+        to = -to;
+    }
+
+    if (cos_a > 0.995f) {
+        return quat(lerp(
+            vec4(from.x, from.y, from.z, from.w),
+            vec4(to.x, to.y, to.z, to.w),
+            factor)).normalized();
+    }
+
+    factor = factor * 0.5f;
+
+    float a = std::acos(cos_a);
+    float b = 1.f / std::sin(a);
+    float c = std::sin((1 - factor) * a) * b;
+    float d = std::sin(factor * a) * b;
+
+    return quat(
+        c * from.x + d * to.x,
+        c * from.y + d * to.y,
+        c * from.z + d * to.z,
+        c * from.w + d * to.w).normalized();
+}
 
 } // slope

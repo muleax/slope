@@ -12,7 +12,7 @@ PolyhedronShape::PolyhedronShape(std::shared_ptr<ConvexPolyhedron> geometry)
     m_principal_edge_axes.reserve(geom.edge_dirs().size());
 }
 
-void PolyhedronShape::set_transform(const Mat44& matrix)
+void PolyhedronShape::set_transform(const mat44& matrix)
 {
     m_transform = matrix;
     auto& geom = *m_geometry;
@@ -38,7 +38,7 @@ void PolyhedronShape::set_transform(const Mat44& matrix)
     }
 }
 
-float PolyhedronShape::get_support_face(const Vec3& axis, Vector<Vec3>& out_support, Vec3& out_face_normal) const
+float PolyhedronShape::get_support_face(const vec3& axis, Vector<vec3>& out_support, vec3& out_face_normal) const
 {
     auto& geom = *m_geometry;
 

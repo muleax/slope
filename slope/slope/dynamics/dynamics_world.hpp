@@ -65,7 +65,7 @@ public:
         float warmstarting_normal = 0.83f;
         float warmstarting_friction = 0.75f;
         float warmstarting_joint = 0.8f;
-        Vec3 gravity = {0.f, -9.81f, 0.f};
+        vec3 gravity = {0.f, -9.81f, 0.f};
 
         NpBackendHint np_backend_hint = NpBackendHint::Mixed;
 

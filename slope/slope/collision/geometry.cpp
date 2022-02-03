@@ -3,12 +3,12 @@
 
 namespace slope {
 
-uint32_t TrimeshFactory::add_vertex(const Vec3& vertex) {
+uint32_t TrimeshFactory::add_vertex(const vec3& vertex) {
     m_result.m_vertices.push_back(vertex);
     return m_result.m_vertices.size() - 1;
 }
 
-uint32_t TrimeshFactory::add_normal(const Vec3& normal) {
+uint32_t TrimeshFactory::add_normal(const vec3& normal) {
     m_result.m_normals.push_back(normal);
     return m_result.m_normals.size() - 1;
 
@@ -44,7 +44,7 @@ TrimeshFactory::GeomPtr TrimeshFactory::from_polyhedron(const ConvexPolyhedron& 
     return build();
 }
 
-uint32_t ConvexPolyhedronFactory::add_vertex(const Vec3& vertex) {
+uint32_t ConvexPolyhedronFactory::add_vertex(const vec3& vertex) {
     m_result.m_vertices.push_back(vertex);
     return static_cast<uint32_t>(m_result.m_vertices.size() - 1);
 }
@@ -58,15 +58,15 @@ uint32_t ConvexPolyhedronFactory::add_face(VectorView<uint32_t> indices) {
 
     m_result.m_face_indices.insert(m_result.m_face_indices.end(), indices.begin(), indices.end());
 
-    const Vec3& a = m_result.m_vertices[indices[0]];
-    const Vec3& b = m_result.m_vertices[indices[1]];
-    const Vec3& c = m_result.m_vertices[indices[1]];
-    Vec3 normal = (b - a).cross(c - a);
+    const vec3& a = m_result.m_vertices[indices[0]];
+    const vec3& b = m_result.m_vertices[indices[1]];
+    const vec3& c = m_result.m_vertices[indices[1]];
+    vec3 normal = (b - a).cross(c - a);
     SL_ASSERT(normal.length_squared() > 1e-12f);
     normal = normal.normalized();
 
     // TODO: optimize
-    auto find_equal_dir = [](const Vec3& dir, Vector<Vec3>& search_vector) -> uint32_t {
+    auto find_equal_dir = [](const vec3& dir, Vector<vec3>& search_vector) -> uint32_t {
         for (size_t i = 0; i < search_vector.size(); i++) {
             if (search_vector[i].cross(dir).length_squared() < 1e-12f) {
                 return i;
@@ -104,12 +104,12 @@ void ConvexPolyhedronFactory::clear() {
     m_result.m_faces.clear();
 }
 
-ConvexPolyhedronFactory::GeomPtr ConvexPolyhedronFactory::convex_hull(const Vector<Vec3>& vertices) {
+ConvexPolyhedronFactory::GeomPtr ConvexPolyhedronFactory::convex_hull(const Vector<vec3>& vertices) {
     // TODO: quickhull
     return nullptr;
 }
 
-ConvexPolyhedronFactory::GeomPtr ConvexPolyhedronFactory::box(Vec3 dimensions, Vec3 offset) {
+ConvexPolyhedronFactory::GeomPtr ConvexPolyhedronFactory::box(vec3 dimensions, vec3 offset) {
     clear();
 
     float extent[] = {-0.5f, 0.5f};

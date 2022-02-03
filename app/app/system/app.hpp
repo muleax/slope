@@ -31,7 +31,7 @@ public:
     void    get_window_size(int& width, int& height) const;
     void    get_cursor_pos(double& x, double& y) const;
     void    set_cursor_pos(double x, double y);
-    void    set_background_color(const Vec3& rgb);
+    void    set_background_color(const vec3& rgb);
 
     void    stop();
 

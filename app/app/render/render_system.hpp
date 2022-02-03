@@ -44,11 +44,11 @@ private:
     void scene_draw();
     void debug_draw();
     void draw_mesh_instanced(
-            RenderComponent* rc, const CameraComponent* cam, const RenderSingleton* rs, const Vec3& light_pos);
+            RenderComponent* rc, const CameraComponent* cam, const RenderSingleton* rs, const vec3& light_pos);
 
     MeshRenderer m_mesh_renderer;
     Vector<QueueEntry> m_queue;
-    Vector<Mat44> m_model_matrices;
+    Vector<mat44> m_model_matrices;
 
     LineRenderer m_line_renderer;
     std::shared_ptr<LineShader> m_line_shader;

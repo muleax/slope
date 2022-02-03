@@ -4,15 +4,15 @@ namespace slope {
 
 
 void FaceClipper::clip_convex_face_by_halfspace(
-    Vector<Vec3>& out_clipped_face,
-    const Vector<Vec3>& face, const Plane& hs_plane) {
+    Vector<vec3>& out_clipped_face,
+    const Vector<vec3>& face, const Plane& hs_plane) {
 
     const float DIVISION_EPSILON = 1e-8f;
     const float BLOAT_EPSILON = 1e-4f;
 
     out_clipped_face.clear();
 
-    const Vec3* prev_pt = &face.back();
+    const vec3* prev_pt = &face.back();
     float prev_dot = hs_plane.normal.dot(face.back());
     float prev_delta_dot = prev_dot - hs_plane.dot;
 
@@ -38,17 +38,17 @@ void FaceClipper::clip_convex_face_by_halfspace(
 }
 
 void FaceClipper::clip_convex_face_by_convex_prism(
-    Vector<Vec3>& out_clipped_face,
-    const Vector<Vec3>& face, const Vector<Vec3>& prism_base, const Vec3& prism_axis) {
+    Vector<vec3>& out_clipped_face,
+    const Vector<vec3>& face, const Vector<vec3>& prism_base, const vec3& prism_axis) {
 
     // TODO: optimize
     m_buffer = face;
 
-    Vec3 base_cross = (prism_base[0] - prism_base.back()).cross(prism_base[1] - prism_base[0]);
+    vec3 base_cross = (prism_base[0] - prism_base.back()).cross(prism_base[1] - prism_base[0]);
     float denom = prism_axis.dot(base_cross);
-    Vec3 prism_dir = denom > 0.f ? -prism_axis : prism_axis;
+    vec3 prism_dir = denom > 0.f ? -prism_axis : prism_axis;
 
-    const Vec3* prev_base_pt = &prism_base.back();
+    const vec3* prev_base_pt = &prism_base.back();
 
     for (auto& base_pt : prism_base) {
         auto base_edge = base_pt - *prev_base_pt;
@@ -66,17 +66,17 @@ void FaceClipper::clip_convex_face_by_convex_prism(
 }
 
 LineSegment FaceClipper::clip_segment_by_convex_prism(
-    const LineSegment& segment, const Vector<Vec3>& prism_base, const Vec3& prism_axis)
+    const LineSegment& segment, const Vector<vec3>& prism_base, const vec3& prism_axis)
 {
     const float DIVISION_EPSILON = 1e-8f;
 
     LineSegment clipped_segment = segment;
 
-    Vec3 base_cross = (prism_base[0] - prism_base.back()).cross(prism_base[1] - prism_base[0]);
+    vec3 base_cross = (prism_base[0] - prism_base.back()).cross(prism_base[1] - prism_base[0]);
     float denom = prism_axis.dot(base_cross);
-    Vec3 prism_dir = denom > 0.f ? -prism_axis : prism_axis;
+    vec3 prism_dir = denom > 0.f ? -prism_axis : prism_axis;
 
-    const Vec3* prev_base_pt = &prism_base.back();
+    const vec3* prev_base_pt = &prism_base.back();
 
     for (auto& base_pt : prism_base) {
         auto base_edge = base_pt - *prev_base_pt;
@@ -93,7 +93,7 @@ LineSegment FaceClipper::clip_segment_by_convex_prism(
             float divider = prev_dot - dot;
             if(divider * divider > DIVISION_EPSILON) {
                 float t = -delta_dot / divider;
-                Vec3 mp = clipped_segment.end + t * (clipped_segment.begin - clipped_segment.end);
+                vec3 mp = clipped_segment.end + t * (clipped_segment.begin - clipped_segment.end);
                 if (delta_dot > 0.f)
                     clipped_segment = {mp, clipped_segment.end};
                 else

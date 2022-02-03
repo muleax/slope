@@ -5,8 +5,8 @@
 namespace slope::app {
 
 struct LinePoint {
-    Vec3 position;
-    Vec3 color;
+    vec3 position;
+    vec3 color;
 };
 
 class LineShader : public Shader
@@ -22,7 +22,7 @@ public:
     };
 
     using Shader::Shader;
-    void set_view_projection(const Mat44& value) const { set(m_view_proj_loc, value); }
+    void set_view_projection(const mat44& value) const { set(m_view_proj_loc, value); }
 
 private:
     void cache_attribute_locations() override;

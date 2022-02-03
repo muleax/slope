@@ -2,7 +2,7 @@
 
 namespace slope {
 
-Vec3 find_orthogonal(const Vec3& axis) {
+vec3 find_orthogonal(const vec3& axis) {
     int max_idx = 0;
     if (fabs(axis.data[1]) > fabs(axis.data[0]))
         max_idx = 1;
@@ -12,16 +12,16 @@ Vec3 find_orthogonal(const Vec3& axis) {
     int u = (max_idx + 1) % 3;
     int v = (max_idx + 2) % 3;
 
-    Vec3 ort;
+    vec3 ort;
     ort.data[max_idx] = -axis.data[u];
     ort[u] = axis.data[max_idx];
     ort[v] = 0.f;
     return ort;
 }
 
-void LineSegment::closest_point(const Vec3& other, float& t, Vec3& p) const
+void LineSegment::closest_point(const vec3& other, float& t, vec3& p) const
 {
-    Vec3 dir = end - begin;
+    vec3 dir = end - begin;
 
     t = dir.dot(other - begin);
 
@@ -40,7 +40,7 @@ void LineSegment::closest_point(const Vec3& other, float& t, Vec3& p) const
     }
 }
 
-void LineSegment::closest_point(const LineSegment& other, float& t1, float& t2, Vec3& p1, Vec3& p2) const
+void LineSegment::closest_point(const LineSegment& other, float& t1, float& t2, vec3& p1, vec3& p2) const
 {
     constexpr float EPSILON = 1e-6f;
     auto d1 = end - begin;

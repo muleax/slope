@@ -24,7 +24,7 @@ public:
         if (pen_axis) {
             // TODO: robust solution for imprecise penetration axis
             // TODO: optimize
-            Vec3 face_normal;
+            vec3 face_normal;
             ctx->support_face[0].clear();
             shape1->get_support_face(*pen_axis, ctx->support_face[0], face_normal);
 
@@ -62,7 +62,7 @@ public:
         float dist = sqrtf(sqr_dist);
         auto& center1 = shape1->transform().translation();
         auto& center2 = shape2->transform().translation();
-        auto pen_axis = dist > DIST_EPSILON ? (center2 - center1) / dist : Vec3{1.f, 0.f, 0.f};
+        auto pen_axis = dist > DIST_EPSILON ? (center2 - center1) / dist : vec3{1.f, 0.f, 0.f};
         auto p1 = center1 + pen_axis * shape1->radius();
         auto p2 = center2 - pen_axis * shape2->radius();
         patch.contacts.push_back({ p1, p2, pen_axis });
@@ -80,8 +80,8 @@ private:
         return sqr_dist <= contact_dist * contact_dist;
     }
 
-    Vec3 m_p1;
-    Vec3 m_p2;
+    vec3 m_p1;
+    vec3 m_p2;
     float m_dist_sqr = 0.f;
 };
 

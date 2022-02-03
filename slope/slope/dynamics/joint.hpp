@@ -48,17 +48,17 @@ public:
     using CachedJoint::CachedJoint;
 
     void        set_damping(const float value) { m_damping = value; }
-    void        set_anchor1(const Vec3& value) { m_anchor1 = value; }
-    void        set_anchor2(const Vec3& value) { m_anchor2 = value; }
+    void        set_anchor1(const vec3& value) { m_anchor1 = value; }
+    void        set_anchor2(const vec3& value) { m_anchor2 = value; }
 
-    const Vec3& anchor1() const { return m_anchor1; }
-    const Vec3& anchor2() const { return m_anchor2; }
+    const vec3& anchor1() const { return m_anchor1; }
+    const vec3& anchor2() const { return m_anchor2; }
 
     void        apply_constraints(ConstraintSolver* solver) final;
 
 private:
-    Vec3 m_anchor1;
-    Vec3 m_anchor2;
+    vec3 m_anchor1;
+    vec3 m_anchor2;
 
     float m_damping = 0.f;
 };

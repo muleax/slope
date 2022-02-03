@@ -8,12 +8,12 @@ namespace slope {
 template <class A, class B>
 class PolyhedraBackendBase : public NpBackend<A, B> {
 protected:
-    void generate_contact_patch(const A* shape1, const B* shape2, const Vec3& pen_axis, NpContactPatch& patch)
+    void generate_contact_patch(const A* shape1, const B* shape2, const vec3& pen_axis, NpContactPatch& patch)
     {
         auto* ctx = this->ctx();
 
         float proximity[2];
-        Vec3 support_normal[2];
+        vec3 support_normal[2];
 
         ctx->support_face[0].clear();
         ctx->support_face[1].clear();
@@ -24,7 +24,7 @@ protected:
 
         int face;
         int clipper;
-        Vec3 clipper_axis;
+        vec3 clipper_axis;
 
         if (proximity[0] < proximity[1]) {
             face = 1;

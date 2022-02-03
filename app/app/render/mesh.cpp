@@ -32,13 +32,13 @@ Mesh::Mesh(VectorView<Vertex> vertices, VectorView<uint32_t> indices)
     glVertexAttribPointer(MeshShader::AttributeLayout::POSITION, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(0));
 
     glEnableVertexAttribArray(MeshShader::AttributeLayout::NORMAL);
-    glVertexAttribPointer(MeshShader::AttributeLayout::NORMAL, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(sizeof(Vec3)));
+    glVertexAttribPointer(MeshShader::AttributeLayout::NORMAL, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(sizeof(vec3)));
 
     glEnableVertexAttribArray(MeshShader::AttributeLayout::COLOR);
-    glVertexAttribPointer(MeshShader::AttributeLayout::COLOR, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec3)));
+    glVertexAttribPointer(MeshShader::AttributeLayout::COLOR, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(vec3)));
 
     glEnableVertexAttribArray(MeshShader::AttributeLayout::TEX_COORDS);
-    glVertexAttribPointer(MeshShader::AttributeLayout::TEX_COORDS, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec3) + sizeof(Vec4)));
+    glVertexAttribPointer(MeshShader::AttributeLayout::TEX_COORDS, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(vec3) + sizeof(vec4)));
 
     glEnableVertexAttribArray(MeshShader::AttributeLayout::MODEL_0);
     glEnableVertexAttribArray(MeshShader::AttributeLayout::MODEL_1);
@@ -58,13 +58,13 @@ Mesh::Mesh(VectorView<Vertex> vertices, VectorView<uint32_t> indices)
 void Mesh::bind(RenderHandle instancing_buffer) const {
     glBindVertexArray(m_vao);
 
-    auto stride = static_cast<GLsizei>(4 * sizeof(Vec4));
+    auto stride = static_cast<GLsizei>(4 * sizeof(vec4));
 
     glBindBuffer(GL_ARRAY_BUFFER, instancing_buffer);
     glVertexAttribPointer(MeshShader::AttributeLayout::MODEL_0, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(0));
-    glVertexAttribPointer(MeshShader::AttributeLayout::MODEL_1, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(sizeof(Vec4)));
-    glVertexAttribPointer(MeshShader::AttributeLayout::MODEL_2, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(Vec4)));
-    glVertexAttribPointer(MeshShader::AttributeLayout::MODEL_3, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(3 * sizeof(Vec4)));
+    glVertexAttribPointer(MeshShader::AttributeLayout::MODEL_1, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(sizeof(vec4)));
+    glVertexAttribPointer(MeshShader::AttributeLayout::MODEL_2, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(2 * sizeof(vec4)));
+    glVertexAttribPointer(MeshShader::AttributeLayout::MODEL_3, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(3 * sizeof(vec4)));
 }
 
 void Mesh::unbind() const {
@@ -85,12 +85,12 @@ MeshRenderer::~MeshRenderer() {
     glDeleteBuffers(1, &m_instancing_buffer);
 }
 
-void MeshRenderer::draw(const Mesh& mesh, const Mat44* instancing_data, size_t instance_count) const {
+void MeshRenderer::draw(const Mesh& mesh, const mat44* instancing_data, size_t instance_count) const {
 
     mesh.bind(m_instancing_buffer);
 
     glBindBuffer(GL_ARRAY_BUFFER, m_instancing_buffer);
-    auto instance_buffer_size = static_cast<GLsizei>(instance_count * sizeof(Mat44));
+    auto instance_buffer_size = static_cast<GLsizei>(instance_count * sizeof(mat44));
     glBufferData(GL_ARRAY_BUFFER, instance_buffer_size, instancing_data, GL_STREAM_DRAW);
 
     glDrawElementsInstanced(GL_TRIANGLES, mesh.size(), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(instance_count));

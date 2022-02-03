@@ -12,8 +12,8 @@ namespace slope {
 namespace {
 
 struct FrictionBasis {
-    Vec3 axis1;
-    Vec3 axis2;
+    vec3 axis1;
+    vec3 axis2;
 };
 
 std::optional<FrictionBasis> get_velocity_dependent_friction_basis(
@@ -21,7 +21,7 @@ std::optional<FrictionBasis> get_velocity_dependent_friction_basis(
 {
     std::optional<FrictionBasis> basis;
 
-    Vec3 vel = body1->point_velocity(geom.p1);
+    vec3 vel = body1->point_velocity(geom.p1);
     if (body2)
         vel -= body2->point_velocity(geom.p2);
 

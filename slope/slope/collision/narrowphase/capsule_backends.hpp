@@ -27,7 +27,7 @@ public:
             auto& support_face = ctx->support_face[0];
             support_face.clear();
 
-            Vec3 support_normal;
+            vec3 support_normal;
             shape1->get_support_face(*pen_axis, support_face, support_normal);
 
             auto segment = ctx->face_clipper.clip_segment_by_convex_prism(shape2->segment(), support_face, *pen_axis);
@@ -53,7 +53,7 @@ class CapsuleSphereBackend : public NpBackend<CapsuleShape, SphereShape> {
 public:
     bool intersect(const Shape1* shape1, const Shape2* shape2)
     {
-        Vec3 closest_pt;
+        vec3 closest_pt;
         float sqr_dist;
         return intersect_impl(shape1, shape2, closest_pt, sqr_dist);
     }
@@ -62,14 +62,14 @@ public:
     {
         static constexpr float DIST_EPSILON = 1e-6f;
 
-        Vec3 closest_pt;
+        vec3 closest_pt;
         float sqr_dist;
         if (!intersect_impl(shape1, shape2, closest_pt, sqr_dist))
             return false;
 
         float dist = sqrtf(sqr_dist);
         auto& sphere_center = shape2->transform().translation();
-        auto pen_axis = (dist > DIST_EPSILON) ? (sphere_center - closest_pt) / dist : Vec3{1.f, 0.f, 0.f};
+        auto pen_axis = (dist > DIST_EPSILON) ? (sphere_center - closest_pt) / dist : vec3{1.f, 0.f, 0.f};
         auto p1 = closest_pt + pen_axis * shape1->radius();
         auto p2 = sphere_center - pen_axis * shape2->radius();
         patch.contacts.push_back({p1, p2, pen_axis});
@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    bool intersect_impl(const Shape1* shape1, const Shape2* shape2, Vec3& closest_pt, float& sqr_dist)
+    bool intersect_impl(const Shape1* shape1, const Shape2* shape2, vec3& closest_pt, float& sqr_dist)
     {
         auto& sphere_center = shape2->transform().translation();
         float t;
@@ -93,8 +93,8 @@ class CapsuleBackend : public NpBackend<CapsuleShape, CapsuleShape> {
 public:
     bool intersect(const Shape1* shape1, const Shape1* shape2)
     {
-        Vec3 closest_pt1;
-        Vec3 closest_pt2;
+        vec3 closest_pt1;
+        vec3 closest_pt2;
         float sqr_dist;
         return intersect_impl(shape1, shape2, closest_pt1, closest_pt2, sqr_dist);
     }
@@ -103,14 +103,14 @@ public:
     {
         static constexpr float DIST_EPSILON = 1e-6f;
 
-        Vec3 closest_pt1;
-        Vec3 closest_pt2;
+        vec3 closest_pt1;
+        vec3 closest_pt2;
         float sqr_dist;
         if (!intersect_impl(shape1, shape2, closest_pt1, closest_pt2, sqr_dist))
             return false;
 
         float dist = sqrtf(sqr_dist);
-        auto pen_axis = (dist > DIST_EPSILON) ? (closest_pt2 - closest_pt1) / dist : Vec3{1.f, 0.f, 0.f};
+        auto pen_axis = (dist > DIST_EPSILON) ? (closest_pt2 - closest_pt1) / dist : vec3{1.f, 0.f, 0.f};
         auto p1 = closest_pt1 + pen_axis * shape1->radius();
         auto p2 = closest_pt2 - pen_axis * shape2->radius();
         patch.contacts.push_back({p1, p2, pen_axis});
@@ -119,7 +119,7 @@ public:
     }
 
 private:
-    bool intersect_impl(const Shape1* shape1, const Shape1* shape2, Vec3& closest_pt1, Vec3& closest_pt2, float& sqr_dist)
+    bool intersect_impl(const Shape1* shape1, const Shape1* shape2, vec3& closest_pt1, vec3& closest_pt2, float& sqr_dist)
     {
         float t1;
         float t2;
