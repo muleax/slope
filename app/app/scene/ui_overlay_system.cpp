@@ -32,8 +32,8 @@ void UIOverlaySystem::update(float dt)
     if (ImGui::CollapsingHeader("General", treeNodeFlags)) {
         ImGui::Text("Simulation Time: %.1f s", world_stats.simulation_time);
         ImGui::Text("CPU Frame Time: %.1f ms", ps->cpu_time.instantaneous() * 1000);
-        ImGui::Text("Static Actors: %d", world_stats.static_actor_count);
-        ImGui::Text("Dynamic Actors: %d", world_stats.dynamic_actor_count);
+        ImGui::Text("Static Actors: %d", world_stats.actor_count[(int)ActorKind::Static]);
+        ImGui::Text("Dynamic Actors: %d", world_stats.actor_count[(int)ActorKind::Dynamic]);
     }
 
     if (ImGui::CollapsingHeader("Narrowphase", treeNodeFlags)) {

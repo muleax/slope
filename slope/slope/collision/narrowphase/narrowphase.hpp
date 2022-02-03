@@ -27,29 +27,29 @@ private:
     NpContext m_context;
     NpNullBackend m_null_backend;
     Vector<std::unique_ptr<INpBackendWrapper>> m_backends;
-    Array<Array<INpBackendWrapper*, (int)ShapeType::Count>, (int)ShapeType::Count> m_backend_map;
+    Array<Array<INpBackendWrapper*, (int)ShapeKind::Count>, (int)ShapeKind::Count> m_backend_map;
 };
 
 template<class Backend>
 void Narrowphase::add_backend()
 {
-    auto type1 = static_cast<int>(Backend::Shape1::Type);
-    auto type2 = static_cast<int>(Backend::Shape2::Type);
+    auto kind1 = static_cast<int>(Backend::Shape1::Kind);
+    auto kind2 = static_cast<int>(Backend::Shape2::Kind);
 
-    remove_backend(type1, type2);
+    remove_backend(kind1, kind2);
 
     m_backends.push_back(std::make_unique<NpBackendWrapper<Backend>>(&m_context));
-    m_backend_map[type1][type2] = m_backends.back().get();
+    m_backend_map[kind1][kind2] = m_backends.back().get();
 
-    if (type1 != type2) {
+    if (kind1 != kind2) {
         m_backends.push_back(std::make_unique<NpBackendWrapper<Backend, true>>(&m_context));
-        m_backend_map[type2][type1] = m_backends.back().get();
+        m_backend_map[kind2][kind1] = m_backends.back().get();
     }
 }
 
 inline INpBackendWrapper* Narrowphase::find_backend(const CollisionShape* shape1, const CollisionShape* shape2)
 {
-    return m_backend_map[(int)shape1->type()][(int)shape2->type()];
+    return m_backend_map[(int)shape1->kind()][(int)shape2->kind()];
 }
 
 inline bool Narrowphase::intersect(const CollisionShape* shape1, const CollisionShape* shape2)

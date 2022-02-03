@@ -92,7 +92,7 @@ public:
             std::swap(shape1, shape2);
         }
 
-        return m_backend.intersect((const Shape1*)shape1, (const Shape2*)shape2);
+        return m_backend.intersect(shape1->template cast<Shape1>(), shape2->template cast<Shape2>());
     }
 
     bool collide(const CollisionShape* shape1, const CollisionShape* shape2, NpContactPatch& patch) final
@@ -102,7 +102,7 @@ public:
             patch.invert_input_order();
         }
 
-        return m_backend.collide((const Shape1*)shape1, (const Shape2*)shape2, patch);
+        return m_backend.collide(shape1->template cast<Shape1>(), shape2->template cast<Shape2>(), patch);
     }
 
 private:

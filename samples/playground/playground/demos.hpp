@@ -16,8 +16,7 @@ public:
 
 protected:
     World*              w() { return m_spawner->world(); }
-    const World*        w() const { return m_spawner->world(); }
-    auto&               physics_config() { return w()->modify_singleton<PhysicsSingleton>()->dynamics_world.config(); }
+    DynamicsWorld*      dynamics_world() { return m_spawner->dynamics_world(); }
 
     void                create_floor();
 
@@ -88,9 +87,7 @@ public:
     using Demo::Demo;
 
     void        init() override;
-    void        fini() override;
     const char* name() override { return "Spherical Joint"; }
 
 private:
-    Vector<std::optional<SphericalJoint>> m_joints;
 };

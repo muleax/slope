@@ -4,8 +4,7 @@
 
 namespace slope {
 
-enum class ShapeType : int {
-    Undefined = 0,
+enum class ShapeKind : int {
     Polyhedron,
     Box,
     Sphere,
@@ -13,10 +12,9 @@ enum class ShapeType : int {
     Count
 };
 
-
 class CollisionShape {
 public:
-    explicit CollisionShape(ShapeType type) : m_type(type) {}
+    explicit CollisionShape(ShapeKind kind) : m_kind(kind) {}
     virtual ~CollisionShape() = default;
 
     virtual void    set_transform(const Mat44& matrix) = 0;
@@ -25,25 +23,52 @@ public:
     const Mat44&    transform() const { return m_transform; }
     const AABB&     aabb() const { return m_aabb; }
     Vec3            support_diff(const CollisionShape* other, const Vec3& axis, float bloat, bool normalized) const;
-    ShapeType       type() const { return m_type; }
+
+    ShapeKind       kind() const { return m_kind; }
+
+    template<class T>
+    bool            is() const;
+    template<class T>
+    const T*        cast() const;
+    template<class T>
+    T*              cast();
 
 protected:
     Mat44 m_transform;
     AABB m_aabb;
-    ShapeType m_type;
+    ShapeKind m_kind;
 };
 
-template <ShapeType T>
-class CollisionShapeImpl : public CollisionShape {
+template <ShapeKind T>
+class TypedCollisionShape : public CollisionShape {
 public:
-    static constexpr ShapeType Type = T;
-
-    CollisionShapeImpl() : CollisionShape(T) {}
+    static constexpr ShapeKind Kind = T;
+    TypedCollisionShape() : CollisionShape(Kind) {}
 };
 
 inline Vec3 CollisionShape::support_diff(const CollisionShape* other, const Vec3& axis, float bloat, bool normalized) const
 {
     return support(axis, bloat, normalized) - other->support(-axis, bloat, normalized);
+}
+template<class T>
+bool CollisionShape::is() const
+{
+    static_assert(std::is_base_of_v<TypedCollisionShape<T::Kind>, T>);
+    return m_kind == T::Kind;
+}
+
+template<class T>
+const T* CollisionShape::cast() const
+{
+    SL_ASSERT(is<T>());
+    return static_cast<const T*>(this);
+}
+
+template<class T>
+T* CollisionShape::cast()
+{
+    SL_ASSERT(is<T>());
+    return static_cast<T*>(this);
 }
 
 } // slope

@@ -221,7 +221,7 @@ std::shared_ptr<Mesh> MeshFactory::from_capsule(float radius, float axis_length)
     return std::make_shared<Mesh>(vertices, indices);
 }
 
-std::shared_ptr<DynamicActor> BodySpawner::spawn_box(const Mat44& tr, const Vec3& velocity, float mass, const Vec3& size)
+DynamicActor* BodySpawner::spawn_box(const Mat44& tr, const Vec3& velocity, float mass, const Vec3& size)
 {
     if (!m_box_material) {
         m_box_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
@@ -242,7 +242,7 @@ std::shared_ptr<DynamicActor> BodySpawner::spawn_box(const Mat44& tr, const Vec3
 
     auto* pc = m_world->create<PhysicsComponent>(e);
 
-    auto actor = std::make_shared<DynamicActor>();
+    auto* actor = m_dynamics_world->create_actor<DynamicActor>();
 
     Vec3 collision_size = {size.x + COLLISION_BLOAT, size.y + COLLISION_BLOAT, size.z + COLLISION_BLOAT};
     actor->set_shape<BoxShape>(collision_size);
@@ -261,7 +261,7 @@ std::shared_ptr<DynamicActor> BodySpawner::spawn_box(const Mat44& tr, const Vec3
     return actor;
 }
 
-std::shared_ptr<DynamicActor> BodySpawner::spawn_sphere(const Mat44& tr, const Vec3& velocity, float mass, float radius)
+DynamicActor* BodySpawner::spawn_sphere(const Mat44& tr, const Vec3& velocity, float mass, float radius)
 {
     if (!m_sphere_material) {
         m_sphere_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
@@ -282,7 +282,7 @@ std::shared_ptr<DynamicActor> BodySpawner::spawn_sphere(const Mat44& tr, const V
 
     float collision_radius = radius + COLLISION_BLOAT;
 
-    auto actor = std::make_shared<DynamicActor>();
+    auto* actor = m_dynamics_world->create_actor<DynamicActor>();
     actor->set_shape<SphereShape>(collision_radius);
     actor->set_transform(tc->transform);
     actor->body().set_velocity(velocity);
@@ -292,11 +292,11 @@ std::shared_ptr<DynamicActor> BodySpawner::spawn_sphere(const Mat44& tr, const V
 
     actor->set_friction(0.5f);
 
-    pc->actor = std::move(actor);
+    pc->actor = actor;
     return actor;
 }
 
-std::shared_ptr<DynamicActor> BodySpawner::spawn_capsule(
+DynamicActor* BodySpawner::spawn_capsule(
     const Mat44& tr, const Vec3& velocity, const Vec3& ang_velocity, float mass, float radius, float height)
 {
     if (!m_capsule_material) {
@@ -318,7 +318,7 @@ std::shared_ptr<DynamicActor> BodySpawner::spawn_capsule(
 
     float collision_radius = radius + COLLISION_BLOAT;
 
-    auto actor = std::make_shared<DynamicActor>();
+    auto* actor = m_dynamics_world->create_actor<DynamicActor>();
     actor->set_shape<CapsuleShape>(collision_radius, height);
     actor->set_transform(tc->transform);
     actor->body().set_velocity(velocity);

@@ -4,6 +4,7 @@
 #include "slope/dynamics/joint.hpp"
 #include "slope/containers/vector.hpp"
 #include "slope/containers/unordered_map.hpp"
+#include "slope/containers/array.hpp"
 #include "slope/collision/contact_manifold.hpp"
 #include "slope/collision/narrowphase/narrowphase.hpp"
 #include "slope/collision/broadphase/broadphase.hpp"
@@ -43,8 +44,7 @@ public:
     };
 
     struct Stats {
-        uint32_t static_actor_count = 0;
-        uint32_t dynamic_actor_count = 0;
+        Array<uint32_t, (int)ActorKind::Count> actor_count = {};
         uint32_t np_test_count = 0;
         uint32_t collision_count = 0;
         uint32_t contact_count = 0;
@@ -82,14 +82,16 @@ public:
 
     explicit DynamicsWorld(std::optional<Config> init_config = std::nullopt);
 
-    // TODO: reconsider actor ownership
-    void                    add_actor(BaseActor* actor);
-    void                    remove_actor(BaseActor* actor);
+    template<class T>
+    T*                      create_actor();
+    // Note: any attached joint will be destroyed along with the actor
+    void                    destroy_actor(BaseActor* actor);
 
-    // TODO: reconsider joint ownership
-    void                    add_joint(Joint* joint);
-    void                    remove_joint(Joint* joint);
+    template<class T>
+    T*                      create_joint(DynamicActor* actor1, DynamicActor* actor2 = nullptr);
+    void                    destroy_joint(BaseJoint* joint);
 
+    // Remove all actors and joints
     void                    clear();
 
     void                    update(float dt);
@@ -123,14 +125,10 @@ private:
         ManifoldPoint* mf_point;
     };
 
-    template <class Actor>
     struct ActorData {
-        Actor* actor = nullptr;
-        Broadphase<BaseActor>::ProxyId proxy_id = 0;
+        std::unique_ptr<BaseActor>      actor;
+        Broadphase<BaseActor>::ProxyId  proxy_id = 0;
     };
-
-    template<class T>
-    void remove_actor_impl(Vector<T>& container, BaseActor* actor);
 
     void apply_gravity();
     void apply_gyroscopic_torque(float dt);
@@ -147,17 +145,15 @@ private:
     void setup_solver(SolverType type, float dt);
     void setup_narrowphase(NpBackendHint hint);
 
+    // TODO: optimize storage
+    Array<Vector<ActorData>, (int)ActorKind::Count> m_actors;
+    Vector<std::unique_ptr<BaseJoint>> m_joints;
+
     std::unique_ptr<ConstraintSolver> m_solver;
 
-    Vector<ActorData<DynamicActor>> m_dynamic_actors;
-    Vector<ActorData<StaticActor>> m_static_actors;
-
-    Vector<Joint*> m_joints;
-
     Broadphase<BaseActor> m_broadphase;
-
-    Vector<PendingContact> m_pending_contacts;
     Narrowphase m_narrowphase;
+    Vector<PendingContact> m_pending_contacts;
 
     NpContactPatch m_contact_patch;
     UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
@@ -171,5 +167,33 @@ private:
 
     std::shared_ptr<DebugDrawer> m_debug_drawer;
 };
+
+template<class T>
+T* DynamicsWorld::create_actor()
+{
+    static_assert(std::is_base_of_v<BaseActor, T>);
+
+    auto actor_ptr = std::make_unique<T>();
+    auto* actor = actor_ptr.get();
+    auto proxy_id = m_broadphase.add_proxy(actor);
+
+    m_actors[(int)actor->kind()].push_back({std::move(actor_ptr), proxy_id});
+
+    return actor;
+}
+
+template<class T>
+T* DynamicsWorld::create_joint(DynamicActor* actor1, DynamicActor* actor2)
+{
+    static_assert(std::is_base_of_v<BaseJoint, T>);
+
+    auto* body1 = &actor1->body();
+    auto* body2 = actor2 ? &actor2->body() : nullptr;
+    auto joint_ptr = std::make_unique<T>(body1, body2);
+    T* joint = joint_ptr.get();
+    m_joints.push_back(std::move(joint_ptr));
+
+    return joint;
+}
 
 } // slope

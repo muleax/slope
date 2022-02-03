@@ -7,9 +7,10 @@
 
 namespace slope {
 
-class Joint {
+class BaseJoint {
 public:
-    explicit Joint(RigidBody* b1, RigidBody* b2 = nullptr) : m_body1(b1), m_body2(b2) {}
+    explicit BaseJoint(RigidBody* b1, RigidBody* b2 = nullptr) : m_body1(b1), m_body2(b2) {}
+    virtual ~BaseJoint() = default;
 
     void            set_warmstarting_ratio(float ratio) { m_warmstarting_ratio = ratio; }
 
@@ -27,9 +28,9 @@ protected:
 };
 
 template <int CACHE_SIZE>
-class CachedJoint : public Joint {
+class CachedJoint : public BaseJoint {
 public:
-    using Joint::Joint;
+    using BaseJoint::BaseJoint;
 
     void cache_lambdas(ConstraintSolver* solver) final;
 

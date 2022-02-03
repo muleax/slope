@@ -7,7 +7,7 @@
 namespace slope {
 
 // Convex Polyhedron
-class PolyhedronShape : public CollisionShapeImpl<ShapeType::Polyhedron> {
+class PolyhedronShape : public TypedCollisionShape<ShapeKind::Polyhedron> {
 public:
     explicit PolyhedronShape(std::shared_ptr<ConvexPolyhedron> geometry);
 

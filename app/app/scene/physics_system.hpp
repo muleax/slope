@@ -20,8 +20,7 @@ struct PhysicsSingleton : public Component<PhysicsSingleton> {
 };
 
 struct PhysicsComponent : public Component<PhysicsComponent> {
-    bool added = false;
-    std::shared_ptr<BaseActor> actor;
+    BaseActor* actor = nullptr;
 };
 
 class PhysicsSystem : public System {

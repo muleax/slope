@@ -101,70 +101,50 @@ void DynamicsWorld::setup_narrowphase(NpBackendHint hint)
     }
 }
 
-void DynamicsWorld::add_actor(BaseActor* actor)
+void DynamicsWorld::destroy_actor(BaseActor* actor)
 {
-    auto proxy_id = m_broadphase.add_proxy(actor);
-
-    if (actor->is<DynamicActor>()) {
-        m_dynamic_actors.push_back({static_cast<DynamicActor*>(actor), proxy_id});
-
-    } else {
-        SL_VERIFY(actor->is<StaticActor>());
-        m_static_actors.push_back({static_cast<StaticActor*>(actor), proxy_id});
-    }
-}
-
-void DynamicsWorld::remove_actor(BaseActor* actor)
-{
-    // TODO: remove associated joints
-    if (actor->is<DynamicActor>()) {
-        remove_actor_impl(m_dynamic_actors, actor);
-
-    } else {
-        SL_VERIFY(actor->is<StaticActor>());
-        remove_actor_impl(m_static_actors, actor);
-    }
-}
-
-void DynamicsWorld::add_joint(Joint* joint)
-{
-    m_joints.push_back(joint);
-}
-
-void DynamicsWorld::remove_joint(Joint* joint)
-{
-    auto it = std::remove(m_joints.begin(), m_joints.end(), joint);
-    m_joints.erase(it, m_joints.end());
-}
-
-void DynamicsWorld::clear()
-{
-    for (auto& actor: m_dynamic_actors)
-        m_broadphase.remove_proxy(actor.proxy_id);
-
-    m_dynamic_actors.clear();
-
-    for (auto& actor: m_static_actors)
-        m_broadphase.remove_proxy(actor.proxy_id);
-
-    m_static_actors.clear();
-
-    m_joints.clear();
-}
-
-template<class T>
-void DynamicsWorld::remove_actor_impl(Vector<T>& container, BaseActor* actor)
-{
-    auto it = std::find_if(container.begin(), container.end(),
-                           [&actor](const auto& data) { return data.actor == actor; });
-    if (it == container.end()) {
-        log::error("Remove actor: actor not found");
+    auto& actors = m_actors[(int)actor->kind()];
+    // TODO: optimize
+    auto it = std::find_if(actors.begin(), actors.end(),
+                           [&actor](auto& data) { return data.actor.get() == actor; });
+    if (it == actors.end()) {
+        log::error("Destroy actor: actor not found");
         return;
     }
 
     m_broadphase.remove_proxy(it->proxy_id);
 
-    container.erase(it);
+    if (actor->is<DynamicActor>()) {
+        auto* body = &actor->cast<DynamicActor>()->body();
+        // remove attached joints
+        // TODO: optimize
+        auto joint_it = std::remove_if(m_joints.begin(), m_joints.end(),
+                                 [body](auto& j) { return j->body1() == body || j->body2() == body; });
+        m_joints.erase(joint_it, m_joints.end());
+    }
+
+    std::swap(*it, actors.back());
+    actors.pop_back();
+}
+
+void DynamicsWorld::destroy_joint(BaseJoint* joint)
+{
+    // TODO: optimize
+    auto it = std::remove_if(m_joints.begin(), m_joints.end(),
+                             [joint](auto& j) { return j.get() == joint; });
+    m_joints.erase(it, m_joints.end());
+}
+
+void DynamicsWorld::clear()
+{
+    for (auto& actors : m_actors) {
+        for (auto& data: actors) {
+            m_broadphase.remove_proxy(data.proxy_id);
+        }
+        actors.clear();
+    }
+
+    m_joints.clear();
 }
 
 void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer)
@@ -174,15 +154,17 @@ void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer)
 
 void DynamicsWorld::apply_gravity()
 {
-    for (auto& data: m_dynamic_actors) {
-        data.actor->body().apply_force_to_com(m_config.gravity * data.actor->body().mass());
+    for (auto& data : m_actors[(int)ActorKind::Dynamic]) {
+        auto* actor = data.actor->cast<DynamicActor>();
+        actor->body().apply_force_to_com(m_config.gravity * actor->body().mass());
     }
 }
 
 void DynamicsWorld::apply_gyroscopic_torque(float dt)
 {
-    for (auto& data: m_dynamic_actors) {
-        data.actor->body().apply_gyroscopic_torque(dt);
+    for (auto& data : m_actors[(int)ActorKind::Dynamic]) {
+        auto* actor = data.actor->cast<DynamicActor>();
+        actor->body().apply_gyroscopic_torque(dt);
     }
 }
 
@@ -232,11 +214,9 @@ void DynamicsWorld::perform_collision_detection()
     m_narrowphase.epa_solver().reset_stats();
     m_narrowphase.sat_solver().reset_stats();
 
-    for (auto& data: m_dynamic_actors)
-        m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
-
-    for (auto& data: m_static_actors)
-        m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
+    for (auto& actors : m_actors)
+        for (auto& data : actors)
+            m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
 
     m_broadphase.find_overlapping_pairs([this](BaseActor* actor1, BaseActor* actor2) {
         collide(actor1, actor2);
@@ -330,7 +310,7 @@ void DynamicsWorld::apply_contacts()
 
 void DynamicsWorld::apply_joints()
 {
-    for (auto* joint : m_joints) {
+    for (auto& joint : m_joints) {
         joint->set_warmstarting_ratio(m_config.warmstarting_joint);
         joint->apply_constraints(m_solver.get());
     }
@@ -344,7 +324,7 @@ void DynamicsWorld::cache_lambdas()
         p->friction2_lambda = m_solver->get_lambda(p->friction2_constr_id);
     }
 
-    for (auto* joint : m_joints) {
+    for (auto& joint : m_joints) {
         joint->cache_lambdas(m_solver.get());
     }
 }
@@ -353,8 +333,9 @@ void DynamicsWorld::integrate_bodies()
 {
     float dt = m_solver->time_interval();
 
-    for (auto& data: m_dynamic_actors) {
-        auto& body = data.actor->body();
+    for (auto& data : m_actors[(int)ActorKind::Dynamic]) {
+        auto* actor = data.actor->cast<DynamicActor>();
+        auto& body = actor->body();
         body.integrate(dt);
         data.actor->shape().set_transform(body.transform());
     }
@@ -377,8 +358,9 @@ void DynamicsWorld::update_constraint_stats()
 
 void DynamicsWorld::update_general_stats()
 {
-    m_stats.static_actor_count = m_static_actors.size();
-    m_stats.dynamic_actor_count = m_dynamic_actors.size();
+    for (int kind = 0; kind < (int)ActorKind::Count; kind++)
+        m_stats.actor_count[kind] = m_actors[kind].size();
+
     m_stats.simulation_time += m_solver->time_interval();
 }
 

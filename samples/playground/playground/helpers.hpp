@@ -31,14 +31,16 @@ private:
 
 class BodySpawner {
 public:
-    explicit BodySpawner(World* world) : m_world(world) {}
+    explicit BodySpawner(World* world)
+    : m_world(world)
+    , m_dynamics_world(&m_world->modify_singleton<PhysicsSingleton>()->dynamics_world) {}
 
-    std::shared_ptr<DynamicActor>   spawn_box(const Mat44& tr, const Vec3& velocity, float mass, const Vec3& size);
-    std::shared_ptr<DynamicActor>   spawn_sphere(const Mat44& tr, const Vec3& velocity, float mass, float radius);
-    std::shared_ptr<DynamicActor>   spawn_capsule(const Mat44& tr, const Vec3& velocity, const Vec3& ang_velocity, float mass, float radius, float height);
+    DynamicActor*   spawn_box(const Mat44& tr, const Vec3& velocity, float mass, const Vec3& size);
+    DynamicActor*   spawn_sphere(const Mat44& tr, const Vec3& velocity, float mass, float radius);
+    DynamicActor*   spawn_capsule(const Mat44& tr, const Vec3& velocity, const Vec3& ang_velocity, float mass, float radius, float height);
 
     World*          world() { return m_world; }
-    const World*    world() const { return m_world; }
+    DynamicsWorld*  dynamics_world() { return m_dynamics_world; }
 
 private:
     template<class T>
@@ -63,6 +65,7 @@ private:
     ConvexPolyhedronFactory m_poly_factory;
 
     World* m_world = nullptr;
+    DynamicsWorld* m_dynamics_world = nullptr;
 };
 
 template<class T, class F>

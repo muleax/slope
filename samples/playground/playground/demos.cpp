@@ -19,7 +19,7 @@ void Demo::create_floor()
     tc->transform = Mat44::translate({0.f, -1.f, 0.f});
 
     auto* pc = w()->create<PhysicsComponent>(e);
-    pc->actor = std::make_shared<StaticActor>();
+    pc->actor = dynamics_world()->create_actor<StaticActor>();
     pc->actor->set_shape<BoxShape>(Vec3{floor_size, 1.f, floor_size});
     pc->actor->set_friction(0.5f);
     pc->actor->set_transform(tc->transform);
@@ -41,7 +41,7 @@ void TriangleStackDemo::init()
 {
     create_floor();
 
-    auto& config = physics_config();
+    auto& config = dynamics_world()->config();
     config.randomize_order = true;
     config.enable_velocity_dependent_friction = true;
     config.solver_config.use_simd = true;
@@ -67,7 +67,7 @@ void StressTestDemo::init()
 {
     create_floor();
 
-    auto& config = physics_config();
+    auto& config = dynamics_world()->config();
     //physics_single->dynamics_world.config().enable_constraint_resolving = false;
     //physics_single->dynamics_world.config().enable_integration = true;
     config.randomize_order = true;
@@ -92,7 +92,7 @@ void StressTestDemo::init()
 
 void CollisionDemo::init()
 {
-    auto& config = physics_config();
+    auto& config = dynamics_world()->config();
     config.gravity.set_zero();
     config.enable_constraint_resolving = false;
     config.delay_integration = true;
@@ -113,11 +113,10 @@ void CollisionDemo::init()
     tc->transform = Mat44::translate({0.f, 5.f, 0.f});
 
     auto* pc = w()->create<PhysicsComponent>(e);
-    auto actor = std::make_shared<DynamicActor>();
+    pc->actor = dynamics_world()->create_actor<DynamicActor>();
     //actor->set_shape<ConvexPolyhedronShape>(box);
-    actor->set_shape<BoxShape>(Vec3{1.f, 1.f, 1.f});
-    actor->set_transform(tc->transform);
-    pc->actor = std::move(actor);
+    pc->actor->set_shape<BoxShape>(Vec3{1.f, 1.f, 1.f});
+    pc->actor->set_transform(tc->transform);
 
     auto box2 = poly_factory.box(Vec3{1.f, 1.f, 1.f}, Vec3{0.f, 0.f, 0.f});
 
@@ -130,15 +129,11 @@ void CollisionDemo::init()
     float offs = 0.f;
     stc->transform = Mat44::translate({0.98f - offs, 5.f - offs, 0.f - offs});
 
+    m_control_actor = dynamics_world()->create_actor<DynamicActor>();
+    m_control_actor->set_shape<SphereShape>(1.f);
+    m_control_actor->set_transform(stc->transform);
     auto* pc2 = w()->create<PhysicsComponent>(se);
-    auto control_actor = std::make_shared<DynamicActor>();
-
-    control_actor->set_shape<SphereShape>(1.f);
-
-    control_actor->set_transform(stc->transform);
-
-    m_control_actor = control_actor.get();
-    pc2->actor = std::move(control_actor);
+    pc2->actor = m_control_actor;
 }
 
 void CollisionDemo::update(float dt)
@@ -168,7 +163,7 @@ void CollisionDemo::update(float dt)
 
 void TennisRacketDemo::init()
 {
-    auto& config = physics_config();
+    auto& config = dynamics_world()->config();
     config.gravity.set_zero();
 
     auto actor = m_spawner->spawn_box(Mat44::translate({0.f, 5.f, 0.f}), {}, 1.f, Vec3{2.f, 4.f, 0.4f});
@@ -184,36 +179,25 @@ void SphericalJointDemo::init()
 
     create_floor();
 
-    auto& config = physics_config();
+    auto& config = dynamics_world()->config();
     config.solver_config.iteration_count = 30;
-
-    m_joints.resize(CHAIN_LENGTH);
-
-    auto& dyn_world = w()->modify_singleton<PhysicsSingleton>()->dynamics_world;
 
     float y = 14.f;
     float x = 0.f;
 
     float offset = 0.9f;
 
-    RigidBody* prev_body = nullptr;
+    DynamicActor* prev_box = nullptr;
     for (int i = 0; i < CHAIN_LENGTH; i++) {
-        auto new_box = m_spawner->spawn_box(Mat44::translate({x, y, 0.f}), {}, 1.f, Vec3{1.2f, 0.5f, 0.5f});
+        auto* new_box = m_spawner->spawn_box(Mat44::translate({x, y, 0.f}), {}, 1.f, Vec3{1.2f, 0.5f, 0.5f});
 
-        auto& joint = m_joints[i];
-        joint.emplace(&new_box->body(), prev_body);
+        auto* joint = dynamics_world()->create_joint<SphericalJoint>(new_box, prev_box);
+
         joint->set_damping(0.5f);
         joint->set_anchor1({ offset, 0.f, 0.f });
-        joint->set_anchor2(prev_body ? Vec3{-offset, 0.f, 0.f} : Vec3{x + offset, y, 0.f});
-        dyn_world.add_joint(&*joint);
-
-        prev_body = &new_box->body();
+        joint->set_anchor2(prev_box ? Vec3{-offset, 0.f, 0.f} : Vec3{x + offset, y, 0.f});
 
         x -= 2.f * offset;
+        prev_box = new_box;
     }
-}
-
-void SphericalJointDemo::fini()
-{
-    m_joints.clear();
 }

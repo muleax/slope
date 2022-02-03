@@ -10,15 +10,6 @@ REGISTER_COMPONENT(PhysicsSingleton);
 void PhysicsSystem::step_simulation(PhysicsSingleton* ps) {
     auto& actors = view<PhysicsComponent, TransformComponent>();
 
-    // TODO: init views
-    for (auto e: actors) {
-        auto* pc = w().modify<PhysicsComponent>(e);
-        if (!pc->added) {
-            ps->dynamics_world.add_actor(pc->actor.get());
-            pc->added = true;
-        }
-    }
-
     auto t1 = get_time();
 
     ps->dynamics_world.update(ps->time_step);
