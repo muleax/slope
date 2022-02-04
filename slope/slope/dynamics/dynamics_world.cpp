@@ -43,10 +43,10 @@ DynamicsWorld::DynamicsWorld(std::optional<Config> init_config)
         m_config = *init_config;
 
     setup_narrowphase(m_config.np_backend_hint);
-    setup_solver(m_config.solver_type, 1.f);
+    setup_solver(m_config.solver_type);
 }
 
-void DynamicsWorld::setup_solver(SolverType type, float dt)
+void DynamicsWorld::setup_solver(SolverType type)
 {
     if (m_solver_type != type) {
         m_solver_type = type;
@@ -62,7 +62,7 @@ void DynamicsWorld::setup_solver(SolverType type, float dt)
     }
 
     m_solver->config() = m_config.solver_config;
-    m_solver->set_time_interval(dt);
+    m_solver->set_time_interval(m_config.time_interval);
 }
 
 void DynamicsWorld::setup_narrowphase(NpBackendHint hint)
@@ -155,25 +155,14 @@ void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer)
     m_debug_drawer = std::move(drawer);
 }
 
-void DynamicsWorld::apply_external_forces(float dt)
+void DynamicsWorld::apply_external_forces()
 {
-    //size_t chunk_beg = 0;
-
-    //for (int worker_id = 0; worker_id < m_concurrency; worker_id++) {
-    //size_t chunk_end = dyn_actors.size();
-    //    if (worker_id < m_concurrency - 1)
-    //        chunk_end = ((worker_id + 1) * dyn_actors.size()) / m_concurrency;
-
-    taskflow.emplace([this, dt]() {
-        for (auto& data: m_actors[(int) ActorKind::Dynamic]) {
-            //for (size_t i = chunk_beg; i < chunk_end; i++) {
-            auto* actor = data.actor->cast<DynamicActor>();
-            actor->body().apply_force_to_com(m_config.gravity * actor->body().mass());
-            actor->body().apply_gyroscopic_torque(dt);
-        }
-    }).precede(m_cd_fence);
-
-    // chunk_beg = chunk_end;
+    float dt = m_config.time_interval;
+    for (auto& data: m_actors[(int) ActorKind::Dynamic]) {
+        auto* actor = data.actor->cast<DynamicActor>();
+        actor->body().apply_force_to_com(m_config.gravity * actor->body().mass());
+        actor->body().apply_gyroscopic_torque(dt);
+    }
 }
 
 void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2, WorkerContext& ctx)
@@ -267,25 +256,25 @@ void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2, WorkerContext&
     }
 }
 
-void DynamicsWorld::perform_collision_detection()
+void DynamicsWorld::setup_collision_detection(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence)
 {
-    m_stats.np_test_count = 0;
-    m_stats.collision_count = 0;
+    TaskId prepare_task = executor.emplace([this](){
+        for (auto& actors : m_actors)
+            for (auto& data : actors)
+                m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
+    });
 
-    for (auto& ctx : m_worker_ctx) {
-        ctx.narrowphase.gjk_solver().reset_stats();
-        ctx.narrowphase.epa_solver().reset_stats();
-        ctx.narrowphase.sat_solver().reset_stats();
-    }
+    executor.set_order(pre_fence, prepare_task);
 
-    for (auto& actors : m_actors)
-        for (auto& data : actors)
-            m_broadphase.update_proxy(data.proxy_id, data.actor->shape().aabb());
+    int cd_concurrency = (executor.concurrency() > 1)
+        ? executor.concurrency() * 2
+        : 1;
 
-    m_broadphase.traverse_overlapping_pairs(
-        [this](BaseActor* actor1, BaseActor* actor2, int worker_id) {
-            this->collide(actor1, actor2, m_worker_ctx[worker_id]);
-        }, taskflow, m_cd_fence);
+    auto overlap_callback = [this](BaseActor* actor1, BaseActor* actor2, int task_index) {
+        this->collide(actor1, actor2, m_worker_ctx[task_index]);
+    };
+
+    m_broadphase.setup_executor(overlap_callback, executor, cd_concurrency, prepare_task, post_fence);
 }
 
 void DynamicsWorld::apply_contacts()
@@ -440,6 +429,18 @@ void DynamicsWorld::refresh_manifolds()
     }
 }
 
+void DynamicsWorld::reset_frame_stats()
+{
+    m_stats.np_test_count = 0;
+    m_stats.collision_count = 0;
+
+    for (auto& ctx : m_worker_ctx) {
+        ctx.narrowphase.gjk_solver().reset_stats();
+        ctx.narrowphase.epa_solver().reset_stats();
+        ctx.narrowphase.sat_solver().reset_stats();
+    }
+}
+
 void DynamicsWorld::update_constraint_stats()
 {
 }
@@ -452,56 +453,54 @@ void DynamicsWorld::update_general_stats()
     m_stats.simulation_time += m_solver->time_interval();
 }
 
-void DynamicsWorld::update(float dt)
+void DynamicsWorld::setup_executor(TaskExecutor& executor)
 {
-    //taskflow.emplace([this, dt]() {
-
+    TaskId prepare_task = executor.emplace([this]() {
         if (m_debug_drawer)
             m_debug_drawer->clear();
 
         if (m_config.enable_integration && m_config.delay_integration)
             integrate_bodies();
 
-        m_broadphase.set_concurrency(m_concurrency * 2);
         setup_narrowphase(m_config.np_backend_hint);
-        setup_solver(m_config.solver_type, dt);
+        setup_solver(m_config.solver_type);
 
-        m_cd_fence = taskflow.emplace([this](){
-            if (m_config.enable_constraint_resolving) {
-                apply_contacts();
-                apply_joints();
+        reset_frame_stats();
+    });
 
-                m_solver->solve();
-                cache_lambdas();
-                update_constraint_stats();
-            }
+    TaskId external_forces_task = executor.emplace([this]() {
+        apply_external_forces();
+    });
 
-            m_solver->clear();
+    TaskId resolve_task = executor.emplace([this]() {
+        if (m_config.enable_constraint_resolving) {
+            apply_contacts();
+            apply_joints();
 
-            for (auto& ctx : m_worker_ctx)
-                ctx.pending_contacts.clear();
+            m_solver->solve();
+            cache_lambdas();
+            update_constraint_stats();
+        }
 
-            refresh_manifolds();
+        m_solver->clear();
 
-            if (m_config.enable_integration && !m_config.delay_integration)
-                integrate_bodies();
-        });
+        for (auto& ctx: m_worker_ctx)
+            ctx.pending_contacts.clear();
 
-        apply_external_forces(dt);
-        perform_collision_detection();
+        refresh_manifolds();
 
-        executor.run(taskflow).wait();
-        taskflow.clear();
+        if (m_config.enable_integration && !m_config.delay_integration)
+            integrate_bodies();
 
         update_general_stats();
 
         m_frame_id++;
-    //});
+    });
 
-    //executor.run(taskflow).wait();
+    executor.set_order(prepare_task, external_forces_task);
+    executor.set_order(external_forces_task, resolve_task);
 
-    //taskflow.clear();
-
+    setup_collision_detection(executor, prepare_task, resolve_task);
 }
 
 } // slope

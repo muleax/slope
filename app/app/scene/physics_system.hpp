@@ -3,6 +3,7 @@
 #include "app/ecs/system.hpp"
 #include "slope/dynamics/actor.hpp"
 #include "slope/dynamics/dynamics_world.hpp"
+#include "slope/thread/parallel_executor.hpp"
 #include <memory>
 
 namespace slope::app {
@@ -14,6 +15,8 @@ struct PhysicsSingleton : public Component<PhysicsSingleton> {
     bool real_time_sync = true;
     float time_step = 1.f / 60.f;
     float time_factor = 1.f;
+
+    int concurrency = 4;
 
     // Stats
     MovingAverage<double> cpu_time;
@@ -31,6 +34,7 @@ public:
 private:
     void step_simulation(PhysicsSingleton* ps);
 
+    std::unique_ptr<ParallelExecutor> m_executor;
     float m_accum_time = 0.f;
 };
 

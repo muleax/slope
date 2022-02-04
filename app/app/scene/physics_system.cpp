@@ -8,11 +8,20 @@ REGISTER_COMPONENT(PhysicsComponent);
 REGISTER_COMPONENT(PhysicsSingleton);
 
 void PhysicsSystem::step_simulation(PhysicsSingleton* ps) {
+    if (!m_executor || m_executor->concurrency() != ps->concurrency) {
+        m_executor = std::make_unique<ParallelExecutor>(ps->concurrency);
+        ps->dynamics_world.setup_executor(*m_executor);
+    }
+
     auto& actors = view<PhysicsComponent, TransformComponent>();
 
     auto t1 = get_time();
 
-    ps->dynamics_world.update(ps->time_step);
+    ps->dynamics_world.config().time_interval = ps->time_step;
+
+    m_executor->run().wait();
+    //m_executor->clear();
+    //ps->dynamics_world.update(ps->time_step);
 
     ps->cpu_time.update(get_time() - t1);
 

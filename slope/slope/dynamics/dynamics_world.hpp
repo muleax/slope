@@ -9,9 +9,8 @@
 #include "slope/collision/narrowphase/narrowphase.hpp"
 #include "slope/collision/broadphase/broadphase.hpp"
 #include "slope/debug/debug_drawer.hpp"
+#include "slope/thread/task_executor.hpp"
 #include <memory>
-
-#include "taskflow/taskflow.hpp"
 
 namespace slope {
 using ManifoldCacheKey = std::pair<const void*, const void*>;
@@ -57,6 +56,8 @@ public:
     };
 
     struct Config {
+        float time_interval = 0.02f;
+
         bool enable_gravity = true;
         bool enable_constraint_resolving = true;
         bool enable_integration = true;
@@ -96,7 +97,7 @@ public:
     // Remove all actors and joints
     void                    clear();
 
-    void                    update(float dt);
+    void                    setup_executor(TaskExecutor& executor);
 
     void                    set_debug_drawer(std::shared_ptr<DebugDrawer> drawer);
     DebugDrawer*            debug_drawer() { return m_debug_drawer.get(); }
@@ -145,8 +146,9 @@ private:
         UnorderedMap<ManifoldCacheKey, ManifoldCache> new_manifolds;
     };
 
-    void apply_external_forces(float dt);
-    void perform_collision_detection();
+    void setup_collision_detection(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence);
+
+    void apply_external_forces();
     void collide(BaseActor* actor1, BaseActor* actor2, WorkerContext& ctx);
     void apply_contacts();
     void apply_joints();
@@ -156,8 +158,9 @@ private:
     void integrate_bodies();
     void refresh_manifolds();
 
-    void setup_solver(SolverType type, float dt);
+    void setup_solver(SolverType type);
     void setup_narrowphase(NpBackendHint hint);
+    void reset_frame_stats();
 
     // TODO: optimize storage
     Array<Vector<ActorData>, (int)ActorKind::Count> m_actors;
@@ -179,12 +182,6 @@ private:
     uint32_t m_frame_id = 0;
 
     std::shared_ptr<DebugDrawer> m_debug_drawer;
-
-    int m_concurrency = 4;
-    tf::Executor executor{4};
-    tf::Taskflow taskflow;
-
-    tf::Task m_cd_fence;
 };
 
 template<class T>
