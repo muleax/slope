@@ -133,7 +133,7 @@ void Broadphase<T>::traverse_overlapping_pairs(Callback&& callback, tf::Taskflow
         if (worker_id < m_concurrency - 1)
             chunk_end = ((worker_id + 1) * m_order.size()) / m_concurrency;
 
-        flow.template emplace([chunk_beg, chunk_end, axis, worker_id, callback, this]() {
+        flow.emplace([chunk_beg, chunk_end, axis, worker_id, callback, this]() {
             for (size_t i = chunk_beg; i < chunk_end; i++) {
                 auto& p1 = m_order[i];
                 for (size_t j = i + 1; j < m_order.size(); j++) {
