@@ -29,7 +29,7 @@ void StackDemo::init()
 {
     create_floor();
 
-    float skew = 0.1f;
+    float skew = 0.f;
     for (int j = 0; j < m_height; j++) {
         mat44 tr = mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
         tr.set_translation({skew * j, 0.5f + j * 2.02f, skew * j});
@@ -69,20 +69,25 @@ void StressTestDemo::init()
 
     auto& config = dynamics_world()->config();
     //physics_single->dynamics_world.config().enable_constraint_resolving = false;
-    //physics_single->dynamics_world.config().enable_integration = true;
+    //physics_single->dynamics_world.config().enable_integration = false;
+
+    //config.enable_integration = false;
+    //config.enable_constraint_resolving = false;
+    //config.enable_gravity = false;
+
     config.randomize_order = true;
     config.enable_velocity_dependent_friction = true;
     config.solver_config.iteration_count = 5;
     config.solver_config.use_simd = true;
 
 
-    float spacing = 1.5f;
+    float spacing = 1.2f;
     for (int i = 0; i < m_width; i++) {
         for (int j = 0; j < m_height; j++) {
             for (int k = 0; k < m_width; k++) {
                 mat44 tr = mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
                 tr.set_translation(
-                    {(float) i * spacing + j * 0.2f, (float) j * spacing + 0.5f, (float) k * spacing + j * 0.2f});
+                    {(float) i * spacing + j * 0.2f, (float) j * spacing + 0.2f, (float) k * spacing + j * 0.2f});
 
                 m_spawner->spawn_box(tr, {}, 1.f, vec3{1.f});
             }

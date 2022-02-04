@@ -6,6 +6,7 @@
 #include "slope/collision/face_clipper.hpp"
 #include "slope/containers/vector.hpp"
 #include "slope/collision/primitives.hpp"
+#include "slope/debug/log.hpp"
 
 namespace slope {
 

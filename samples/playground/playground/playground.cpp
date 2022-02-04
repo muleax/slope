@@ -63,7 +63,7 @@ public:
         // create demos
         register_demos<TriangleStackDemo, StackDemo, StressTestDemo, CollisionDemo, TennisRacketDemo, SphericalJointDemo>();
 
-        m_current_demo = m_demos[0].get();
+        m_current_demo = m_demos[2].get();
         reset_demo();
     }
 

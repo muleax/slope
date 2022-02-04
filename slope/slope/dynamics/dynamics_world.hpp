@@ -11,6 +11,8 @@
 #include "slope/debug/debug_drawer.hpp"
 #include <memory>
 
+#include "taskflow/taskflow.hpp"
+
 namespace slope {
 using ManifoldCacheKey = std::pair<const void*, const void*>;
 }
@@ -106,8 +108,8 @@ public:
 
     uint32_t                frame_id() const { return m_frame_id; }
 
-    Narrowphase&            narrowphase() { return m_narrowphase; }
-    const Narrowphase&      narrowphase() const { return m_narrowphase; }
+    Narrowphase&            narrowphase() { return m_worker_ctx[0].narrowphase; }
+    const Narrowphase&      narrowphase() const { return m_worker_ctx[0].narrowphase; }
 
     ConstraintSolver&       solver() { return *m_solver; }
     const ConstraintSolver& solver() const { return *m_solver; }
@@ -123,6 +125,12 @@ private:
     struct PendingContact {
         const ManifoldCache* mf_cache;
         ManifoldPoint* mf_point;
+        float friction_ratio;
+
+        //Constraint nc;
+        //Constraint fc1;
+        //Constraint fc2;
+        //float friction_ratio = 0.f;
     };
 
     struct ActorData {
@@ -130,10 +138,16 @@ private:
         Broadphase<BaseActor>::ProxyId  proxy_id = 0;
     };
 
-    void apply_gravity();
-    void apply_gyroscopic_torque(float dt);
+    struct WorkerContext {
+        Vector<PendingContact>  pending_contacts;
+        Narrowphase             narrowphase;
+        NpContactPatch          contact_patch;
+        UnorderedMap<ManifoldCacheKey, ManifoldCache> new_manifolds;
+    };
+
+    void apply_external_forces(float dt);
     void perform_collision_detection();
-    void collide(BaseActor* actor1, BaseActor* actor2);
+    void collide(BaseActor* actor1, BaseActor* actor2, WorkerContext& ctx);
     void apply_contacts();
     void apply_joints();
     void update_constraint_stats();
@@ -152,10 +166,9 @@ private:
     std::unique_ptr<ConstraintSolver> m_solver;
 
     Broadphase<BaseActor> m_broadphase;
-    Narrowphase m_narrowphase;
-    Vector<PendingContact> m_pending_contacts;
 
-    NpContactPatch m_contact_patch;
+    Array<WorkerContext, 16> m_worker_ctx;
+
     UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
 
     std::optional<NpBackendHint> m_np_backend_hint;
@@ -166,6 +179,12 @@ private:
     uint32_t m_frame_id = 0;
 
     std::shared_ptr<DebugDrawer> m_debug_drawer;
+
+    int m_concurrency = 4;
+    tf::Executor executor{4};
+    tf::Taskflow taskflow;
+
+    tf::Task m_cd_fence;
 };
 
 template<class T>

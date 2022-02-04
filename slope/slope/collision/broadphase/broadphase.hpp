@@ -1,7 +1,10 @@
 #pragma once
 #include "slope/collision/aabb.hpp"
 #include "slope/containers/vector.hpp"
+#include "slope/debug/log.hpp"
 #include <algorithm>
+
+#include "taskflow/taskflow.hpp"
 
 namespace slope {
 
@@ -14,9 +17,12 @@ public:
     void    remove_proxy(ProxyId proxy_id);
     void    update_proxy(ProxyId proxy_id, const AABB& aabb);
 
+    void    set_concurrency(int concurrency) { m_concurrency = concurrency; }
+    int     concurrency() const { return m_concurrency; }
+
     // Sweep and prune
     template<class Callback>
-    void    find_overlapping_pairs(Callback&& callback);
+    void    traverse_overlapping_pairs(Callback&& callback, tf::Taskflow& flow, const tf::Task& fence);
 
 private:
     struct Proxy {
@@ -32,8 +38,8 @@ private:
 
     Vector<Proxy> m_proxies;
     Vector<ProxyId> m_free_ids;
-
     Vector<Data> m_order;
+    int m_concurrency = 8;
 };
 
 template <class T>
@@ -70,7 +76,7 @@ void Broadphase<T>::update_proxy(typename Broadphase<T>::ProxyId proxy_id, const
 
 template <class T>
 template <class Callback>
-void Broadphase<T>::find_overlapping_pairs(Callback&& callback)
+void Broadphase<T>::traverse_overlapping_pairs(Callback&& callback, tf::Taskflow& flow, const tf::Task& fence)
 {
     float mean0 = 0.f;
     float mean1 = 0.f;
@@ -120,17 +126,29 @@ void Broadphase<T>::find_overlapping_pairs(Callback&& callback)
         return a.aabb.min[axis] < b.aabb.min[axis];
     });
 
-    for (int i = 0; i < m_order.size(); i++) {
-        auto& p1 = m_order[i];
-        for (int j = i + 1; j < m_order.size(); j++) {
-            auto& p2 = m_order[j];
-            if (p1.aabb.max[axis] >= p2.aabb.min[axis]) {
-                if (p1.aabb.intersects(p2.aabb))
-                    callback(p1.data, p2.data);
-            } else {
-                break;
+    size_t chunk_beg = 0;
+
+    for (int worker_id = 0; worker_id < m_concurrency; worker_id++) {
+        size_t chunk_end = m_order.size();
+        if (worker_id < m_concurrency - 1)
+            chunk_end = ((worker_id + 1) * m_order.size()) / m_concurrency;
+
+        flow.template emplace([chunk_beg, chunk_end, axis, worker_id, callback, this]() {
+            for (size_t i = chunk_beg; i < chunk_end; i++) {
+                auto& p1 = m_order[i];
+                for (size_t j = i + 1; j < m_order.size(); j++) {
+                    auto& p2 = m_order[j];
+                    if (p1.aabb.max[axis] >= p2.aabb.min[axis]) {
+                        if (p1.aabb.intersects(p2.aabb))
+                            callback(p1.data, p2.data, worker_id);
+                    } else {
+                        break;
+                    }
+                }
             }
-        }
+        }).precede(fence);
+
+        chunk_beg = chunk_end;
     }
 }
 
