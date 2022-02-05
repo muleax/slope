@@ -126,12 +126,13 @@ private:
     struct PendingContact {
         const ManifoldCache* mf_cache;
         ManifoldPoint* mf_point;
-        float friction_ratio;
+        float friction_ratio = 0.f;
+        //vec3 friction_u;
+        //vec3 friction_v;
 
-        //Constraint nc;
-        //Constraint fc1;
-        //Constraint fc2;
-        //float friction_ratio = 0.f;
+        Constraint nc;
+        Constraint fc1;
+        Constraint fc2;
     };
 
     struct ActorData {
@@ -146,10 +147,11 @@ private:
         UnorderedMap<ManifoldCacheKey, ManifoldCache> new_manifolds;
     };
 
-    void setup_collision_detection(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence);
+    void setup_collision_detection(TaskExecutor& executor, Fence fence);
 
     void apply_external_forces();
     void collide(BaseActor* actor1, BaseActor* actor2, WorkerContext& ctx);
+    void apply_friction();
     void apply_contacts();
     void apply_joints();
     void update_constraint_stats();

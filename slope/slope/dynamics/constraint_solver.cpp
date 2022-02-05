@@ -550,7 +550,14 @@ Constraint Constraint::generic(
     return c;
 }
 
-void ConstraintSolver::register_body(RigidBody* body) {
+ConstraintSolver::ConstraintSolver()
+{
+    //for (auto& group : m_groups)
+    //    group = std::make_unique<GroupData>();
+}
+
+void ConstraintSolver::register_body(RigidBody* body)
+{
     body->set_in_solver_index(static_cast<int>(m_bodies.size()));
     m_bodies.emplace_back();
     m_bodies_extra.emplace_back().body = body;
@@ -558,8 +565,9 @@ void ConstraintSolver::register_body(RigidBody* body) {
 
 std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(const Constraint& c, ConstraintGroup group)
 {
-    if (c.body1->in_solver_index() == -1)
-        register_body(c.body1);
+    SL_ASSERT(c.body1->in_solver_index() != -1);
+    //if (c.body1->in_solver_index() == -1)
+    //    register_body(c.body1);
 
     auto& group_data = m_groups[(int)group];
 
@@ -570,8 +578,9 @@ std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::cre
     data.jacobian12 = c.jacobian1[1];
 
     if (c.body2) {
-        if (c.body2->in_solver_index() == -1)
-            register_body(c.body2);
+        SL_ASSERT(c.body2->in_solver_index() != -1);
+        //if (c.body2->in_solver_index() == -1)
+        //    register_body(c.body2);
 
         data.body2_idx = c.body2->in_solver_index();
         data.jacobian21 = c.jacobian2[0];
@@ -657,7 +666,8 @@ ConstraintIds ConstraintSolver::join_friction_cone(const Constraint& c1, const C
     return { constr1_id, constr2_id };
 }
 
-void ConstraintSolver::clear() {
+void ConstraintSolver::clear()
+{
     for (auto& data : m_bodies_extra)
         data.body->set_in_solver_index(-1);
 
@@ -670,62 +680,101 @@ void ConstraintSolver::clear() {
     }
 }
 
-void ConstraintSolver::prepare_data() {
+void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
+{
     static constexpr float INV_DIAG_EPSILON = 1e-8f;
 
-    // V_delta = V / dt + M_inv * F
+    int concurrency = executor.concurrency();
+    //int concurrency = 1;
+    m_task_ctx.resize(executor.concurrency());
 
-    auto b_extra = m_bodies_extra.begin();
-    for (auto b = m_bodies.begin(); b != m_bodies.end(); ++b, ++b_extra) {
-        auto* body = b_extra->body;
-        b_extra->v_delta1 = body->velocity() * m_inv_dt + body->force() * body->inv_mass();
-        b_extra->v_delta2 = body->ang_velocity() * m_inv_dt + body->inv_inertia().apply_normal(body->torque());
+    auto init_body_data_task = executor.emplace([this]() {
+        // V_delta = V / dt + M_inv * F
 
-        b->inv_m_f1.set_zero();
-        b->inv_m_f2.set_zero();
-    }
+        auto b_extra = m_bodies_extra.begin();
+        for (auto b = m_bodies.begin(); b != m_bodies.end(); ++b, ++b_extra) {
+            auto* body = b_extra->body;
+            b_extra->v_delta1 = body->velocity() * m_inv_dt + body->force() * body->inv_mass();
+            b_extra->v_delta2 = body->ang_velocity() * m_inv_dt + body->inv_inertia().apply_normal(body->torque());
 
-    // J * M_inv * J_t * lambda = pos_error / dt^2 - J * V_delta
-    // inv_diag = 1 / (cfm / dt + J * M_inv * J_t)
-    // M_inv * force = M_inv * J_t * lambda
-    for (auto& group : m_groups) {
-
-        auto* lambda = group.lambda.data();
-        for (auto c = group.constraints.begin(); c != group.constraints.end(); ++c, ++lambda) {
-            auto& b1 = m_bodies[c->body1_idx];
-            auto& b1_extra = m_bodies_extra[c->body1_idx];
-
-            float j_v_delta = c->jacobian11.dot(b1_extra.v_delta1) + c->jacobian12.dot(b1_extra.v_delta2);
-
-            c->inv_m_j11 = c->jacobian11 * b1_extra.body->inv_mass();
-            c->inv_m_j12 = b1_extra.body->inv_inertia().apply_normal(c->jacobian12);
-
-            b1.inv_m_f1 += c->inv_m_j11 * *lambda;
-            b1.inv_m_f2 += c->inv_m_j12 * *lambda;
-
-            float j_inv_m_j = c->jacobian11.dot(c->inv_m_j11) + c->jacobian12.dot(c->inv_m_j12);
-
-            if (c->body2_idx >= 0) {
-                auto& b2 = m_bodies[c->body2_idx];
-                auto& b2_extra = m_bodies_extra[c->body2_idx];
-
-                j_v_delta += c->jacobian21.dot(b2_extra.v_delta1) + c->jacobian22.dot(b2_extra.v_delta2);
-
-                c->inv_m_j21 = c->jacobian21 * b2_extra.body->inv_mass();
-                c->inv_m_j22 = b2_extra.body->inv_inertia().apply_normal(c->jacobian22);
-
-                b2.inv_m_f1 += c->inv_m_j21 * *lambda;
-                b2.inv_m_f2 += c->inv_m_j22 * *lambda;
-
-                j_inv_m_j += c->jacobian21.dot(c->inv_m_j21) + c->jacobian22.dot(c->inv_m_j22);
-            }
-
-            c->rhs = m_inv_dt * m_inv_dt * c->bg_error - j_v_delta;
-
-            float rcp = c->cfm_inv_dt + j_inv_m_j;
-            c->inv_diag = rcp * rcp > INV_DIAG_EPSILON ? m_config.sor / rcp : 0.f;
+            b->inv_m_f1.set_zero();
+            b->inv_m_f2.set_zero();
         }
+    }, "init_body_data");
+
+    executor.set_order(fence.pre, init_body_data_task);
+
+    auto mid_fence = executor.emplace([](){});
+
+    for (int task_idx = 0; task_idx < concurrency; task_idx++) {
+        auto prepare_task = executor.emplace([this, task_idx]() {
+            // J * M_inv * J_t * lambda = pos_error / dt^2 - J * V_delta
+            // inv_diag = 1 / (cfm / dt + J * M_inv * J_t)
+            // M_inv * force = M_inv * J_t * lambda
+
+            size_t concurrency = m_task_ctx.size();
+
+            for (auto& group: m_groups) {
+
+                auto chunk_size = group.constraints.size() / concurrency;
+                auto chunk_beg = group.constraints.begin() + (task_idx * chunk_size);
+                auto chunk_end = (task_idx == concurrency - 1)
+                    ? group.constraints.end()
+                    : (chunk_beg + chunk_size);
+
+                for (auto c = chunk_beg; c != chunk_end; ++c) {
+
+                    auto& b1_extra = m_bodies_extra[c->body1_idx];
+
+                    float j_v_delta = c->jacobian11.dot(b1_extra.v_delta1) + c->jacobian12.dot(b1_extra.v_delta2);
+
+                    c->inv_m_j11 = c->jacobian11 * b1_extra.body->inv_mass();
+                    c->inv_m_j12 = b1_extra.body->inv_inertia().apply_normal(c->jacobian12);
+
+                    float j_inv_m_j = c->jacobian11.dot(c->inv_m_j11) + c->jacobian12.dot(c->inv_m_j12);
+
+                    if (c->body2_idx >= 0) {
+                        auto& b2 = m_bodies[c->body2_idx];
+                        auto& b2_extra = m_bodies_extra[c->body2_idx];
+
+                        j_v_delta += c->jacobian21.dot(b2_extra.v_delta1) + c->jacobian22.dot(b2_extra.v_delta2);
+
+                        c->inv_m_j21 = c->jacobian21 * b2_extra.body->inv_mass();
+                        c->inv_m_j22 = b2_extra.body->inv_inertia().apply_normal(c->jacobian22);
+
+                        j_inv_m_j += c->jacobian21.dot(c->inv_m_j21) + c->jacobian22.dot(c->inv_m_j22);
+                    }
+
+                    c->rhs = m_inv_dt * m_inv_dt * c->bg_error - j_v_delta;
+
+                    float rcp = c->cfm_inv_dt + j_inv_m_j;
+                    c->inv_diag = rcp * rcp > INV_DIAG_EPSILON ? m_config.sor / rcp : 0.f;
+                }
+            }
+        }, "prepare1");
+
+        executor.set_order(init_body_data_task, prepare_task, mid_fence);
     }
+
+    auto prepare2_task = executor.emplace([this]() {
+        for (auto& group: m_groups) {
+            auto* lambda = group.lambda.data();
+            for (auto c = group.constraints.begin(); c != group.constraints.end(); ++c, ++lambda) {
+                auto& b1 = m_bodies[c->body1_idx];
+
+                b1.inv_m_f1 += c->inv_m_j11 * *lambda;
+                b1.inv_m_f2 += c->inv_m_j12 * *lambda;
+
+                if (c->body2_idx >= 0) {
+                    auto& b2 = m_bodies[c->body2_idx];
+                    b2.inv_m_f1 += c->inv_m_j21 * *lambda;
+                    b2.inv_m_f2 += c->inv_m_j22 * *lambda;
+                }
+            }
+        }
+    }, "prepare2");
+
+    executor.set_order(mid_fence, prepare2_task, fence.post);
 }
 
 template<bool UseSIMD>
@@ -801,18 +850,26 @@ void ConstraintSolver::solve_iterations()
     }
 }
 
-void ConstraintSolver::solve() {
-    prepare_data();
+void ConstraintSolver::setup_solve_executor(TaskExecutor& executor, Fence fence)
+{
+    auto solve_task = executor.emplace([this]() {
+        if (m_config.use_simd)
+            solve_iterations<true>();
+        else
+            solve_iterations<false>();
+    }, "solve_iterations");
 
-    if (m_config.use_simd)
-        solve_iterations<true>();
-    else
-        solve_iterations<false>();
+    prepare_data(executor, { fence.pre, solve_task });
 
-    apply_impulses();
+    auto apply_impulses_task = executor.emplace([this]() {
+        apply_impulses();
+    }, "apply_impulses");
+
+    executor.set_order(solve_task, apply_impulses_task, fence.post);
 }
 
-void ConstraintSolver::apply_impulses() {
+void ConstraintSolver::apply_impulses()
+{
     auto b_extra = m_bodies_extra.begin();
     for (auto b = m_bodies.begin(); b != m_bodies.end(); ++b, ++b_extra) {
         auto* body = b_extra->body;

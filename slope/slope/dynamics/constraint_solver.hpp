@@ -2,6 +2,7 @@
 #include "slope/dynamics/rigid_body.hpp"
 #include "slope/containers/vector.hpp"
 #include "slope/containers/array.hpp"
+#include "slope/thread/task_executor.hpp"
 
 namespace slope {
 
@@ -85,6 +86,7 @@ public:
         int         iteration_count = 10;
     };
 
+    ConstraintSolver();
     virtual ~ConstraintSolver() = default;
 
     Config&         config() { return m_config; }
@@ -93,15 +95,17 @@ public:
     void            set_time_interval(float value);
     float           time_interval() const { return m_dt; }
 
+    void            register_body(RigidBody* body);
+
     ConstraintId    add_constraint(const Constraint& c);
     ConstraintId    join_friction_1d(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
     ConstraintIds   join_friction_2d(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id);
     ConstraintIds   join_friction_cone(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id);
 
-    virtual void    solve();
+    float           get_lambda(ConstraintId constr_id) const;
     void            clear();
 
-    float           get_lambda(ConstraintId constr_id) const;
+    void            setup_solve_executor(TaskExecutor& executor, Fence fence);
 
 protected:
     struct alignas(16) ConstraintData {
@@ -148,9 +152,13 @@ protected:
         Vector<float> lambda;
     };
 
-    void register_body(RigidBody* body);
+    struct TaskContext {
+
+    };
+
+    void prepare_data(TaskExecutor& executor, Fence fence);
+
     auto create_constraint(const Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
-    void prepare_data();
     void apply_impulses();
 
     template<bool UseSIMD>
@@ -162,7 +170,10 @@ protected:
 
     Vector<BodyData> m_bodies;
     Vector<BodyExtraData> m_bodies_extra;
+    //Array<std::unique_ptr<GroupData>, (int)ConstraintGroup::Count> m_groups;
     Array<GroupData, (int)ConstraintGroup::Count> m_groups;
+
+    Vector<TaskContext> m_task_ctx;
 
     friend struct ConstraintHelper;
 };

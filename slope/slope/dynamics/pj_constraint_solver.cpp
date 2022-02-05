@@ -1,7 +1,7 @@
 #include "slope/dynamics/pj_constraint_solver.hpp"
 
 namespace slope {
-
+/*
 void PJConstraintSolver::solve_constraint_pj(ConstraintData& c, float& lambda)
 {
     float prev_lambda = lambda;
@@ -31,8 +31,8 @@ void PJConstraintSolver::solve_iterations_pj()
 
         for (auto friction_type : { ConstraintGroup::Friction1D, ConstraintGroup::Friction2D, ConstraintGroup::FrictionCone }) {
             auto& friction_group = m_groups[(int)friction_type];
-            for (auto& c : friction_group.constraints) {
-                float normal_lambda = general_group.lambda[c.normal_constr_idx];
+            for (auto& c : friction_group->constraints) {
+                float normal_lambda = general_group->lambda[c.normal_constr_idx];
                 float bound = c.friction_ratio * fabsf(normal_lambda);
                 c.min_bound = -bound;
                 c.max_bound = bound;
@@ -41,8 +41,8 @@ void PJConstraintSolver::solve_iterations_pj()
 
         // Cone friction is not supported
         for (auto& container : m_groups) {
-            auto lambda_it = container.lambda.begin();
-            for (auto& c : container.constraints) {
+            auto lambda_it = container->lambda.begin();
+            for (auto& c : container->constraints) {
                 solve_constraint_pj(c, *lambda_it);
                 ++lambda_it;
             }
@@ -54,9 +54,9 @@ void PJConstraintSolver::solve_iterations_pj()
         }
 
         for (auto& container : m_groups) {
-            auto lambda_it = container.lambda.begin();
+            auto lambda_it = container->lambda.begin();
 
-            for (auto& c : container.constraints) {
+            for (auto& c : container->constraints) {
                 auto lambda =  *lambda_it;
 
                 auto& b1 = m_bodies[c.body1_idx];
@@ -82,5 +82,5 @@ void PJConstraintSolver::solve()
     solve_iterations_pj();
     apply_impulses();
 }
-
+*/
 } // slope

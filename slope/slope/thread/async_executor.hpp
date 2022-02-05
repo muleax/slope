@@ -7,7 +7,7 @@ namespace slope {
 
 class AsyncExecutor : public TaskExecutor {
 public:
-    TaskId emplace(Callback&& task) final
+    TaskId emplace(Callback&& task, const char* name = nullptr) final
     {
         m_tasks.push_back({std::move(task)});
         return static_cast<TaskId>(m_tasks.size() - 1);
