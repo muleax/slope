@@ -563,6 +563,7 @@ void ConstraintSolver::register_body(RigidBody* body)
     m_bodies_extra.emplace_back().body = body;
 }
 
+/*
 std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(const Constraint& c, ConstraintGroup group)
 {
     SL_ASSERT(c.body1->in_solver_index() != -1);
@@ -665,6 +666,7 @@ ConstraintIds ConstraintSolver::join_friction_cone(const Constraint& c1, const C
 
     return { constr1_id, constr2_id };
 }
+ */
 
 void ConstraintSolver::clear()
 {
@@ -675,8 +677,9 @@ void ConstraintSolver::clear()
     m_bodies_extra.clear();
 
     for (auto& container : m_groups) {
-        container.constraints.clear();
-        container.lambda.clear();
+        //container.constraints.clear();
+        //container.lambda.clear();
+        container.size = 0;
     }
 }
 
@@ -716,14 +719,13 @@ void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
 
             for (auto& group: m_groups) {
 
-                auto chunk_size = group.constraints.size() / concurrency;
+                auto chunk_size = group.size / concurrency;
                 auto chunk_beg = group.constraints.begin() + (task_idx * chunk_size);
                 auto chunk_end = (task_idx == concurrency - 1)
-                    ? group.constraints.end()
+                    ? group.constraints.begin() + group.size
                     : (chunk_beg + chunk_size);
 
                 for (auto c = chunk_beg; c != chunk_end; ++c) {
-
                     auto& b1_extra = m_bodies_extra[c->body1_idx];
 
                     float j_v_delta = c->jacobian11.dot(b1_extra.v_delta1) + c->jacobian12.dot(b1_extra.v_delta2);
@@ -759,7 +761,7 @@ void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
     auto prepare2_task = executor.emplace([this]() {
         for (auto& group: m_groups) {
             auto* lambda = group.lambda.data();
-            for (auto c = group.constraints.begin(); c != group.constraints.end(); ++c, ++lambda) {
+            for (auto c = group.constraints.begin(); c != group.constraints.begin() + group.size; ++c, ++lambda) {
                 auto& b1 = m_bodies[c->body1_idx];
 
                 b1.inv_m_f1 += c->inv_m_j11 * *lambda;
@@ -789,7 +791,7 @@ void ConstraintSolver::solve_iterations()
 
         {
             auto c          = general_group.constraints.begin();
-            auto c_end      = general_group.constraints.end();
+            auto c_end      = general_group.constraints.begin() + general_group.size;
             auto c_lambda   = general_lambda.begin();
             for (; c != c_end; ++c, ++c_lambda) {
                 if constexpr (UseSIMD)
@@ -803,7 +805,7 @@ void ConstraintSolver::solve_iterations()
             auto& friction_1d_group = m_groups[(int) ConstraintGroup::Friction1D];
 
             auto c          = friction_1d_group.constraints.begin();
-            auto c_end      = friction_1d_group.constraints.end();
+            auto c_end      = friction_1d_group.constraints.begin() + friction_1d_group.size;
             auto c_lambda   = friction_1d_group.lambda.data();
             for (; c != c_end; ++c, ++c_lambda) {
                 float normal_lambda = c->friction_ratio * fabs(general_lambda[c->normal_constr_idx]);
@@ -819,7 +821,7 @@ void ConstraintSolver::solve_iterations()
             auto& friction_2d_group = m_groups[(int) ConstraintGroup::Friction2D];
 
             auto c1         = friction_2d_group.constraints.begin();
-            auto c1_end     = friction_2d_group.constraints.end();
+            auto c1_end     = friction_2d_group.constraints.begin() + friction_2d_group.size;
             auto c1_lambda  = friction_2d_group.lambda.data();
             for (; c1 != c1_end; c1 += 2, c1_lambda += 2) {
                 auto c2 = c1 + 1;
@@ -837,7 +839,7 @@ void ConstraintSolver::solve_iterations()
             auto& friction_cone_group = m_groups[(int) ConstraintGroup::FrictionCone];
 
             auto c1         = friction_cone_group.constraints.begin();
-            auto c1_end     = friction_cone_group.constraints.end();
+            auto c1_end     = friction_cone_group.constraints.begin() + friction_cone_group.size;
             auto c1_lambda  = friction_cone_group.lambda.data();
             for (; c1 != c1_end; c1 += 2, c1_lambda += 2) {
                 auto c2 = c1 + 1;

@@ -216,44 +216,7 @@ void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2, WorkerContext&
 
         auto& pending_contacts = ctx.pending_contacts;
         for (auto& p : manifold) {
-            // TODO: implement policies
-            float friction_ratio = actor1->friction() * actor2->friction();
-
-            //pending_contacts.push_back({cache, &p, friction_ratio});
-            auto& pc = pending_contacts.emplace_back();
-            pc.mf_cache = cache;
-            pc.mf_point = &p;
-
-            ConstraintGeom geom = {p.geom.p1, p.geom.p2, p.geom.normal};
-
-            SL_ASSERT(actor1->is<DynamicActor>());
-            RigidBody* body1 = &actor1->cast<DynamicActor>()->body();
-            RigidBody* body2 = actor2->is<DynamicActor>() ? &actor2->cast<DynamicActor>()->body() : nullptr;
-
-            pc.nc = Constraint::stabilized_unilateral(body1, body2, geom);
-            pc.nc.init_lambda = p.normal_lambda * m_config.warmstarting_normal;
-
-            std::optional<FrictionBasis> basis;
-            if (m_config.enable_velocity_dependent_friction) {
-                // TODO: reconsider threshold
-                basis = get_velocity_dependent_friction_basis(body1, body2, geom, 0.3f);
-            }
-
-            if (!basis) {
-                basis.emplace();
-                find_tangent(basis->axis1, basis->axis2, geom.axis);
-            }
-            //pc.friction_u = basis->axis1;
-            //pc.friction_v = basis->axis2;
-
-
-            pc.fc1 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis1});
-            pc.fc2 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis2});
-
-            pc.fc1.init_lambda = p.friction1_lambda * m_config.warmstarting_friction;
-            pc.fc2.init_lambda = p.friction2_lambda * m_config.warmstarting_friction;
-
-            pc.friction_ratio = friction_ratio;
+            pending_contacts.push_back({cache, &p});
         }
     }
 }
@@ -279,116 +242,84 @@ void DynamicsWorld::setup_collision_detection(TaskExecutor& executor, Fence fenc
     m_broadphase.setup_executor(overlap_callback, executor, {prepare_task, fence.post}, cd_concurrency);
 }
 
-void DynamicsWorld::apply_friction()
+void DynamicsWorld::apply_contacts(TaskExecutor& executor, Fence fence)
 {
-    int nid = 0;
-    for (auto& ctx : m_worker_ctx) {
-        for (auto& pc : ctx.pending_contacts) {
-            auto& p = pc.mf_point;
+    int concurrency = executor.concurrency();
+    for (int task_idx = 0; task_idx < concurrency; task_idx++) {
 
-            //auto& nc = pc.nc;
-            auto& fc1 = pc.fc1;
-            auto& fc2 = pc.fc2;
+        TaskId task = executor.emplace([this, task_idx, concurrency]() {
 
-/*
-            ConstraintGeom geom = {p->geom.p1, p->geom.p2, p->geom.normal};
+            size_t chunk_size = m_pending_contacts.size() / concurrency;
 
-            auto* actor1 = pc.mf_cache->actor1;
-            auto* actor2 = pc.mf_cache->actor2;
+            int chunk_beg = task_idx * chunk_size;
+            int chunk_end = (task_idx == concurrency - 1)
+                            ? m_pending_contacts.size()
+                            : chunk_beg + chunk_size;
 
-            SL_ASSERT(actor1->is<DynamicActor>());
-            RigidBody* body1 = &actor1->cast<DynamicActor>()->body();
-            RigidBody* body2 = actor2->is<DynamicActor>() ? &actor2->cast<DynamicActor>()->body() : nullptr;
+            ConstraintId normal_id{ m_normal_range.first.group(), m_normal_range.first.index() + chunk_beg };
+            ConstraintId friction_id{ m_friction_range.first.group(), m_friction_range.first.index() + chunk_beg * 2 };
 
-            auto nc = Constraint::stabilized_unilateral(body1, body2, geom);
-            nc.init_lambda = p->normal_lambda * m_config.warmstarting_normal;
-            m_solver->add_constraint(nc);
+            for (auto it = m_pending_contacts.begin() + chunk_beg; it != m_pending_contacts.begin() + chunk_end; ++it) {
+                auto [mf_cache, mf_point] = *it;
 
-            auto fc1 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, pc.friction_u});
-            auto fc2 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, pc.friction_v});
+                ConstraintGeom geom = {mf_point->geom.p1, mf_point->geom.p2, mf_point->geom.normal};
 
-            fc1.init_lambda = p->friction1_lambda * m_config.warmstarting_friction;
-            fc2.init_lambda = p->friction2_lambda * m_config.warmstarting_friction;
-*/
+                auto* actor1 = mf_cache->actor1;
+                auto* actor2 = mf_cache->actor2;
 
-            p->normal_constr_id = ConstraintId(ConstraintGroup::General, nid);
-            nid++;
+                SL_ASSERT(actor1->is<DynamicActor>());
+                RigidBody* body1 = &actor1->cast<DynamicActor>()->body();
+                RigidBody* body2 = actor2->is<DynamicActor>() ? &actor2->cast<DynamicActor>()->body() : nullptr;
 
-            if (m_config.enable_cone_friction) {
-                auto ids = m_solver->join_friction_cone(fc1, fc2, {pc.friction_ratio, pc.friction_ratio},
-                                                        p->normal_constr_id);
-                p->friction1_constr_id = ids.first;
-                p->friction2_constr_id = ids.second;
+                std::optional<FrictionBasis> basis;
+                if (m_config.enable_velocity_dependent_friction) {
+                    // TODO: reconsider threshold
+                    basis = get_velocity_dependent_friction_basis(body1, body2, geom, 0.3f);
+                }
 
-            } else {
-                //p->friction1_constr_id = m_solver->join_friction(fc1, friction_ratio, p->normal_constr_id);
-                //p->friction2_constr_id = m_solver->join_friction(fc2, friction_ratio, p->normal_constr_id);
-                auto ids = m_solver->join_friction_2d(fc1, fc2, {pc.friction_ratio, pc.friction_ratio}, p->normal_constr_id);
-                p->friction1_constr_id = ids.first;
-                p->friction2_constr_id = ids.second;
+                if (!basis) {
+                    basis.emplace();
+                    find_tangent(basis->axis1, basis->axis2, geom.axis);
+                }
+
+                // TODO: implement policies
+                float friction_ratio = actor1->friction() * actor2->friction();
+
+                auto fc1 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis1});
+                auto fc2 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis2});
+
+                fc1.init_lambda = mf_point->friction1_lambda * m_config.warmstarting_friction;
+                fc2.init_lambda = mf_point->friction2_lambda * m_config.warmstarting_friction;
+
+                auto nc = Constraint::stabilized_unilateral(body1, body2, geom);
+                nc.init_lambda = mf_point->normal_lambda * m_config.warmstarting_normal;
+                m_solver->setup_constraint(normal_id, nc);
+                mf_point->normal_constr_id = normal_id;
+
+                ++normal_id;
+
+                ConstraintIds friction_ids;
+                friction_ids.first = friction_id;
+                ++friction_id;
+                friction_ids.second = friction_id;
+                ++friction_id;
+
+                mf_point->friction1_constr_id = friction_ids.first;
+                mf_point->friction2_constr_id = friction_ids.second;
+
+                if (m_config.enable_cone_friction) {
+                    m_solver->setup_friction_cone(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, mf_point->normal_constr_id);
+
+                } else {
+                    m_solver->setup_friction_2d(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, mf_point->normal_constr_id);
+                }
             }
-        }
+        }, "apply_contacts");
+
+        executor.set_order(fence.pre, task, fence.post);
     }
-
-}
-
-void DynamicsWorld::apply_contacts()
-{
-    //m_stats.contact_count = m_pending_contacts.size();
-
-    auto* debug_drawer = m_debug_drawer.get();
-
-    /*
-    if (m_config.randomize_order) {
-        for (auto& c: m_pending_contacts) {
-            auto r = rand() % m_pending_contacts.size();
-            std::swap(c, m_pending_contacts[r]);
-        }
-    }
-     */
-
-    for (auto& ctx : m_worker_ctx) {
-        for (auto& pc : ctx.pending_contacts) {
-            auto& p = pc.mf_point;
-
-            auto& nc = pc.nc;
-            //auto& fc1 = pc.fc1;
-            //auto& fc2 = pc.fc2;
-
-            /*
-            ConstraintGeom geom = {p->geom.p1, p->geom.p2, p->geom.normal};
-
-            auto* actor1 = pc.mf_cache->actor1;
-            auto* actor2 = pc.mf_cache->actor2;
-
-            SL_ASSERT(actor1->is<DynamicActor>());
-            RigidBody* body1 = &actor1->cast<DynamicActor>()->body();
-            RigidBody* body2 = actor2->is<DynamicActor>() ? &actor2->cast<DynamicActor>()->body() : nullptr;
-*/
-
-
-            //p->normal_constr_id = m_solver->add_constraint(nc);
-            //auto nc = Constraint::stabilized_unilateral(body1, body2, geom);
-            //nc.init_lambda = p->normal_lambda * m_config.warmstarting_normal;
-
-            m_solver->add_constraint(nc);
-
-            /*
-            if (m_config.enable_cone_friction) {
-                auto ids = m_solver->join_friction_cone(fc1, fc2, {pc.friction_ratio, pc.friction_ratio},
-                                                        p->normal_constr_id);
-                p->friction1_constr_id = ids.first;
-                p->friction2_constr_id = ids.second;
-
-            } else {
-                //p->friction1_constr_id = m_solver->join_friction(fc1, friction_ratio, p->normal_constr_id);
-                //p->friction2_constr_id = m_solver->join_friction(fc2, friction_ratio, p->normal_constr_id);
-                auto ids = m_solver->join_friction_2d(fc1, fc2, {pc.friction_ratio, pc.friction_ratio}, p->normal_constr_id);
-                p->friction1_constr_id = ids.first;
-                p->friction2_constr_id = ids.second;
-            }
-*/
 /*
+ * auto* debug_drawer = m_debug_drawer.get();
             if (debug_drawer) {
                 auto& geom = p->geom;
 
@@ -411,8 +342,7 @@ void DynamicsWorld::apply_contacts()
                 }
             }
             */
-        }
-    }
+
 }
 
 void DynamicsWorld::apply_joints()
@@ -466,6 +396,8 @@ void DynamicsWorld::refresh_manifolds()
             m_manifolds[k] = mf;
 
         ctx.new_manifolds.clear();
+
+        m_frame_id++;
     }
 }
 
@@ -518,6 +450,37 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
 
     setup_collision_detection(executor, {prepare_task, after_collision});
 
+    TaskId merge_task = executor.emplace([this]() {
+        for (auto& ctx : m_worker_ctx)
+            m_pending_contacts.insert(m_pending_contacts.end(), ctx.pending_contacts.begin(), ctx.pending_contacts.end());
+    }, "merge_contacts");
+
+    TaskId randomize_task = executor.emplace([this]() {
+        if (m_config.randomize_order) {
+            for (auto& c: m_pending_contacts) {
+                auto r = rand() % m_pending_contacts.size();
+                std::swap(c, m_pending_contacts[r]);
+            }
+        }
+    }, "randomize");
+
+    executor.set_order(after_collision, merge_task, randomize_task);
+
+    TaskId allocate_task = executor.emplace([this]() {
+        if (m_config.enable_constraint_resolving) {
+            int contact_count = m_pending_contacts.size();
+            m_normal_range = m_solver->allocate_range(ConstraintGroup::General, contact_count);
+            ConstraintGroup friction_group = m_config.enable_cone_friction
+                ? ConstraintGroup::FrictionCone
+                : ConstraintGroup::Friction2D;
+            m_friction_range = m_solver->allocate_range(friction_group, contact_count * 2);
+        }
+    }, "allocate");
+
+    executor.set_order(randomize_task, allocate_task);
+
+
+    /*
     TaskId normal_constr_task = executor.emplace([this]() {
         if (m_config.enable_constraint_resolving)
             apply_contacts();
@@ -527,16 +490,22 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
         if (m_config.enable_constraint_resolving)
             apply_friction();
     }, "friction_constraints");
+*/
 
     TaskId joints_task = executor.emplace([this]() {
         if (m_config.enable_constraint_resolving)
             apply_joints();
     }, "joint_constraints");
 
-    TaskId before_solver = executor.emplace([]() {});
+    apply_contacts(executor, {allocate_task, joints_task});
 
-    executor.set_order(after_collision, friction_constr_task, before_solver);
-    executor.set_order(after_collision, normal_constr_task, joints_task, before_solver);
+    TaskId before_solver = executor.emplace([]() {});
+    TaskId after_solver = executor.emplace([]() {});
+
+    //executor.set_order(randomize_task, friction_constr_task, before_solver);
+    executor.set_order(joints_task, before_solver);
+
+    m_solver->setup_solve_executor(executor, {before_solver, after_solver});
 
     TaskId cache_lambda_task = executor.emplace([this]() {
         if (m_config.enable_constraint_resolving) {
@@ -546,17 +515,17 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
 
         m_solver->clear();
 
+        m_pending_contacts.clear();
         for (auto& ctx: m_worker_ctx)
             ctx.pending_contacts.clear();
     }, "cache_lambda");
 
-    m_solver->setup_solve_executor(executor, {before_solver, cache_lambda_task});
 
     TaskId refresh_manifolds_task = executor.emplace([this]() {
         refresh_manifolds();
     }, "refresh_manifolds");
 
-    executor.set_order(cache_lambda_task, refresh_manifolds_task);
+    //executor.set_order(cache_lambda_task, refresh_manifolds_task);
 
     TaskId integrate_task = executor.emplace([this]() {
         if (m_config.enable_integration && !m_config.delay_integration)
@@ -564,10 +533,10 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
 
         update_general_stats();
 
-        m_frame_id++;
     }, "integrate");
 
-    executor.set_order(refresh_manifolds_task, integrate_task);
+    executor.set_order(after_solver, cache_lambda_task, refresh_manifolds_task);
+    executor.set_order(after_solver, integrate_task);
 }
 
 } // slope

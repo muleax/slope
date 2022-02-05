@@ -35,6 +35,8 @@ public:
 
     operator int() const { return m_raw; }
 
+    void operator++() { *this = {group(), index() + 1}; }
+
 private:
     int m_raw = -1;
 };
@@ -97,10 +99,111 @@ public:
 
     void            register_body(RigidBody* body);
 
+    ConstraintId    allocate(ConstraintGroup group)
+    {
+        auto& group_data = m_groups[(int)group];
+        ConstraintId constr_id = { group, group_data.size };
+
+        group_data.size++;
+        if (group_data.constraints.size() < group_data.size) {
+            group_data.constraints.emplace_back();
+            group_data.lambda.emplace_back();
+        }
+        return constr_id;
+    }
+
+    ConstraintIds    allocate_pair(ConstraintGroup group)
+    {
+        return { allocate(group), allocate(group) };
+    }
+
+    ConstraintIds   allocate_range(ConstraintGroup group, int count)
+    {
+        auto& group_data = m_groups[(int)group];
+        ConstraintId begin_id = { group, group_data.size };
+
+        group_data.size += count;
+
+        if (group_data.constraints.size() < group_data.size) {
+            group_data.constraints.resize(group_data.size);
+            group_data.lambda.resize(group_data.size);
+        }
+
+        ConstraintId end_id = { group, group_data.size };
+        return {begin_id, end_id};
+    }
+
+    void            setup_constraint(ConstraintId constr_id, const Constraint& c)
+    {
+        auto& data = basic_setup(constr_id, c);
+        data.min_bound = c.min_bound;
+        data.max_bound = c.max_bound;
+        data.cfm_inv_dt = c.cfm * m_inv_dt;
+
+        // TODO: reconsider
+        if (c.min_bound == 0.f) {
+            // unilateral case
+            if (c.pos_error > c.unilateral_penetration)
+                data.bg_error = (c.pos_error - c.unilateral_penetration) * c.erp;
+            else
+                data.bg_error = c.pos_error - c.unilateral_penetration;
+        } else {
+            // bilateral case
+            data.bg_error = c.pos_error * c.erp;
+        }
+    }
+
+    void            setup_friction_1d(ConstraintId constr_id, const Constraint& c, float friction_ratio, ConstraintId normal_constr_id)
+    {
+        auto& data = basic_setup(constr_id, c);
+
+        data.cfm_inv_dt = c.cfm * m_inv_dt;
+        data.bg_error = 0.f;
+
+        data.friction_ratio = friction_ratio;
+        data.normal_constr_idx = normal_constr_id.index();
+    }
+
+    void            setup_friction_2d(ConstraintIds constr_ids, const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id)
+    {
+        auto setup_constraint = [this, normal_constr_id](ConstraintData& data, const Constraint& c, float friction_ratio) {
+            data.cfm_inv_dt = c.cfm * m_inv_dt;
+            data.bg_error = 0.f;
+
+            data.friction_ratio = friction_ratio;
+            data.normal_constr_idx = normal_constr_id.index();
+        };
+
+        auto& data1 = basic_setup(constr_ids.first, c1);
+        setup_constraint(data1, c1, friction_ratio.x);
+
+        auto& data2 = basic_setup(constr_ids.second, c2);
+        setup_constraint(data2, c2, friction_ratio.y);
+    }
+
+    void            setup_friction_cone(ConstraintIds constr_ids, const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id)
+    {
+        auto setup_constraint = [this, normal_constr_id](ConstraintData& data, const Constraint& c, float friction_ratio) {
+            data.cfm_inv_dt = c.cfm * m_inv_dt;
+            data.bg_error = 0.f;
+
+            data.friction_ratio = friction_ratio;
+            data.normal_constr_idx = normal_constr_id.index();
+        };
+
+        auto& data1 = basic_setup(constr_ids.first, c1);
+        setup_constraint(data1, c1, friction_ratio.x);
+
+        auto& data2 = basic_setup(constr_ids.second, c2);
+        setup_constraint(data2, c2, friction_ratio.y);
+    }
+
+    /*
     ConstraintId    add_constraint(const Constraint& c);
     ConstraintId    join_friction_1d(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
     ConstraintIds   join_friction_2d(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id);
     ConstraintIds   join_friction_cone(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id);
+*/
 
     float           get_lambda(ConstraintId constr_id) const;
     void            clear();
@@ -150,15 +253,46 @@ protected:
     struct GroupData {
         Vector<ConstraintData> constraints;
         Vector<float> lambda;
+        int size = 0;
     };
 
     struct TaskContext {
 
     };
 
+    ConstraintData& basic_setup(ConstraintId constr_id, const Constraint& c)
+    {
+        SL_ASSERT(c.body1->in_solver_index() != -1);
+
+        auto& group = m_groups[(int)constr_id.group()];
+        auto& data = group.constraints[constr_id.index()];
+
+        data.body1_idx = c.body1->in_solver_index();
+        data.jacobian11 = c.jacobian1[0];
+        data.jacobian12 = c.jacobian1[1];
+
+        if (c.body2) {
+            SL_ASSERT(c.body2->in_solver_index() != -1);
+
+            data.body2_idx = c.body2->in_solver_index();
+            data.jacobian21 = c.jacobian2[0];
+            data.jacobian22 = c.jacobian2[1];
+        } else {
+            data.body2_idx = -1;
+            data.jacobian21.set_zero();
+            data.jacobian22.set_zero();
+        }
+
+        data.normal_constr_idx = -1;
+
+        group.lambda[constr_id.index()] = c.init_lambda;
+
+        return data;
+    }
+
     void prepare_data(TaskExecutor& executor, Fence fence);
 
-    auto create_constraint(const Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
+    //auto create_constraint(const Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
     void apply_impulses();
 
     template<bool UseSIMD>
