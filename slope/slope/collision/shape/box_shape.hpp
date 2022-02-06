@@ -1,7 +1,7 @@
 #pragma once
 #include "slope/collision/shape/collision_shape.hpp"
-#include "slope/containers/array.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/array.hpp"
+#include "slope/core/vector.hpp"
 #include <memory>
 
 namespace slope {

@@ -1,6 +1,6 @@
 #pragma once
 #include "slope/math/vector3.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 #include "slope/collision/primitives.hpp"
 
 namespace slope {

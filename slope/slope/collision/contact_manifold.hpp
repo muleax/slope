@@ -1,7 +1,7 @@
 #pragma once
 #include "slope/collision/primitives.hpp"
 #include "slope/math/matrix44.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/array.hpp"
 
 namespace slope {
 

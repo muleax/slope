@@ -1,7 +1,7 @@
 #include "app/render/shader.hpp"
 #include "slope/debug/assert.hpp"
 #include "slope/debug/log.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/array.hpp"
 #include "glad/gl.h"
 #include <optional>
 

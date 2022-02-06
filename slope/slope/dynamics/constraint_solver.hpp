@@ -1,7 +1,7 @@
 #pragma once
 #include "slope/dynamics/rigid_body.hpp"
-#include "slope/containers/vector.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/vector.hpp"
+#include "slope/core/array.hpp"
 #include "slope/thread/task_executor.hpp"
 
 namespace slope {
@@ -257,7 +257,7 @@ protected:
     };
 
     struct TaskContext {
-
+        Vector<BodyData> bodies;
     };
 
     ConstraintData& basic_setup(ConstraintId constr_id, const Constraint& c)

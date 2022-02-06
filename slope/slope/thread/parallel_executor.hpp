@@ -1,6 +1,6 @@
 #include "task_executor.hpp"
 #include "slope/thread/task_executor.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 #include "taskflow/taskflow.hpp"
 #include <memory>
 

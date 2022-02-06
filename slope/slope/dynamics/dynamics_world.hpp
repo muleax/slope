@@ -2,9 +2,10 @@
 #include "slope/dynamics/constraint_solver.hpp"
 #include "slope/dynamics/actor.hpp"
 #include "slope/dynamics/joint.hpp"
-#include "slope/containers/vector.hpp"
-#include "slope/containers/unordered_map.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/vector.hpp"
+#include "slope/core/unordered_map.hpp"
+#include "slope/core/array.hpp"
+#include "slope/core/disjoint_set.hpp"
 #include "slope/collision/contact_manifold.hpp"
 #include "slope/collision/narrowphase/narrowphase.hpp"
 #include "slope/collision/broadphase/broadphase.hpp"
@@ -112,8 +113,8 @@ public:
     Narrowphase&            narrowphase() { return m_worker_ctx[0].narrowphase; }
     const Narrowphase&      narrowphase() const { return m_worker_ctx[0].narrowphase; }
 
-    ConstraintSolver&       solver() { return *m_solver; }
-    const ConstraintSolver& solver() const { return *m_solver; }
+    ConstraintSolver&       solver() { return *m_solver_ctx[0].solver; }
+    const ConstraintSolver& solver() const { return *m_solver_ctx[0].solver; }
 
 private:
     struct ManifoldCache {
@@ -126,6 +127,7 @@ private:
     struct PendingContact {
         const ManifoldCache* mf_cache;
         ManifoldPoint* mf_point;
+        uint32_t actor_index;
     };
 
     struct ActorData {
@@ -135,9 +137,15 @@ private:
 
     struct WorkerContext {
         Vector<PendingContact>  pending_contacts;
+        Vector<std::pair<uint32_t, uint32_t>> actor_contacts;
         Narrowphase             narrowphase;
         NpContactPatch          contact_patch;
         UnorderedMap<ManifoldCacheKey, ManifoldCache> new_manifolds;
+    };
+
+    struct SolverContext {
+        std::unique_ptr<ConstraintSolver> solver;
+        Vector<PendingContact>  pending_contacts;
     };
 
     void setup_collision_detection(TaskExecutor& executor, Fence fence);
@@ -163,13 +171,21 @@ private:
     Array<Vector<ActorData>, (int)ActorKind::Count> m_actors;
     Vector<std::unique_ptr<BaseJoint>> m_joints;
 
-    std::unique_ptr<ConstraintSolver> m_solver;
+    DisjointSet m_islands_ds;
+
+    struct Island {
+        uint32_t root;
+        uint32_t size;
+    };
+
+    Vector<Island> m_islands;
+
+    Vector<int> m_island_to_bin;
 
     Broadphase<BaseActor> m_broadphase;
 
     Array<WorkerContext, 4 * 8> m_worker_ctx;
-
-    Vector<PendingContact>  m_pending_contacts;
+    Array<SolverContext, 8> m_solver_ctx;
 
     UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
 

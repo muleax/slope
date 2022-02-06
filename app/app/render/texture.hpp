@@ -1,6 +1,6 @@
 #pragma once
 #include "app/resource/resource_cache.hpp"
-#include "slope/containers/string.hpp"
+#include "slope/core/string.hpp"
 
 namespace slope::app {
 

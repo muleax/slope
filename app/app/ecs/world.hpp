@@ -2,8 +2,8 @@
 #include "app/ecs/entity.hpp"
 #include "app/ecs/entity_view.hpp"
 #include "app/ecs/component.hpp"
-#include "slope/containers/vector.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/vector.hpp"
+#include "slope/core/array.hpp"
 #include <optional>
 #include <mutex>
 

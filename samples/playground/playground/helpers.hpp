@@ -11,7 +11,7 @@
 #include "slope/collision/shape/sphere_shape.hpp"
 #include "slope/collision/shape/box_shape.hpp"
 #include "slope/collision/shape/capsule_shape.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 #include <memory>
 
 using namespace slope;

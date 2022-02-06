@@ -1,7 +1,7 @@
 #pragma once
 #include "app/render/line.hpp"
 #include "slope/debug/debug_drawer.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 
 namespace slope::app {
 

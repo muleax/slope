@@ -88,7 +88,7 @@ void StressTestDemo::init()
             for (int k = 0; k < m_width; k++) {
                 mat44 tr = mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
                 tr.set_translation(
-                    {(float) i * spacing + j * 0.2f, (float) j * spacing + 0.2f, (float) k * spacing + j * 0.2f});
+                    {(float) i * spacing * 5 + j * 0.2f, (float) j * spacing + 0.2f, (float) k * spacing * 5 + j * 0.2f});
 
                 m_spawner->spawn_box(tr, {}, 1.f, vec3{1.f});
             }

@@ -16,7 +16,7 @@ struct PhysicsSingleton : public Component<PhysicsSingleton> {
     float time_step = 1.f / 60.f;
     float time_factor = 1.f;
 
-    int concurrency = 8;
+    int concurrency = 4;
 
     // Stats
     MovingAverage<double> cpu_time;

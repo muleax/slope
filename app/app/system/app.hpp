@@ -1,6 +1,6 @@
 #pragma once
 #include "app/system/input.hpp"
-#include "slope/containers/string.hpp"
+#include "slope/core/string.hpp"
 #include "slope/math/vector3.hpp"
 
 struct GLFWwindow;

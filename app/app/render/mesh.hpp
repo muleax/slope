@@ -4,7 +4,7 @@
 #include "slope/math/vector2.hpp"
 #include "slope/math/vector3.hpp"
 #include "slope/math/vector4.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 #include <memory>
 
 namespace slope::app {

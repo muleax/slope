@@ -48,21 +48,24 @@ DynamicsWorld::DynamicsWorld(std::optional<Config> init_config)
 
 void DynamicsWorld::setup_solver(SolverType type)
 {
-    if (m_solver_type != type) {
-        m_solver_type = type;
+    if (m_solver_type == type)
+        return;
 
+    m_solver_type = type;
+
+    for (auto& ctx: m_solver_ctx) {
         switch (type) {
         case SolverType::PGS:
-            m_solver = std::make_unique<ConstraintSolver>();
+            ctx.solver = std::make_unique<ConstraintSolver>();
             break;
         case SolverType::PJ:
             //m_solver = std::make_unique<PJConstraintSolver>();
             break;
         }
-    }
 
-    m_solver->config() = m_config.solver_config;
-    m_solver->set_time_interval(m_config.time_interval);
+        ctx.solver->config() = m_config.solver_config;
+        ctx.solver->set_time_interval(m_config.time_interval);
+    }
 }
 
 void DynamicsWorld::setup_narrowphase(NpBackendHint hint)
@@ -158,11 +161,15 @@ void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer)
 void DynamicsWorld::apply_external_forces()
 {
     float dt = m_config.time_interval;
+    uint32_t local_id = 0;
     for (auto& data: m_actors[(int) ActorKind::Dynamic]) {
         auto* actor = data.actor->cast<DynamicActor>();
         actor->body().apply_force_to_com(m_config.gravity * actor->body().mass());
         actor->body().apply_gyroscopic_torque(dt);
-        m_solver->register_body(&actor->body());
+
+        // TODO
+        actor->set_local_id(local_id++);
+        //m_solver->register_body(&actor->body());
     }
 }
 
@@ -200,9 +207,14 @@ void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2, WorkerContext&
         }
 
         // TODO: check in broadphase
-        cache->actor1 = static_cast<DynamicActor*>(actor1);
+        cache->actor1 = actor1->cast<DynamicActor>();
         cache->actor2 = actor2;
         cache->touch_frame_id = m_frame_id;
+
+        if (actor2->is<DynamicActor>()) {
+            ctx.actor_contacts.push_back(
+                { actor1->cast<DynamicActor>()->local_id(), actor2->cast<DynamicActor>()->local_id() });
+        }
 
         auto& manifold = cache->manifold;
         manifold.update_inv_transform(actor1->inv_transform());
@@ -216,7 +228,7 @@ void DynamicsWorld::collide(BaseActor* actor1, BaseActor* actor2, WorkerContext&
 
         auto& pending_contacts = ctx.pending_contacts;
         for (auto& p : manifold) {
-            pending_contacts.push_back({cache, &p});
+            pending_contacts.push_back({cache, &p, cache->actor1->local_id()});
         }
     }
 }
@@ -245,22 +257,24 @@ void DynamicsWorld::setup_collision_detection(TaskExecutor& executor, Fence fenc
 void DynamicsWorld::apply_contacts(TaskExecutor& executor, Fence fence)
 {
     int concurrency = executor.concurrency();
+    for (int solver_id = 0; solver_id < concurrency; solver_id++)
     for (int task_idx = 0; task_idx < concurrency; task_idx++) {
 
-        TaskId task = executor.emplace([this, task_idx, concurrency]() {
+        TaskId task = executor.emplace([this, task_idx, solver_id, concurrency]() {
+            auto& ctx = m_solver_ctx[solver_id];
 
-            size_t chunk_size = m_pending_contacts.size() / concurrency;
+            size_t chunk_size = ctx.pending_contacts.size() / concurrency;
 
             int chunk_beg = task_idx * chunk_size;
             int chunk_end = (task_idx == concurrency - 1)
-                            ? m_pending_contacts.size()
+                            ? ctx.pending_contacts.size()
                             : chunk_beg + chunk_size;
 
             ConstraintId normal_id{ m_normal_range.first.group(), m_normal_range.first.index() + chunk_beg };
             ConstraintId friction_id{ m_friction_range.first.group(), m_friction_range.first.index() + chunk_beg * 2 };
 
-            for (auto it = m_pending_contacts.begin() + chunk_beg; it != m_pending_contacts.begin() + chunk_end; ++it) {
-                auto [mf_cache, mf_point] = *it;
+            for (auto it = ctx.pending_contacts.begin() + chunk_beg; it != ctx.pending_contacts.begin() + chunk_end; ++it) {
+                auto [mf_cache, mf_point, _] = *it;
 
                 ConstraintGeom geom = {mf_point->geom.p1, mf_point->geom.p2, mf_point->geom.normal};
 
@@ -293,7 +307,7 @@ void DynamicsWorld::apply_contacts(TaskExecutor& executor, Fence fence)
 
                 auto nc = Constraint::stabilized_unilateral(body1, body2, geom);
                 nc.init_lambda = mf_point->normal_lambda * m_config.warmstarting_normal;
-                m_solver->setup_constraint(normal_id, nc);
+                ctx.solver->setup_constraint(normal_id, nc);
                 mf_point->normal_constr_id = normal_id;
 
                 ++normal_id;
@@ -308,10 +322,10 @@ void DynamicsWorld::apply_contacts(TaskExecutor& executor, Fence fence)
                 mf_point->friction2_constr_id = friction_ids.second;
 
                 if (m_config.enable_cone_friction) {
-                    m_solver->setup_friction_cone(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, mf_point->normal_constr_id);
+                    ctx.solver->setup_friction_cone(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, mf_point->normal_constr_id);
 
                 } else {
-                    m_solver->setup_friction_2d(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, mf_point->normal_constr_id);
+                    ctx.solver->setup_friction_2d(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, mf_point->normal_constr_id);
                 }
             }
         }, "apply_contacts");
@@ -347,31 +361,32 @@ void DynamicsWorld::apply_contacts(TaskExecutor& executor, Fence fence)
 
 void DynamicsWorld::apply_joints()
 {
+    //TODO
     for (auto& joint : m_joints) {
         joint->set_warmstarting_ratio(m_config.warmstarting_joint);
-        joint->apply_constraints(m_solver.get());
+        //joint->apply_constraints(m_solver.get());
     }
 }
 
 void DynamicsWorld::cache_lambdas()
 {
-    for (auto& ctx : m_worker_ctx) {
+    for (auto& ctx : m_solver_ctx) {
         for (auto& pc : ctx.pending_contacts) {
             auto* p = pc.mf_point;
-            p->normal_lambda = m_solver->get_lambda(p->normal_constr_id);
-            p->friction1_lambda = m_solver->get_lambda(p->friction1_constr_id);
-            p->friction2_lambda = m_solver->get_lambda(p->friction2_constr_id);
+            p->normal_lambda = ctx.solver->get_lambda(p->normal_constr_id);
+            p->friction1_lambda = ctx.solver->get_lambda(p->friction1_constr_id);
+            p->friction2_lambda = ctx.solver->get_lambda(p->friction2_constr_id);
         }
     }
 
     for (auto& joint : m_joints) {
-        joint->cache_lambdas(m_solver.get());
+        //joint->cache_lambdas(m_solver.get());
     }
 }
 
 void DynamicsWorld::integrate_bodies()
 {
-    float dt = m_solver->time_interval();
+    float dt = m_solver_ctx[0].solver->time_interval();
 
     for (auto& data : m_actors[(int)ActorKind::Dynamic]) {
         auto* actor = data.actor->cast<DynamicActor>();
@@ -422,7 +437,7 @@ void DynamicsWorld::update_general_stats()
     for (int kind = 0; kind < (int)ActorKind::Count; kind++)
         m_stats.actor_count[kind] = m_actors[kind].size();
 
-    m_stats.simulation_time += m_solver->time_interval();
+    m_stats.simulation_time += m_solver_ctx[0].solver->time_interval();
 }
 
 void DynamicsWorld::setup_executor(TaskExecutor& executor)
@@ -446,20 +461,66 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
 
     TaskId after_collision = executor.emplace([]() {});
 
-    executor.set_order(prepare_task, external_forces_task, after_collision);
+    // TODO: optimize order
+    executor.set_order(prepare_task, external_forces_task);
+    setup_collision_detection(executor, {external_forces_task, after_collision});
 
-    setup_collision_detection(executor, {prepare_task, after_collision});
+    TaskId merge_task = executor.emplace([this, concurrency = executor.concurrency()]() {
+        auto& dyn_actors = m_actors[(int) ActorKind::Dynamic];
+        m_islands_ds.reset(dyn_actors.size());
+        m_island_to_bin.resize(dyn_actors.size());
+        m_islands.clear();
 
-    TaskId merge_task = executor.emplace([this]() {
-        for (auto& ctx : m_worker_ctx)
-            m_pending_contacts.insert(m_pending_contacts.end(), ctx.pending_contacts.begin(), ctx.pending_contacts.end());
+        for (auto& ctx : m_worker_ctx) {
+            //m_pending_contacts.insert(m_pending_contacts.end(), ctx.pending_contacts.begin(), ctx.pending_contacts.end());
+
+            for (auto[a, b]: ctx.actor_contacts) {
+                m_islands_ds.merge(a, b);
+            }
+
+            ctx.actor_contacts.clear();
+        }
+
+        for (uint32_t i = 0; i < dyn_actors.size(); i++) {
+            if (i == m_islands_ds.find_root(i)) {
+                m_islands.push_back({i, m_islands_ds.get_size(i)});
+            }
+        }
+
+        std::sort(m_islands.begin(), m_islands.end(), [](auto& a, auto& b) { return a.size > b.size; } );
+
+        int bin_cnt = 0;
+        for (auto& [root, size] : m_islands) {
+            m_island_to_bin[root] = bin_cnt % concurrency;
+            bin_cnt++;
+        }
+
+        for (uint32_t i = 0; i < dyn_actors.size(); i++) {
+            uint32_t root = m_islands_ds.find_root(i);
+            int bin = m_island_to_bin[root];
+            auto& body = dyn_actors[i].actor->cast<DynamicActor>()->body();
+            m_solver_ctx[bin].solver->register_body(&body);
+        }
+
+        for (auto& ctx : m_worker_ctx) {
+            for (auto& c : ctx.pending_contacts) {
+                uint32_t root = m_islands_ds.find_root(c.actor_index);
+                int bin = m_island_to_bin[root];
+                m_solver_ctx[bin].pending_contacts.push_back(c);
+            }
+            ctx.pending_contacts.clear();
+        }
+
     }, "merge_contacts");
 
     TaskId randomize_task = executor.emplace([this]() {
-        if (m_config.randomize_order) {
-            for (auto& c: m_pending_contacts) {
-                auto r = rand() % m_pending_contacts.size();
-                std::swap(c, m_pending_contacts[r]);
+        if (!m_config.randomize_order)
+            return;
+
+        for (auto& ctx : m_solver_ctx) {
+            for (auto& c: ctx.pending_contacts) {
+                auto r = rand() % ctx.pending_contacts.size();
+                std::swap(c, ctx.pending_contacts[r]);
             }
         }
     }, "randomize");
@@ -467,13 +528,16 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
     executor.set_order(after_collision, merge_task, randomize_task);
 
     TaskId allocate_task = executor.emplace([this]() {
-        if (m_config.enable_constraint_resolving) {
-            int contact_count = m_pending_contacts.size();
-            m_normal_range = m_solver->allocate_range(ConstraintGroup::General, contact_count);
+        if (!m_config.enable_constraint_resolving)
+            return;
+
+        for (auto& ctx : m_solver_ctx) {
+            int contact_count = ctx.pending_contacts.size();
+            m_normal_range = ctx.solver->allocate_range(ConstraintGroup::General, contact_count);
             ConstraintGroup friction_group = m_config.enable_cone_friction
-                ? ConstraintGroup::FrictionCone
-                : ConstraintGroup::Friction2D;
-            m_friction_range = m_solver->allocate_range(friction_group, contact_count * 2);
+                                             ? ConstraintGroup::FrictionCone
+                                             : ConstraintGroup::Friction2D;
+            m_friction_range = ctx.solver->allocate_range(friction_group, contact_count * 2);
         }
     }, "allocate");
 
@@ -505,7 +569,8 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
     //executor.set_order(randomize_task, friction_constr_task, before_solver);
     executor.set_order(joints_task, before_solver);
 
-    m_solver->setup_solve_executor(executor, {before_solver, after_solver});
+    for (int i = 0; i < executor.concurrency(); i++)
+        m_solver_ctx[i].solver->setup_solve_executor(executor, {before_solver, after_solver});
 
     TaskId cache_lambda_task = executor.emplace([this]() {
         if (m_config.enable_constraint_resolving) {
@@ -513,11 +578,12 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
             update_constraint_stats();
         }
 
-        m_solver->clear();
-
-        m_pending_contacts.clear();
-        for (auto& ctx: m_worker_ctx)
+        for (auto& ctx : m_solver_ctx) {
+            ctx.solver->clear();
             ctx.pending_contacts.clear();
+        }
+        //for (auto& ctx: m_worker_ctx)
+        //    ctx.pending_contacts.clear();
     }, "cache_lambda");
 
 

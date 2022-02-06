@@ -1,8 +1,8 @@
 #pragma once
 #include "app/ecs/entity.hpp"
 #include "app/ecs/component.hpp"
-#include "slope/containers/unordered_map.hpp"
-#include "slope/containers/unordered_set.hpp"
+#include "slope/core/unordered_map.hpp"
+#include "slope/core/unordered_set.hpp"
 #include <limits>
 #include <mutex>
 

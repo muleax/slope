@@ -2,7 +2,7 @@
 
 #include "slope/dynamics/constraint_solver.hpp"
 #include "slope/dynamics/rigid_body.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/array.hpp"
 #include <optional>
 
 namespace slope {

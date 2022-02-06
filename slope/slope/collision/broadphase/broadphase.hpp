@@ -1,6 +1,6 @@
 #pragma once
 #include "slope/collision/aabb.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 #include "slope/thread/task_executor.hpp"
 #include "slope/debug/log.hpp"
 #include <algorithm>

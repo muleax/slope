@@ -1,6 +1,6 @@
 #pragma once
 #include "slope/collision/narrowphase/narrowphase_backend.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/array.hpp"
 #include "slope/debug/log.hpp"
 #include <memory>
 

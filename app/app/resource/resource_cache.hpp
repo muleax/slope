@@ -1,6 +1,6 @@
 #pragma once
-#include "slope/containers/unordered_map.hpp"
-#include "slope/containers/string.hpp"
+#include "slope/core/unordered_map.hpp"
+#include "slope/core/string.hpp"
 #include <memory>
 #include <functional>
 

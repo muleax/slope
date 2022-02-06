@@ -1,6 +1,6 @@
 #pragma once
 #include "app/ecs/world.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 #include "slope/debug/assert.hpp"
 
 namespace slope::app {

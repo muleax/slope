@@ -1,8 +1,8 @@
 #pragma once
 #include "slope/math/vector2.hpp"
 #include "slope/math/vector3.hpp"
-#include "slope/containers/vector.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/vector.hpp"
+#include "slope/core/array.hpp"
 #include <memory>
 
 namespace slope {

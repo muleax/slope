@@ -6,7 +6,7 @@
 #include "app/render/debug_drawer_impl.hpp"
 #include "app/ecs/system.hpp"
 #include "slope/math/matrix44.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 
 namespace slope::app {
 

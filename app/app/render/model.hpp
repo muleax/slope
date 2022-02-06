@@ -1,6 +1,6 @@
 #pragma once
 #include "app/render/mesh.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 #include <atomic>
 
 namespace slope::app {

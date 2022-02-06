@@ -1,8 +1,8 @@
 #pragma once
 #include "app/ecs/entity.hpp"
-#include "slope/containers/string.hpp"
-#include "slope/containers/vector.hpp"
-#include "slope/containers/array.hpp"
+#include "slope/core/string.hpp"
+#include "slope/core/vector.hpp"
+#include "slope/core/array.hpp"
 #include "slope/debug/assert.hpp"
 #include <atomic>
 #include <bitset>

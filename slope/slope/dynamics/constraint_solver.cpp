@@ -699,9 +699,6 @@ void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
             auto* body = b_extra->body;
             b_extra->v_delta1 = body->velocity() * m_inv_dt + body->force() * body->inv_mass();
             b_extra->v_delta2 = body->ang_velocity() * m_inv_dt + body->inv_inertia().apply_normal(body->torque());
-
-            b->inv_m_f1.set_zero();
-            b->inv_m_f2.set_zero();
         }
     }, "init_body_data");
 
@@ -715,6 +712,10 @@ void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
             // inv_diag = 1 / (cfm / dt + J * M_inv * J_t)
             // M_inv * force = M_inv * J_t * lambda
 
+            auto& bodies = m_task_ctx[task_idx].bodies;
+            bodies.clear();
+            bodies.resize(m_bodies.size());
+
             size_t concurrency = m_task_ctx.size();
 
             for (auto& group: m_groups) {
@@ -725,7 +726,8 @@ void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
                     ? group.constraints.begin() + group.size
                     : (chunk_beg + chunk_size);
 
-                for (auto c = chunk_beg; c != chunk_end; ++c) {
+                auto* lambda = group.lambda.data() + (task_idx * chunk_size);
+                for (auto c = chunk_beg; c != chunk_end; ++c, ++lambda) {
                     auto& b1_extra = m_bodies_extra[c->body1_idx];
 
                     float j_v_delta = c->jacobian11.dot(b1_extra.v_delta1) + c->jacobian12.dot(b1_extra.v_delta2);
@@ -735,8 +737,11 @@ void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
 
                     float j_inv_m_j = c->jacobian11.dot(c->inv_m_j11) + c->jacobian12.dot(c->inv_m_j12);
 
+                    auto& b1 = bodies[c->body1_idx];
+                    b1.inv_m_f1 += c->inv_m_j11 * *lambda;
+                    b1.inv_m_f2 += c->inv_m_j12 * *lambda;
+
                     if (c->body2_idx >= 0) {
-                        auto& b2 = m_bodies[c->body2_idx];
                         auto& b2_extra = m_bodies_extra[c->body2_idx];
 
                         j_v_delta += c->jacobian21.dot(b2_extra.v_delta1) + c->jacobian22.dot(b2_extra.v_delta2);
@@ -745,6 +750,10 @@ void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
                         c->inv_m_j22 = b2_extra.body->inv_inertia().apply_normal(c->jacobian22);
 
                         j_inv_m_j += c->jacobian21.dot(c->inv_m_j21) + c->jacobian22.dot(c->inv_m_j22);
+
+                        auto& b2 = bodies[c->body2_idx];
+                        b2.inv_m_f1 += c->inv_m_j21 * *lambda;
+                        b2.inv_m_f2 += c->inv_m_j22 * *lambda;
                     }
 
                     c->rhs = m_inv_dt * m_inv_dt * c->bg_error - j_v_delta;
@@ -759,19 +768,15 @@ void ConstraintSolver::prepare_data(TaskExecutor& executor, Fence fence)
     }
 
     auto prepare2_task = executor.emplace([this]() {
-        for (auto& group: m_groups) {
-            auto* lambda = group.lambda.data();
-            for (auto c = group.constraints.begin(); c != group.constraints.begin() + group.size; ++c, ++lambda) {
-                auto& b1 = m_bodies[c->body1_idx];
+        for (size_t i = 0; i < m_bodies.size(); i++) {
+            auto& b = m_bodies[i];
+            b.inv_m_f1.set_zero();
+            b.inv_m_f2.set_zero();
 
-                b1.inv_m_f1 += c->inv_m_j11 * *lambda;
-                b1.inv_m_f2 += c->inv_m_j12 * *lambda;
-
-                if (c->body2_idx >= 0) {
-                    auto& b2 = m_bodies[c->body2_idx];
-                    b2.inv_m_f1 += c->inv_m_j21 * *lambda;
-                    b2.inv_m_f2 += c->inv_m_j22 * *lambda;
-                }
+            for (auto& ctx : m_task_ctx) {
+                auto& cb = ctx.bodies[i];
+                b.inv_m_f1 += cb.inv_m_f1;
+                b.inv_m_f2 += cb.inv_m_f2;
             }
         }
     }, "prepare2");
