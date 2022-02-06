@@ -53,8 +53,8 @@ public:
     const char* name() override { return "Stress Test"; }
 
 private:
-    int m_height = 10;
-    int m_width = 25;
+    int m_height = 60;
+    int m_width = 10;
 };
 
 class CollisionDemo : public Demo {

@@ -146,11 +146,24 @@ private:
     struct SolverContext {
         std::unique_ptr<ConstraintSolver> solver;
         Vector<PendingContact>  pending_contacts;
+        ConstraintIds normal_range;
+        ConstraintIds friction_range;
     };
 
     void setup_collision_detection(TaskExecutor& executor, Fence fence);
 
-    void apply_contacts(TaskExecutor& executor, Fence fence);
+    void merge_contacts();
+
+    void randomize_contacts(int solver_id);
+
+    void allocate_constraints();
+
+    void apply_contacts(int solver_id, TaskExecutor& executor, Fence fence, int concurrency);
+
+    TaskId setup_solver_executor(int solver_id, TaskExecutor& executor, Fence fence, int concurrency);
+
+
+
 
     void apply_external_forces();
     void collide(BaseActor* actor1, BaseActor* actor2, WorkerContext& ctx);
@@ -194,10 +207,9 @@ private:
     Config m_config;
     Stats m_stats;
 
-    ConstraintIds m_normal_range;
-    ConstraintIds m_friction_range;
-
     uint32_t m_frame_id = 0;
+
+    int m_concurrency = 1;
 
     std::shared_ptr<DebugDrawer> m_debug_drawer;
 };

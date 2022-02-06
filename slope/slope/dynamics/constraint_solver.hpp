@@ -2,7 +2,6 @@
 #include "slope/dynamics/rigid_body.hpp"
 #include "slope/core/vector.hpp"
 #include "slope/core/array.hpp"
-#include "slope/thread/task_executor.hpp"
 
 namespace slope {
 
@@ -198,17 +197,15 @@ public:
         setup_constraint(data2, c2, friction_ratio.y);
     }
 
-    /*
-    ConstraintId    add_constraint(const Constraint& c);
-    ConstraintId    join_friction_1d(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id);
-    ConstraintIds   join_friction_2d(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id);
-    ConstraintIds   join_friction_cone(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id);
-*/
-
     float           get_lambda(ConstraintId constr_id) const;
     void            clear();
 
-    void            setup_solve_executor(TaskExecutor& executor, Fence fence);
+    void            set_concurrency(int concurrency) { m_worker_ctx.resize(concurrency); }
+    int             concurrency() const { return static_cast<int>(m_worker_ctx.size()); }
+
+    void            solve_pass0();
+    void            solve_pass1(int worker_id);
+    void            solve_pass2();
 
 protected:
     struct alignas(16) ConstraintData {
@@ -256,58 +253,27 @@ protected:
         int size = 0;
     };
 
-    struct TaskContext {
+    struct WorkerContext {
         Vector<BodyData> bodies;
     };
 
-    ConstraintData& basic_setup(ConstraintId constr_id, const Constraint& c)
-    {
-        SL_ASSERT(c.body1->in_solver_index() != -1);
+    using Groups = Array<GroupData, (int)ConstraintGroup::Count>;
 
-        auto& group = m_groups[(int)constr_id.group()];
-        auto& data = group.constraints[constr_id.index()];
+    ConstraintData& basic_setup(ConstraintId constr_id, const Constraint& c);
 
-        data.body1_idx = c.body1->in_solver_index();
-        data.jacobian11 = c.jacobian1[0];
-        data.jacobian12 = c.jacobian1[1];
-
-        if (c.body2) {
-            SL_ASSERT(c.body2->in_solver_index() != -1);
-
-            data.body2_idx = c.body2->in_solver_index();
-            data.jacobian21 = c.jacobian2[0];
-            data.jacobian22 = c.jacobian2[1];
-        } else {
-            data.body2_idx = -1;
-            data.jacobian21.set_zero();
-            data.jacobian22.set_zero();
-        }
-
-        data.normal_constr_idx = -1;
-
-        group.lambda[constr_id.index()] = c.init_lambda;
-
-        return data;
-    }
-
-    void prepare_data(TaskExecutor& executor, Fence fence);
-
-    //auto create_constraint(const Constraint& c, ConstraintGroup group) -> std::pair<ConstraintId, ConstraintData*>;
     void apply_impulses();
 
     template<bool UseSIMD>
     void solve_iterations();
 
-    float   m_dt = 1.f;
-    float   m_inv_dt = 1.f;
-    Config  m_config;
+    float                   m_dt = 1.f;
+    float                   m_inv_dt = 1.f;
+    Config                  m_config;
 
-    Vector<BodyData> m_bodies;
-    Vector<BodyExtraData> m_bodies_extra;
-    //Array<std::unique_ptr<GroupData>, (int)ConstraintGroup::Count> m_groups;
-    Array<GroupData, (int)ConstraintGroup::Count> m_groups;
-
-    Vector<TaskContext> m_task_ctx;
+    Vector<BodyData>        m_bodies;
+    Vector<BodyExtraData>   m_bodies_extra;
+    Groups                  m_groups;
+    Vector<WorkerContext>   m_worker_ctx;
 
     friend struct ConstraintHelper;
 };
