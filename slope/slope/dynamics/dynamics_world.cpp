@@ -255,17 +255,14 @@ void DynamicsWorld::setup_collision_detection(TaskExecutor& executor, Fence fenc
     m_broadphase.setup_executor(overlap_callback, executor, {prepare_task, fence.post}, cd_concurrency);
 }
 
-void DynamicsWorld::apply_contacts(int solver_id, TaskExecutor& executor, Fence fence, int concurrency)
+void DynamicsWorld::apply_contacts(int worker_id, int solver_id)
 {
-    for (int worker_id = 0; worker_id < concurrency; worker_id++) {
-
-        TaskId task = executor.emplace([this, worker_id, solver_id, concurrency]() {
             auto& ctx = m_solver_ctx[solver_id];
 
-            size_t chunk_size = ctx.pending_contacts.size() / concurrency;
+            size_t chunk_size = ctx.pending_contacts.size() / m_concurrency;
 
             int chunk_beg = worker_id * chunk_size;
-            int chunk_end = (worker_id == concurrency - 1)
+            int chunk_end = (worker_id == m_concurrency - 1)
                             ? ctx.pending_contacts.size()
                             : chunk_beg + chunk_size;
 
@@ -331,10 +328,7 @@ void DynamicsWorld::apply_contacts(int solver_id, TaskExecutor& executor, Fence 
                                                   mf_point->normal_constr_id);
                 }
             }
-        }, "apply_contacts");
 
-        executor.set_order(fence.pre, task, fence.post);
-    }
 /*
  * auto* debug_drawer = m_debug_drawer.get();
             if (debug_drawer) {
@@ -388,33 +382,32 @@ void DynamicsWorld::allocate_constraints()
     }
 }
 
-TaskId DynamicsWorld::setup_solver_executor(int solver_id, TaskExecutor& executor, Fence fence, int concurrency)
+void DynamicsWorld::setup_solver_pass01(int solver_id, TaskExecutor& executor, Fence fence)
 {
-    m_solver_ctx[solver_id].solver->set_concurrency(concurrency);
+    m_solver_ctx[solver_id].solver->set_concurrency(m_concurrency);
 
     TaskId pass0 = executor.emplace([this, solver_id]() {
         m_solver_ctx[solver_id].solver->solve_pass0();
     }, "solver_pass0");
 
-    TaskId pass2 = executor.emplace([this, solver_id]() {
-        m_solver_ctx[solver_id].solver->solve_pass2();
-    }, "solver_pass2");
+    executor.set_order(fence.pre, pass0);
 
-    TaskId after_pass1 = executor.emplace([](){});
-
-    for (int worker_id = 0; worker_id < concurrency; worker_id++) {
+    for (int worker_id = 0; worker_id < m_concurrency; worker_id++) {
         TaskId pass1 = executor.emplace([this, solver_id, worker_id]() {
             m_solver_ctx[solver_id].solver->solve_pass1(worker_id);
         }, "solver_pass1");
 
-        executor.set_order(pass0, pass1, pass2);
-        executor.set_order(pass1, after_pass1);
+        executor.set_order(pass0, pass1, fence.post);
     }
+}
 
-    executor.set_order(fence.pre, pass0);
-    executor.set_order(pass2, fence.post);
+void DynamicsWorld::setup_solver_pass2(int solver_id, TaskExecutor& executor, Fence fence)
+{
+    TaskId pass2 = executor.emplace([this, solver_id]() {
+        m_solver_ctx[solver_id].solver->solve_pass2();
+    }, "solver_pass2");
 
-    return after_pass1;
+    executor.set_order(fence.pre, pass2, fence.post);
 }
 
 void DynamicsWorld::apply_joints()
@@ -426,11 +419,17 @@ void DynamicsWorld::apply_joints()
     }
 }
 
-void DynamicsWorld::cache_lambdas()
+void DynamicsWorld::cache_lambdas(int worker_id)
 {
     for (auto& ctx : m_solver_ctx) {
-        for (auto& pc : ctx.pending_contacts) {
-            auto* p = pc.mf_point;
+        size_t chunk_size = ctx.pending_contacts.size() / m_concurrency;
+        int chunk_beg = worker_id * chunk_size;
+        int chunk_end = (worker_id == m_concurrency - 1)
+                        ? ctx.pending_contacts.size()
+                        : chunk_beg + chunk_size;
+
+        for (auto it = ctx.pending_contacts.begin() + chunk_beg; it != ctx.pending_contacts.begin() + chunk_end; it++) {
+            auto* p = it->mf_point;
             p->normal_lambda = ctx.solver->get_lambda(p->normal_constr_id);
             p->friction1_lambda = ctx.solver->get_lambda(p->friction1_constr_id);
             p->friction2_lambda = ctx.solver->get_lambda(p->friction2_constr_id);
@@ -442,15 +441,24 @@ void DynamicsWorld::cache_lambdas()
     }
 }
 
-void DynamicsWorld::integrate_bodies()
+void DynamicsWorld::integrate_bodies(int worker_id, int concurrency)
 {
     float dt = m_solver_ctx[0].solver->time_interval();
 
-    for (auto& data : m_actors[(int)ActorKind::Dynamic]) {
-        auto* actor = data.actor->cast<DynamicActor>();
+    auto& dyn_actors = m_actors[(int)ActorKind::Dynamic];
+
+    size_t chunk_size = dyn_actors.size() / concurrency;
+
+    int chunk_beg = worker_id * chunk_size;
+    int chunk_end = (worker_id == concurrency - 1)
+                    ? dyn_actors.size()
+                    : chunk_beg + chunk_size;
+
+    for (auto it = dyn_actors.begin() + chunk_beg; it != dyn_actors.begin() + chunk_end; it++) {
+        auto* actor = it->actor->cast<DynamicActor>();
         auto& body = actor->body();
         body.integrate(dt);
-        data.actor->shape().set_transform(body.transform());
+        actor->shape().set_transform(body.transform());
     }
 }
 
@@ -524,11 +532,18 @@ void DynamicsWorld::merge_contacts()
     std::sort(m_islands.begin(), m_islands.end(), [](auto& a, auto& b) { return a.size > b.size; } );
 
     // TODO: reconsider
-    m_island_to_bin[m_islands[0].root] = 0;
-    int bin_cnt = 0;
-    for (auto it = m_islands.begin() + 1; it != m_islands.end(); it++) {
-        m_island_to_bin[it->root] = 1 + bin_cnt % (m_concurrency - 1);
-        bin_cnt++;
+    if (m_concurrency == 1) {
+        for (auto& island : m_islands) {
+            m_island_to_bin[island.root] = 0;
+        }
+    } else {
+        //m_island_to_bin[m_islands[0].root] = 0;
+        int bin_cnt = 0;
+        for (auto it = m_islands.begin(); it != m_islands.end(); it++) {
+            //m_island_to_bin[it->root] = 1 + bin_cnt % (m_concurrency - 1);
+            m_island_to_bin[it->root] = bin_cnt % m_concurrency;
+            bin_cnt++;
+        }
     }
 
     for (uint32_t i = 0; i < dyn_actors.size(); i++) {
@@ -557,7 +572,8 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
             m_debug_drawer->clear();
 
         if (m_config.enable_integration && m_config.delay_integration)
-            integrate_bodies();
+            for (int worker_id = 0; worker_id < m_concurrency; worker_id++)
+                integrate_bodies(worker_id, m_concurrency);
 
         setup_narrowphase(m_config.np_backend_hint);
         setup_solver(m_config.solver_type);
@@ -577,10 +593,11 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
 
     TaskId merge_task = executor.emplace([this]() { merge_contacts(); }, "merge_contacts");
 
-    TaskId randomize_main = executor.emplace([this]() { randomize_contacts(0); }, "randomize_main");
+    //TaskId randomize_main = executor.emplace([this]() { randomize_contacts(0); }, "randomize_main");
 
     TaskId allocate = executor.emplace([this]() { allocate_constraints(); }, "allocate");
-    executor.set_order(after_collision, merge_task, randomize_main, allocate);
+    //executor.set_order(after_collision, merge_task, randomize_main, allocate);
+    executor.set_order(after_collision, merge_task, allocate);
 
     /*
     TaskId joints_task = executor.emplace([this]() {
@@ -589,58 +606,117 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
     }, "joint_constraints");
 */
 
-    TaskId before_solver = executor.emplace([]() {});
-    TaskId after_solver = executor.emplace([]() {});
 
-    apply_contacts(0, executor, {allocate, before_solver}, m_concurrency);
+    TaskId pass1_fence = executor.emplace([]() {});
+
+    //apply_contacts(0, executor, {allocate, before_solver}, m_concurrency);
 
     //executor.set_order(randomize_task, friction_constr_task, before_solver);
     //executor.set_order(joints_task, before_solver);
 
-    TaskId after_main_pass1 = setup_solver_executor(0, executor, {before_solver, after_solver}, m_concurrency);
+    //TaskId after_main_pass1 = setup_solver_executor(0, executor, {before_solver, after_solver}, m_concurrency);
 
-    for (int solver_id = 1; solver_id < m_concurrency; solver_id++) {
+    TaskId after_randomize = executor.emplace([]() {});
+    for (int solver_id = 0; solver_id < m_concurrency; solver_id++) {
         TaskId randomize = executor.emplace([this, solver_id]() { randomize_contacts(solver_id); }, "randomize_minor");
-        executor.set_order(after_main_pass1, randomize);
-
-        TaskId before_solver_minor = executor.emplace([]() {});
-
-        apply_contacts(solver_id, executor, {randomize, before_solver_minor}, 1);
-
-        setup_solver_executor(solver_id, executor, {before_solver_minor, after_solver}, 1);
+        executor.set_order(allocate, randomize, after_randomize);
     }
 
-    TaskId cache_lambda_task = executor.emplace([this]() {
+    //TaskId after_contacts0 = executor.emplace([]() {});
+    //apply_contacts(0, executor, {after_randomize, after_contacts0});
+
+    //TaskId after_contacts = executor.emplace([]() {});
+
+    for (int solver_id = 0; solver_id < m_concurrency; solver_id++)
+        m_solver_ctx[solver_id].solver->set_concurrency(m_concurrency);
+
+    TaskId before_pass0 = executor.emplace([]() {});
+    TaskId after_pass0 = executor.emplace([]() {});
+
+    for (int worker_id = 0; worker_id < m_concurrency; worker_id++) {
+        TaskId pre = after_randomize;
+        for (int solver_id = 0; solver_id < m_concurrency; solver_id++) {
+            TaskId task = executor.emplace([this, worker_id, solver_id]() {
+                apply_contacts(worker_id, solver_id);
+            }, "apply_contacts");
+            executor.set_order(pre, task);
+            pre = task;
+        }
+
+        executor.set_order(pre, before_pass0);
+    }
+
+
+    for (int solver_id = 0; solver_id < m_concurrency; solver_id++) {
+        TaskId task = executor.emplace([this, solver_id]() {
+            m_solver_ctx[solver_id].solver->solve_pass0();
+        }, "solver_pass0");
+        executor.set_order(before_pass0, task, after_pass0);
+    }
+
+    TaskId after_pass1 = executor.emplace([]() {});
+
+    for (int worker_id = 0; worker_id < m_concurrency; worker_id++) {
+        TaskId pre = after_pass0;
+        for (int solver_id = 0; solver_id < m_concurrency; solver_id++) {
+            TaskId task = executor.emplace([this, solver_id, worker_id]() {
+                m_solver_ctx[solver_id].solver->solve_pass1(worker_id);
+            }, "solver_pass1");
+            executor.set_order(pre, task);
+            pre = task;
+        }
+
+        executor.set_order(pre, after_pass1);
+    }
+
+    TaskId after_solver = executor.emplace([]() {});
+
+    for (int solver_id = 0; solver_id < m_concurrency; solver_id++) {
+        TaskId pass2 = executor.emplace([this, solver_id]() {
+            m_solver_ctx[solver_id].solver->solve_pass2();
+        }, "solver_pass2");
+        executor.set_order(after_pass1, pass2, after_solver);
+    }
+
+    TaskId after_cache_lambda = executor.emplace([]() {});
+
+    for (int worker_id = 0; worker_id < m_concurrency; worker_id++) {
+        TaskId cache_lambda_task = executor.emplace([this, worker_id]() {
+            if (m_config.enable_constraint_resolving) {
+                cache_lambdas(worker_id);
+            }
+        }, "cache_lambda");
+
+        executor.set_order(after_solver, cache_lambda_task, after_cache_lambda);
+    }
+
+    TaskId cleanup = executor.emplace([this]() {
         if (m_config.enable_constraint_resolving) {
-            cache_lambdas();
             update_constraint_stats();
         }
+
+        update_general_stats();
 
         for (auto& ctx : m_solver_ctx) {
             ctx.solver->clear();
             ctx.pending_contacts.clear();
         }
-        //for (auto& ctx: m_worker_ctx)
-        //    ctx.pending_contacts.clear();
-    }, "cache_lambda");
 
-
-    TaskId refresh_manifolds_task = executor.emplace([this]() {
         refresh_manifolds();
-    }, "refresh_manifolds");
+    }, "cleanup");
 
     //executor.set_order(cache_lambda_task, refresh_manifolds_task);
 
-    TaskId integrate_task = executor.emplace([this]() {
-        if (m_config.enable_integration && !m_config.delay_integration)
-            integrate_bodies();
+    int integrate_concurrency = m_concurrency * 3;
+    for (int worker_id = 0; worker_id < integrate_concurrency; worker_id++) {
+        TaskId integrate_task = executor.emplace([this, worker_id, integrate_concurrency]() {
+            if (m_config.enable_integration && !m_config.delay_integration)
+                integrate_bodies(worker_id, integrate_concurrency);
+        }, "integrate");
+        executor.set_order(after_cache_lambda, integrate_task);
+    }
 
-        update_general_stats();
-
-    }, "integrate");
-
-    executor.set_order(after_solver, cache_lambda_task, refresh_manifolds_task);
-    executor.set_order(after_solver, integrate_task);
+    executor.set_order(after_cache_lambda, cleanup);
 }
 
 } // slope

@@ -82,13 +82,15 @@ void StressTestDemo::init()
 
 
     //float spacing = 0.99f;
-    float spacing = 1.2f;
+    float y_spacing = 1.2f;
+    float xz_spacing = 4.2f;
+    float skew = 0.f;
     for (int i = 0; i < m_width; i++) {
         for (int j = 0; j < m_height; j++) {
             for (int k = 0; k < m_width; k++) {
                 mat44 tr = mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
                 tr.set_translation(
-                    {(float) i * spacing + j * 0.2f, (float) j * spacing + 0.2f, (float) k * spacing + j * 0.2f});
+                    {(float) i * xz_spacing + j * skew, (float) j * y_spacing + 0.2f, (float) k * xz_spacing + j * skew});
 
                 m_spawner->spawn_box(tr, {}, 1.f, vec3{1.f});
             }

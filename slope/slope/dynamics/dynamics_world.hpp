@@ -158,10 +158,10 @@ private:
 
     void allocate_constraints();
 
-    void apply_contacts(int solver_id, TaskExecutor& executor, Fence fence, int concurrency);
+    void apply_contacts(int worker_id, int solver_id);
 
-    TaskId setup_solver_executor(int solver_id, TaskExecutor& executor, Fence fence, int concurrency);
-
+    void setup_solver_pass01(int solver_id, TaskExecutor& executor, Fence fence);
+    void setup_solver_pass2(int solver_id, TaskExecutor& executor, Fence fence);
 
 
 
@@ -172,8 +172,8 @@ private:
     void apply_joints();
     void update_constraint_stats();
     void update_general_stats();
-    void cache_lambdas();
-    void integrate_bodies();
+    void cache_lambdas(int worker_id);
+    void integrate_bodies(int worker_id, int concurrency);
     void refresh_manifolds();
 
     void setup_solver(SolverType type);
