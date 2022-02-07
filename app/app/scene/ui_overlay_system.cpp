@@ -76,14 +76,6 @@ void UIOverlaySystem::update(float dt)
         ImGui::Checkbox("Gyroscopic Torque", &world_config.enable_gyroscopic_torque);
         ImGui::Checkbox("Use SIMD solver", &world_config.solver_config.use_simd);
 
-        bool use_pgs = (world_config.solver_type == DynamicsWorld::SolverType::PGS);
-        if (ImGui::RadioButton("PGS", use_pgs))
-            world_config.solver_type = DynamicsWorld::SolverType::PGS;
-        ImGui::SameLine();
-        bool use_pj = (world_config.solver_type == DynamicsWorld::SolverType::PJ);
-        if (ImGui::RadioButton("Projected Jacobi", use_pj))
-            world_config.solver_type = DynamicsWorld::SolverType::PJ;
-
         bool use_mixed = (world_config.np_backend_hint == DynamicsWorld::NpBackendHint::Mixed);
         if (ImGui::RadioButton("Mixed", use_mixed))
             world_config.np_backend_hint = DynamicsWorld::NpBackendHint::Mixed;
@@ -96,6 +88,7 @@ void UIOverlaySystem::update(float dt)
         if (ImGui::RadioButton("SAT", use_sat))
             world_config.np_backend_hint = DynamicsWorld::NpBackendHint::SAT;
 
+        ImGui::DragInt("Concurrency", &ps->concurrency, 1.f, 1, 8);
         ImGui::DragScalar("GJK Max Iters", ImGuiDataType_U32, &gjk_config.max_iteration_count);
         ImGui::DragScalar("EPA Max Iters", ImGuiDataType_U32, &epa_config.max_iteration_count);
         ImGui::DragFloat("EPA Support Bloat", &epa_config.support_bloat);

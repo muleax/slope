@@ -1,10 +1,9 @@
 #pragma once
 #include "slope/collision/aabb.hpp"
 #include "slope/core/vector.hpp"
-#include "slope/thread/task_executor.hpp"
+#include "slope/thread/utils.hpp"
 #include "slope/debug/log.hpp"
 #include <algorithm>
-#include <optional>
 
 namespace slope {
 
@@ -13,65 +12,60 @@ class Broadphase {
 public:
     using ProxyId = uint32_t;
 
-    ProxyId add_proxy(T* data);
+    struct Overlap {
+        T data1;
+        T data2;
+    };
+
+    ProxyId add_proxy(T data);
     void    remove_proxy(ProxyId proxy_id);
     void    update_proxy(ProxyId proxy_id, const AABB& aabb);
 
-    // Sweep and prune
-    template <class Callback>
-    void    setup_executor(const Callback& callback, TaskExecutor& executor, Fence fence, int concurrency);
+    void    clear();
+
+    void    set_concurrency(int concurrency) { m_concurrency = concurrency; }
+    int     concurrency() const { return m_concurrency; }
+
+    void    find_overlaps_pass0();
+    void    find_overlaps_pass1(int worker_id, Vector<Overlap>& out_overlaps);
 
 private:
     struct Proxy {
-        T* data = nullptr;
-        AABB aabb;
-        bool active = false;
+        bool    active = false;
+        T       data;
+        AABB    aabb;
     };
 
-    struct Data {
-        T* data = nullptr;
-        AABB aabb;
+    struct TraverseData {
+        T       data;
+        AABB    aabb;
     };
-
-    struct OverlapCache {
-        T* data1 = nullptr;
-        T* data2 = nullptr;
-    };
-
-    struct TaskContext {
-        int chunk_beg = 0;
-        int chunk_end = 0;
-        Vector<OverlapCache> overlaps;
-    };
-
-    void update_traverse_order();
-    void update_execution_context();
 
     Vector<Proxy>           m_proxies;
     Vector<ProxyId>         m_free_ids;
-    Vector<Data>            m_traverse_order;
-    Vector<TaskContext>     m_task_ctx;
-    int                     m_sort_axis = 0;
+    int                     m_concurrency = 1;
 
-    Vector<OverlapCache>    m_overlaps;
+    Vector<TraverseData>    m_traverse_order;
+    int                     m_sort_axis = 0;
 };
 
 template <class T>
-typename Broadphase<T>::ProxyId Broadphase<T>::add_proxy(T* data)
+typename Broadphase<T>::ProxyId Broadphase<T>::add_proxy(T data)
 {
     ProxyId new_id;
     if (!m_free_ids.empty()) {
         new_id = m_free_ids.back();
         m_free_ids.pop_back();
 
+        auto& proxy = m_proxies[new_id];
+        proxy.active = true;
+        proxy.data = data;
+
     } else {
-        new_id = (ProxyId)m_proxies.size();
-        m_proxies.emplace_back();
+        new_id = static_cast<ProxyId>(m_proxies.size());
+        m_proxies.push_back({true, data});
     }
 
-    auto& proxy = m_proxies[new_id];
-    proxy.data = data;
-    proxy.active = true;
     return new_id;
 }
 
@@ -83,13 +77,20 @@ void Broadphase<T>::remove_proxy(typename Broadphase<T>::ProxyId proxy_id)
 }
 
 template <class T>
+void Broadphase<T>::clear()
+{
+    m_proxies.clear();
+    m_free_ids.clear();
+}
+
+template <class T>
 void Broadphase<T>::update_proxy(typename Broadphase<T>::ProxyId proxy_id, const AABB& aabb)
 {
     m_proxies[proxy_id].aabb = aabb;
 }
 
 template <class T>
-void Broadphase<T>::update_traverse_order()
+void Broadphase<T>::find_overlaps_pass0()
 {
     float mean0 = 0.f;
     float mean1 = 0.f;
@@ -141,84 +142,20 @@ void Broadphase<T>::update_traverse_order()
 }
 
 template <class T>
-void Broadphase<T>::update_execution_context()
+void Broadphase<T>::find_overlaps_pass1(int worker_id, Vector<Overlap>& out_overlaps)
 {
-    update_traverse_order();
+    auto [chunk_beg, chunk_end] = select_sequence_chunk(worker_id, m_concurrency, m_traverse_order);
 
-    int concurrency = static_cast<int>(m_task_ctx.size());
-    size_t chunk_beg = 0;
-
-    for (int task_idx = 0; task_idx < concurrency; task_idx++) {
-        auto& ctx = m_task_ctx[task_idx];
-        ctx.chunk_beg = chunk_beg;
-        ctx.chunk_end = (task_idx == concurrency - 1)
-                        ? m_traverse_order.size()
-                        : ((task_idx + 1) * m_traverse_order.size()) / concurrency;
-
-        chunk_beg = ctx.chunk_end;
-    }
-}
-
-template <class T>
-template <class Callback>
-void Broadphase<T>::setup_executor(const Callback& callback, TaskExecutor& executor, Fence fence, int concurrency)
-{
-    m_task_ctx.resize(concurrency);
-
-    auto prepare_task = executor.emplace([this]() {
-        update_execution_context();
-    }, "prepare_boradphase");
-
-    executor.set_order(fence.pre, prepare_task);
-
-    auto merge_task = executor.emplace([this]() {
-        m_overlaps.clear();
-        for (TaskContext& ctx : m_task_ctx) {
-            m_overlaps.insert(m_overlaps.end(), ctx.overlaps.begin(), ctx.overlaps.end());
-        }
-    }, "merge_overlaps");
-
-    for (int task_idx = 0; task_idx < concurrency; task_idx++) {
-
-        auto chunk_task = executor.emplace([task_idx, callback, this]() {
-            auto& ctx = m_task_ctx[task_idx];
-            ctx.overlaps.clear();
-            for (size_t i = ctx.chunk_beg; i < ctx.chunk_end; i++) {
-                auto& proxy1 = m_traverse_order[i];
-                for (size_t j = i + 1; j < m_traverse_order.size(); j++) {
-                    auto& proxy2 = m_traverse_order[j];
-                    if (proxy1.aabb.max[m_sort_axis] >= proxy2.aabb.min[m_sort_axis]) {
-                        if (proxy1.aabb.intersects(proxy2.aabb)) {
-                            //callback(proxy1.data, proxy2.data, task_idx);
-                            ctx.overlaps.push_back({proxy1.data, proxy2.data});
-                        }
-                    } else {
-                        break;
-                    }
+    for (auto proxy1 = chunk_beg; proxy1 != chunk_end; ++proxy1) {
+        for (auto proxy2 = proxy1 + 1; proxy2 != m_traverse_order.end(); ++proxy2) {
+            if (proxy1->aabb.max[m_sort_axis] >= proxy2->aabb.min[m_sort_axis]) {
+                if (proxy1->aabb.intersects(proxy2->aabb)) {
+                    out_overlaps.push_back({proxy1->data, proxy2->data});
                 }
+            } else {
+                break;
             }
-        }, "overlap");
-
-        executor.set_order(prepare_task, chunk_task, merge_task);
-    }
-
-    for (int task_idx = 0; task_idx < concurrency; task_idx++) {
-
-        auto chunk_task = executor.emplace([task_idx, callback, concurrency, this]() {
-
-            size_t chunk_size = m_overlaps.size() / concurrency;
-
-            int chunk_beg = task_idx * chunk_size;
-            int chunk_end = (task_idx == concurrency - 1)
-                            ? m_overlaps.size()
-                            : chunk_beg + chunk_size;
-
-            for (auto it = m_overlaps.begin() + chunk_beg; it != m_overlaps.begin() + chunk_end; ++it) {
-                callback(it->data1, it->data2, task_idx);
-            }
-        }, "collide");
-
-        executor.set_order(merge_task, chunk_task, fence.post);
+        }
     }
 }
 

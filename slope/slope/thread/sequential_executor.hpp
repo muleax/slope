@@ -1,13 +1,13 @@
 #pragma once
 #include "slope/thread/task_executor.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/vector.hpp"
 #include <cstdint>
 
 namespace slope {
 
-class AsyncExecutor : public TaskExecutor {
+class SequentialExecutor : public TaskExecutor {
 public:
-    TaskId emplace(Callback&& task, const char* name = nullptr) final
+    TaskId emplace(Callback&& task, std::string_view name) final
     {
         m_tasks.push_back({std::move(task)});
         return static_cast<TaskId>(m_tasks.size() - 1);

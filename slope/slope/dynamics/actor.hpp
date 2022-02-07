@@ -76,12 +76,6 @@ public:
 
 private:
     RigidBody m_body;
-
-    uint32_t m_local_id;
-    void        set_local_id(uint32_t value) { m_local_id = value; }
-    uint32_t    local_id() const { return m_local_id; }
-
-    friend class DynamicsWorld;
 };
 
 template<class T>

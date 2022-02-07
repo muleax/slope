@@ -12,11 +12,10 @@ public:
         : m_concurrency(concurrency)
         , m_tf_executor(std::make_unique<tf::Executor>(concurrency)) {}
 
-    TaskId emplace(Callback&& task, const char* name = nullptr) final
+    TaskId emplace(Callback&& task, std::string_view name) final
     {
         m_tasks.push_back(m_taskflow.emplace(std::move(task)));
-        if (name != nullptr)
-            m_tasks.back().name(name);
+        m_tasks.back().name(std::string{name});
         return static_cast<TaskId>(m_tasks.size() - 1);
     }
 

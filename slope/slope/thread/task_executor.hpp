@@ -1,15 +1,10 @@
 #pragma once
 #include <functional>
-#include <optional>
+#include <string>
 
 namespace slope {
 
 using TaskId = int;
-
-struct Fence {
-    TaskId pre = 0;
-    TaskId post = 0;
-};
 
 class TaskExecutor {
 public:
@@ -17,7 +12,7 @@ public:
 
     virtual ~TaskExecutor() = default;
 
-    virtual TaskId  emplace(Callback&& task, const char* name = nullptr) = 0;
+    virtual TaskId  emplace(Callback&& task, std::string_view name) = 0;
     virtual void    set_order(TaskId pre, TaskId post) = 0;
 
     virtual int     concurrency() const = 0;

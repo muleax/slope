@@ -6,29 +6,13 @@
 #include "slope/core/unordered_map.hpp"
 #include "slope/core/array.hpp"
 #include "slope/core/disjoint_set.hpp"
+#include "slope/core/pair_cache.hpp"
 #include "slope/collision/contact_manifold.hpp"
 #include "slope/collision/narrowphase/narrowphase.hpp"
 #include "slope/collision/broadphase/broadphase.hpp"
 #include "slope/debug/debug_drawer.hpp"
 #include "slope/thread/task_executor.hpp"
 #include <memory>
-
-namespace slope {
-using ManifoldCacheKey = std::pair<const void*, const void*>;
-}
-
-namespace std
-{
-template<> struct hash<slope::ManifoldCacheKey>
-{
-    std::size_t operator()(const slope::ManifoldCacheKey& key) const noexcept
-    {
-        auto a = reinterpret_cast<size_t>(key.first);
-        auto b = reinterpret_cast<size_t>(key.second);
-        return a ^ (b + 0x9e3779b9 + (a << 6) + (a >> 2));
-    }
-};
-}
 
 namespace slope {
 
@@ -38,11 +22,6 @@ public:
         Mixed,
         GJK_EPA,
         SAT
-    };
-
-    enum SolverType {
-        PGS,
-        PJ
     };
 
     struct Stats {
@@ -73,7 +52,6 @@ public:
 
         NpBackendHint np_backend_hint = NpBackendHint::Mixed;
 
-        SolverType solver_type = SolverType::PGS;
         ConstraintSolver::Config solver_config;
 
         // debug draw
@@ -110,13 +88,35 @@ public:
 
     uint32_t                frame_id() const { return m_frame_id; }
 
-    Narrowphase&            narrowphase() { return m_worker_ctx[0].narrowphase; }
-    const Narrowphase&      narrowphase() const { return m_worker_ctx[0].narrowphase; }
+    Narrowphase&            narrowphase() { return m_narrowphase_ctx[0].narrowphase; }
+    const Narrowphase&      narrowphase() const { return m_narrowphase_ctx[0].narrowphase; }
 
-    ConstraintSolver&       solver() { return *m_solver_ctx[0].solver; }
-    const ConstraintSolver& solver() const { return *m_solver_ctx[0].solver; }
+    ConstraintSolver&       solver() { return m_solve_ctx[0].solver; }
+    const ConstraintSolver& solver() const { return m_solve_ctx[0].solver; }
 
 private:
+
+    struct ActorId {
+        static constexpr int KIND_BITS = 8;
+        static constexpr int KIND_MASK = (1 << KIND_BITS) - 1;
+
+        static uint64_t compress(ActorId a, ActorId b) { return (static_cast<uint64_t>(a.raw) << 32) | b.raw; }
+
+        ActorId(ActorKind kind, uint32_t index) : raw((index << KIND_BITS) | ((int)kind)) {}
+
+        ActorKind   kind() const { return static_cast<ActorKind>(raw & KIND_MASK); }
+        uint32_t    index() const { return raw >> KIND_BITS; }
+
+        uint32_t    raw;
+    };
+
+    using Broadphase = Broadphase<ActorId>;
+
+    struct ActorData {
+        std::unique_ptr<BaseActor>  actor;
+        Broadphase::ProxyId         proxy_id = 0;
+    };
+
     struct ManifoldCache {
         ContactManifold manifold;
         DynamicActor* actor1 = nullptr;
@@ -130,88 +130,73 @@ private:
         uint32_t actor_index;
     };
 
-    struct ActorData {
-        std::unique_ptr<BaseActor>      actor;
-        Broadphase<BaseActor>::ProxyId  proxy_id = 0;
+    struct BroadphaseContext {
+        Vector<Broadphase::Overlap> overlaps;
     };
 
-    struct WorkerContext {
-        Vector<PendingContact>  pending_contacts;
-        Vector<std::pair<uint32_t, uint32_t>> actor_contacts;
-        Narrowphase             narrowphase;
-        NpContactPatch          contact_patch;
-        UnorderedMap<ManifoldCacheKey, ManifoldCache> new_manifolds;
+    struct NarrowphaseContext {
+        Narrowphase                             narrowphase;
+        NpContactPatch                          contact_patch;
+        Vector<PendingContact>                  pending_contacts;
+        Vector<std::pair<uint32_t, uint32_t>>   actor_contacts;
+        PairCache<ManifoldCache>                new_manifolds;
     };
 
-    struct SolverContext {
-        std::unique_ptr<ConstraintSolver> solver;
+    struct SolveContext {
+        ConstraintSolver solver;
         Vector<PendingContact>  pending_contacts;
         ConstraintIds normal_range;
         ConstraintIds friction_range;
     };
-
-    void setup_collision_detection(TaskExecutor& executor, Fence fence);
-
-    void merge_contacts();
-
-    void randomize_contacts(int solver_id);
-
-    void allocate_constraints();
-
-    void apply_contacts(int worker_id, int solver_id);
-
-    void setup_solver_pass01(int solver_id, TaskExecutor& executor, Fence fence);
-    void setup_solver_pass2(int solver_id, TaskExecutor& executor, Fence fence);
-
-
-
-    void apply_external_forces();
-    void collide(BaseActor* actor1, BaseActor* actor2, WorkerContext& ctx);
-    // void apply_friction();
-
-    void apply_joints();
-    void update_constraint_stats();
-    void update_general_stats();
-    void cache_lambdas(int worker_id);
-    void integrate_bodies(int worker_id, int concurrency);
-    void refresh_manifolds();
-
-    void setup_solver(SolverType type);
-    void setup_narrowphase(NpBackendHint hint);
-    void reset_frame_stats();
-
-    // TODO: optimize storage
-    Array<Vector<ActorData>, (int)ActorKind::Count> m_actors;
-    Vector<std::unique_ptr<BaseJoint>> m_joints;
-
-    DisjointSet m_islands_ds;
 
     struct Island {
         uint32_t root;
         uint32_t size;
     };
 
-    Vector<Island> m_islands;
+    void setup_collision_detection(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence);
 
-    Vector<int> m_island_to_bin;
+    void merge_contacts();
+    void randomize_contacts(int solver_id);
+    void allocate_constraints();
+    void apply_contacts(int worker_id, int concurrency, int solver_id);
+    void apply_external_forces();
+    void collide(NarrowphaseContext& ctx, ActorId actor1_id, ActorId actor2_id);
 
-    Broadphase<BaseActor> m_broadphase;
+    void apply_joints();
+    void update_constraint_stats();
+    void update_general_stats();
+    void cache_lambdas(int worker_id, int concurrency);
+    void integrate_bodies(int worker_id, int concurrency);
+    void refresh_manifolds();
 
-    Array<WorkerContext, 4 * 8> m_worker_ctx;
-    Array<SolverContext, 8> m_solver_ctx;
+    void setup_solver();
+    void setup_narrowphase();
+    void reset_frame_stats();
 
-    UnorderedMap<ManifoldCacheKey, ManifoldCache> m_manifolds;
+    // TODO: optimize storage
+    Array<Vector<ActorData>, (int)ActorKind::Count> m_actors;
+    Vector<std::unique_ptr<BaseJoint>>              m_joints;
 
-    std::optional<NpBackendHint> m_np_backend_hint;
-    std::optional<SolverType> m_solver_type;
-    Config m_config;
-    Stats m_stats;
+    Vector<BroadphaseContext>       m_broadphase_ctx;
+    Broadphase                      m_broadphase;
+    Vector<Broadphase::Overlap>     m_overlaps;
 
-    uint32_t m_frame_id = 0;
+    Vector<NarrowphaseContext>      m_narrowphase_ctx;
+    NpBackendHint                   m_np_backend_hint;
+    PairCache<ManifoldCache>        m_manifolds;
 
-    int m_concurrency = 1;
+    DisjointSet                     m_islands_ds;
+    Vector<Island>                  m_islands;
+    Vector<uint32_t>                m_island_to_bin;
 
-    std::shared_ptr<DebugDrawer> m_debug_drawer;
+    Vector<SolveContext>            m_solve_ctx;
+
+    Config                          m_config;
+    Stats                           m_stats;
+    uint32_t                        m_frame_id = 0;
+
+    std::shared_ptr<DebugDrawer>    m_debug_drawer;
 };
 
 template<class T>
@@ -221,9 +206,11 @@ T* DynamicsWorld::create_actor()
 
     auto actor_ptr = std::make_unique<T>();
     auto* actor = actor_ptr.get();
-    auto proxy_id = m_broadphase.add_proxy(actor);
 
-    m_actors[(int)actor->kind()].push_back({std::move(actor_ptr), proxy_id});
+    auto& container = m_actors[(int)actor->kind()];
+    auto proxy_id = m_broadphase.add_proxy({actor->kind(), static_cast<uint32_t>(container.size())});
+
+    container.push_back({std::move(actor_ptr), proxy_id});
 
     return actor;
 }
