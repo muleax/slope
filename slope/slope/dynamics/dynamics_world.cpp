@@ -314,9 +314,9 @@ void DynamicsWorld::apply_contacts(int worker_id, int concurrency, int solver_id
             ctx.solver.setup_friction_2d(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, normal_id);
         }
 
-        mf_point->normal_constr_id = {normal_id};
-        mf_point->friction1_constr_id = {friction_ids.first};
-        mf_point->friction2_constr_id = {friction_ids.second};
+        mf_point->normal_constr_id = normal_id.raw();
+        mf_point->friction1_constr_id = friction_ids.first.raw();
+        mf_point->friction2_constr_id = friction_ids.second.raw();
 
         ++normal_id;
         friction_id += 2;

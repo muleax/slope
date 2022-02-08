@@ -32,8 +32,6 @@ public:
     int             index() const { return m_raw >> 2; }
     int             raw() const { return m_raw; }
 
-    explicit operator int() const { return m_raw; }
-
     ConstraintId    operator+(int delta) const { return {group(), index() + delta}; }
     ConstraintId    operator-(int delta) const { return {group(), index() - delta}; }
     void            operator+=(int delta) { *this = *this + delta; }

@@ -1,5 +1,5 @@
-#include "slope/containers/string.hpp"
-#include "slope/containers/vector.hpp"
+#include "slope/core/string.hpp"
+#include "slope/core/vector.hpp"
 #include "slope/debug/log.hpp"
 #include "slope/math/math.hpp"
 #include "nlohmann/json.hpp"

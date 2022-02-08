@@ -40,7 +40,7 @@ private:
 template <class Base, typename Base::TKind K>
 class TypedObject : public Base {
 public:
-    static_assert(std::is_base_of_v<TypedBase<Base, typename Base::TKind>, Base>);
+    // static_assert(std::is_base_of_v<TypedBase<Base, typename Base::TKind>, Base>);
 
     static constexpr typename Base::TKind s_kind() { return K; }
 
