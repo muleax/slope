@@ -6,7 +6,7 @@
 
 namespace slope {
 
-class BoxShape : public TypedCollisionShape<ShapeKind::Box> {
+class BoxShape : public TypedObject<CollisionShape, ShapeKind::Box> {
 public:
     explicit BoxShape(const vec3& dimensions);
 

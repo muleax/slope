@@ -34,8 +34,8 @@ private:
 template<class Backend>
 void Narrowphase::add_backend()
 {
-    auto kind1 = static_cast<int>(Backend::Shape1::Kind);
-    auto kind2 = static_cast<int>(Backend::Shape2::Kind);
+    auto kind1 = static_cast<int>(Backend::Shape1::s_kind());
+    auto kind2 = static_cast<int>(Backend::Shape2::s_kind());
 
     remove_backend(kind1, kind2);
 

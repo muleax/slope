@@ -1,7 +1,7 @@
 #pragma once
-#include "slope/dynamics/rigid_body.hpp"
 #include "slope/core/vector.hpp"
 #include "slope/core/array.hpp"
+#include "slope/dynamics/rigid_body.hpp"
 
 namespace slope {
 
@@ -24,7 +24,7 @@ enum class ConstraintGroup : int {
 class ConstraintId {
 public:
     ConstraintId() = default;
-    ConstraintId(int raw) : m_raw(raw) {}
+    explicit ConstraintId(int raw) : m_raw(raw) {}
     ConstraintId(ConstraintGroup group, int index) : m_raw((int)group | index << 2) {}
 
     bool            is_valid() const { return m_raw >= 0; }
@@ -32,9 +32,14 @@ public:
     int             index() const { return m_raw >> 2; }
     int             raw() const { return m_raw; }
 
-    operator int() const { return m_raw; }
+    explicit operator int() const { return m_raw; }
 
-    void operator++() { *this = {group(), index() + 1}; }
+    ConstraintId    operator+(int delta) const { return {group(), index() + delta}; }
+    ConstraintId    operator-(int delta) const { return {group(), index() - delta}; }
+    void            operator+=(int delta) { *this = *this + delta; }
+    void            operator-=(int delta) { *this = *this - delta; }
+    void            operator++() { *this += 1; }
+    void            operator--() { *this -= 1; }
 
 private:
     int m_raw = -1;
@@ -98,104 +103,17 @@ public:
 
     void            register_body(RigidBody* body);
 
-    ConstraintId    allocate(ConstraintGroup group)
-    {
-        auto& group_data = m_groups[(int)group];
-        ConstraintId constr_id = { group, group_data.size };
+    ConstraintId    allocate(ConstraintGroup group, int count);
 
-        group_data.size++;
-        if (group_data.constraints.size() < group_data.size) {
-            group_data.constraints.emplace_back();
-            group_data.lambda.emplace_back();
-        }
-        return constr_id;
-    }
+    void            setup_constraint(ConstraintId id, const Constraint& c);
+    void            setup_friction_1d(ConstraintId id, const Constraint& c, float ratio, ConstraintId normal_id);
+    void            setup_friction_2d(ConstraintIds ids, const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id);
+    void            setup_friction_cone(ConstraintIds ids, const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id);
 
-    ConstraintIds    allocate_pair(ConstraintGroup group)
-    {
-        return { allocate(group), allocate(group) };
-    }
-
-    ConstraintIds   allocate_range(ConstraintGroup group, int count)
-    {
-        auto& group_data = m_groups[(int)group];
-        ConstraintId begin_id = { group, group_data.size };
-
-        group_data.size += count;
-
-        if (group_data.constraints.size() < group_data.size) {
-            group_data.constraints.resize(group_data.size);
-            group_data.lambda.resize(group_data.size);
-        }
-
-        ConstraintId end_id = { group, group_data.size };
-        return {begin_id, end_id};
-    }
-
-    void            setup_constraint(ConstraintId constr_id, const Constraint& c)
-    {
-        auto& data = basic_setup(constr_id, c);
-        data.min_bound = c.min_bound;
-        data.max_bound = c.max_bound;
-        data.cfm_inv_dt = c.cfm * m_inv_dt;
-
-        // TODO: reconsider
-        if (c.min_bound == 0.f) {
-            // unilateral case
-            if (c.pos_error > c.unilateral_penetration)
-                data.bg_error = (c.pos_error - c.unilateral_penetration) * c.erp;
-            else
-                data.bg_error = c.pos_error - c.unilateral_penetration;
-        } else {
-            // bilateral case
-            data.bg_error = c.pos_error * c.erp;
-        }
-    }
-
-    void            setup_friction_1d(ConstraintId constr_id, const Constraint& c, float friction_ratio, ConstraintId normal_constr_id)
-    {
-        auto& data = basic_setup(constr_id, c);
-
-        data.cfm_inv_dt = c.cfm * m_inv_dt;
-        data.bg_error = 0.f;
-
-        data.friction_ratio = friction_ratio;
-        data.normal_constr_idx = normal_constr_id.index();
-    }
-
-    void            setup_friction_2d(ConstraintIds constr_ids, const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id)
-    {
-        auto setup_constraint = [this, normal_constr_id](ConstraintData& data, const Constraint& c, float friction_ratio) {
-            data.cfm_inv_dt = c.cfm * m_inv_dt;
-            data.bg_error = 0.f;
-
-            data.friction_ratio = friction_ratio;
-            data.normal_constr_idx = normal_constr_id.index();
-        };
-
-        auto& data1 = basic_setup(constr_ids.first, c1);
-        setup_constraint(data1, c1, friction_ratio.x);
-
-        auto& data2 = basic_setup(constr_ids.second, c2);
-        setup_constraint(data2, c2, friction_ratio.y);
-    }
-
-    void            setup_friction_cone(ConstraintIds constr_ids, const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id)
-    {
-        auto setup_constraint = [this, normal_constr_id](ConstraintData& data, const Constraint& c, float friction_ratio) {
-            data.cfm_inv_dt = c.cfm * m_inv_dt;
-            data.bg_error = 0.f;
-
-            data.friction_ratio = friction_ratio;
-            data.normal_constr_idx = normal_constr_id.index();
-        };
-
-        auto& data1 = basic_setup(constr_ids.first, c1);
-        setup_constraint(data1, c1, friction_ratio.x);
-
-        auto& data2 = basic_setup(constr_ids.second, c2);
-        setup_constraint(data2, c2, friction_ratio.y);
-    }
+    ConstraintId    add_constraint(const Constraint& c);
+    ConstraintId    add_friction_1d(const Constraint& c, float ratio, ConstraintId normal_id);
+    ConstraintIds   add_friction_2d(const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id);
+    ConstraintIds   add_friction_cone(const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id);
 
     float           get_lambda(ConstraintId constr_id) const;
     void            clear();
@@ -248,9 +166,9 @@ protected:
     };
 
     struct GroupData {
-        Vector<ConstraintData> constraints;
-        Vector<float> lambda;
-        int size = 0;
+        Vector<ConstraintData>  constraints;
+        Vector<float>           lambda;
+        int                     size = 0;
     };
 
     struct WorkerContext {
@@ -259,7 +177,7 @@ protected:
 
     using Groups = Array<GroupData, (int)ConstraintGroup::Count>;
 
-    ConstraintData& basic_setup(ConstraintId constr_id, const Constraint& c);
+    ConstraintData& basic_setup(ConstraintId id, const Constraint& c);
 
     void apply_impulses();
 
@@ -278,44 +196,84 @@ protected:
     friend struct ConstraintHelper;
 };
 
-inline void ConstraintSolver::set_time_interval(float value) {
+inline void ConstraintSolver::set_time_interval(float value)
+{
     m_dt = value;
     m_inv_dt = 1.f / value;
 }
 
-inline Constraint Constraint::bilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom) {
+inline ConstraintId ConstraintSolver::add_constraint(const Constraint& c)
+{
+    ConstraintId id = allocate(ConstraintGroup::General, 1);
+    setup_constraint(id, c);
+    return id;
+}
+
+inline ConstraintId ConstraintSolver::add_friction_1d(const Constraint& c, float ratio, ConstraintId normal_id)
+{
+    ConstraintId id = allocate(ConstraintGroup::Friction1D, 1);
+    setup_friction_1d(id, c, ratio, normal_id);
+    return id;
+}
+
+inline ConstraintIds ConstraintSolver::add_friction_2d(const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id)
+{
+    ConstraintId first = allocate(ConstraintGroup::Friction2D, 2);
+    ConstraintIds ids = {first, first + 1};
+    setup_friction_2d(ids, c1, c2, ratio, normal_id);
+    return ids;
+}
+
+inline ConstraintIds ConstraintSolver::add_friction_cone(const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id)
+{
+    ConstraintId first = allocate(ConstraintGroup::FrictionCone, 2);
+    ConstraintIds ids = {first, first + 1};
+    setup_friction_cone(ids, c1, c2, ratio, normal_id);
+    return ids;
+}
+
+inline Constraint Constraint::bilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom)
+{
     return generic(body1, body2, geom, 0.f, -FLOAT_MAX, FLOAT_MAX);
 }
 
-inline Constraint Constraint::bilateral(RigidBody* body1, const ConstraintGeom& geom) {
+inline Constraint Constraint::bilateral(RigidBody* body1, const ConstraintGeom& geom)
+{
     return generic(body1, nullptr, geom, 0.f, -FLOAT_MAX, FLOAT_MAX);
 }
 
-inline Constraint Constraint::unilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom) {
+inline Constraint Constraint::unilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom)
+{
     return generic(body1, body2, geom, 0.f, 0.f, FLOAT_MAX);
 }
 
-inline Constraint Constraint::unilateral(RigidBody* body1, const ConstraintGeom& geom) {
+inline Constraint Constraint::unilateral(RigidBody* body1, const ConstraintGeom& geom)
+{
     return generic(body1, nullptr, geom, 0.f, 0.f, FLOAT_MAX);
 }
 
-inline Constraint Constraint::stabilized_bilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom) {
+inline Constraint Constraint::stabilized_bilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom)
+{
     return generic(body1, body2, geom, geom.pos_error(), -FLOAT_MAX, FLOAT_MAX);
 }
 
-inline Constraint Constraint::stabilized_bilateral(RigidBody* body1, const ConstraintGeom& geom) {
+inline Constraint Constraint::stabilized_bilateral(RigidBody* body1, const ConstraintGeom& geom)
+{
     return generic(body1, nullptr, geom, geom.pos_error(), -FLOAT_MAX, FLOAT_MAX);
 }
 
-inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom) {
+inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom)
+{
     return generic(body1, body2, geom, geom.pos_error(), 0.f, FLOAT_MAX);
 }
 
-inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, const ConstraintGeom& geom) {
+inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, const ConstraintGeom& geom)
+{
     return generic(body1, nullptr, geom, geom.pos_error(), 0.f, FLOAT_MAX);
 }
 
-inline float ConstraintSolver::get_lambda(ConstraintId constr_id) const {
+inline float ConstraintSolver::get_lambda(ConstraintId constr_id) const
+{
     return m_groups[(int)constr_id.group()].lambda[constr_id.index()];
 }
 

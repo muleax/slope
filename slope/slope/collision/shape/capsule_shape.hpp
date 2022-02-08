@@ -4,7 +4,7 @@
 
 namespace slope {
 
-class CapsuleShape : public TypedCollisionShape<ShapeKind::Capsule> {
+class CapsuleShape : public TypedObject<CollisionShape, ShapeKind::Capsule> {
 public:
     CapsuleShape(float radius, float height);
 

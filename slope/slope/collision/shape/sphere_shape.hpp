@@ -3,7 +3,7 @@
 
 namespace slope {
 
-class SphereShape : public TypedCollisionShape<ShapeKind::Sphere> {
+class SphereShape : public TypedObject<CollisionShape, ShapeKind::Sphere> {
 public:
     explicit SphereShape(float radius);
 

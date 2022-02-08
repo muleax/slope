@@ -7,11 +7,11 @@
 
 namespace slope {
 
+using ProxyId = int;
+
 template <class T>
 class Broadphase {
 public:
-    using ProxyId = uint32_t;
-
     struct Overlap {
         T data1;
         T data2;
@@ -50,7 +50,7 @@ private:
 };
 
 template <class T>
-typename Broadphase<T>::ProxyId Broadphase<T>::add_proxy(T data)
+ProxyId Broadphase<T>::add_proxy(T data)
 {
     ProxyId new_id;
     if (!m_free_ids.empty()) {
@@ -70,7 +70,7 @@ typename Broadphase<T>::ProxyId Broadphase<T>::add_proxy(T data)
 }
 
 template <class T>
-void Broadphase<T>::remove_proxy(typename Broadphase<T>::ProxyId proxy_id)
+void Broadphase<T>::remove_proxy(ProxyId proxy_id)
 {
     m_proxies[proxy_id].active = false;
     m_free_ids.push_back(proxy_id);
@@ -84,7 +84,7 @@ void Broadphase<T>::clear()
 }
 
 template <class T>
-void Broadphase<T>::update_proxy(typename Broadphase<T>::ProxyId proxy_id, const AABB& aabb)
+void Broadphase<T>::update_proxy(ProxyId proxy_id, const AABB& aabb)
 {
     m_proxies[proxy_id].aabb = aabb;
 }

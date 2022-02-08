@@ -1,6 +1,8 @@
 #pragma once
 #include "slope/dynamics/rigid_body.hpp"
 #include "slope/collision/shape/collision_shape.hpp"
+#include "slope/collision/broadphase/broadphase.hpp"
+#include "slope/core/typed_object.hpp"
 #include <memory>
 
 namespace slope {
@@ -11,9 +13,11 @@ enum class ActorKind : int {
     Count
 };
 
-class BaseActor {
+class BaseActor : public TypedBase<BaseActor, ActorKind> {
 public:
-    explicit BaseActor(ActorKind kind) : m_kind(kind) {}
+    using LinearId = uint32_t;
+
+    using TypedBase::TypedBase;
     virtual ~BaseActor() = default;
 
     void                    set_shape(std::unique_ptr<CollisionShape>&& shape);
@@ -32,29 +36,22 @@ public:
     virtual const           mat44& transform() = 0;
     virtual const           mat44& inv_transform() = 0;
 
-    ActorKind               kind() const { return m_kind; }
+    // Interface for DynamicsWorld
+    LinearId                linear_id() const { return m_linear_id; }
+    void                    set_linear_id(LinearId id) { m_linear_id = id; }
 
-    template<class T>
-    bool                    is() const;
-    template<class T>
-    const T*                cast() const;
-    template<class T>
-    T*                      cast();
+    ProxyId                 proxy_id() const { return m_proxy_id; }
+    void                    set_proxy_id(ProxyId id) { m_proxy_id = id; }
 
 protected:
     std::unique_ptr<CollisionShape> m_shape;
-    float m_friction = 0.5f;
-    ActorKind m_kind;
+    float                           m_friction = 0.5f;
+
+    LinearId                        m_linear_id = 0;
+    ProxyId                         m_proxy_id = 0;
 };
 
-template <ActorKind T>
-class TypedActor : public BaseActor {
-public:
-    static constexpr ActorKind Kind = T;
-    TypedActor() : BaseActor(Kind) {}
-};
-
-class StaticActor : public TypedActor<ActorKind::Static> {
+class StaticActor : public TypedObject<BaseActor, ActorKind::Static> {
 public:
     void            set_transform(const mat44& transform) final;
     const mat44&    transform() final { return m_transform; }
@@ -65,7 +62,7 @@ private:
     mat44 m_inv_transform;
 };
 
-class DynamicActor : public TypedActor<ActorKind::Dynamic> {
+class DynamicActor : public TypedObject<BaseActor, ActorKind::Dynamic> {
 public:
     void                set_transform(const mat44& transform) final;
     const mat44&        transform() final { return m_body.transform(); }
@@ -77,27 +74,6 @@ public:
 private:
     RigidBody m_body;
 };
-
-template<class T>
-bool BaseActor::is() const
-{
-    static_assert(std::is_base_of_v<TypedActor<T::Kind>, T>);
-    return m_kind == T::Kind;
-}
-
-template<class T>
-const T* BaseActor::cast() const
-{
-    SL_ASSERT(is<T>());
-    return static_cast<const T*>(this);
-}
-
-template<class T>
-T* BaseActor::cast()
-{
-    SL_ASSERT(is<T>());
-    return static_cast<T*>(this);
-}
 
 inline void BaseActor::set_shape(std::unique_ptr<CollisionShape>&& shape) {
     m_shape = std::move(shape);

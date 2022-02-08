@@ -15,9 +15,7 @@ void SphericalJoint::apply_constraints(ConstraintSolver* solver)
         geom.axis = transform1.apply_to_unit_axis(i);
         auto conf = Constraint::stabilized_bilateral(m_body1, m_body2, geom);
         conf.init_lambda = cache.lambda * m_warmstarting_ratio;
-        //cache.constraint_id = solver->add_constraint(conf);
-        cache.constraint_id = solver->allocate(ConstraintGroup::General);
-        solver->setup_constraint(*cache.constraint_id, conf);
+        cache.constraint_id = solver->add_constraint(conf);
     }
 
     if (m_damping > 0.f) {
@@ -36,9 +34,7 @@ void SphericalJoint::apply_constraints(ConstraintSolver* solver)
         damping_conf.max_bound = m_damping;
         damping_conf.init_lambda = damping_cache.lambda * m_warmstarting_ratio;
 
-        //damping_cache.constraint_id = solver->add_constraint(damping_conf);
-        damping_cache.constraint_id = solver->allocate(ConstraintGroup::General);
-        solver->setup_constraint(*damping_cache.constraint_id, damping_conf);
+        damping_cache.constraint_id = solver->add_constraint(damping_conf);
     }
 }
 

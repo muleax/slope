@@ -64,8 +64,8 @@ public:
 
     explicit DynamicsWorld(std::optional<Config> init_config = std::nullopt);
 
-    template<class T>
-    T*                      create_actor();
+    StaticActor*            create_static_actor();
+    DynamicActor*           create_dynamic_actor();
     // Note: any attached joint will be destroyed along with the actor
     void                    destroy_actor(BaseActor* actor);
 
@@ -88,33 +88,19 @@ public:
 
     uint32_t                frame_id() const { return m_frame_id; }
 
-    Narrowphase&            narrowphase() { return m_narrowphase_ctx[0].narrowphase; }
-    const Narrowphase&      narrowphase() const { return m_narrowphase_ctx[0].narrowphase; }
+    Narrowphase&            narrowphase() { return *m_narrowphase_ctx[0].narrowphase; }
+    const Narrowphase&      narrowphase() const { return *m_narrowphase_ctx[0].narrowphase; }
 
     ConstraintSolver&       solver() { return m_solve_ctx[0].solver; }
     const ConstraintSolver& solver() const { return m_solve_ctx[0].solver; }
 
 private:
+    using Broadphase = Broadphase<BaseActor*>;
 
-    struct ActorId {
-        static constexpr int KIND_BITS = 8;
-        static constexpr int KIND_MASK = (1 << KIND_BITS) - 1;
-
-        static uint64_t compress(ActorId a, ActorId b) { return (static_cast<uint64_t>(a.raw) << 32) | b.raw; }
-
-        ActorId(ActorKind kind, uint32_t index) : raw((index << KIND_BITS) | ((int)kind)) {}
-
-        ActorKind   kind() const { return static_cast<ActorKind>(raw & KIND_MASK); }
-        uint32_t    index() const { return raw >> KIND_BITS; }
-
-        uint32_t    raw;
-    };
-
-    using Broadphase = Broadphase<ActorId>;
-
-    struct ActorData {
-        std::unique_ptr<BaseActor>  actor;
-        Broadphase::ProxyId         proxy_id = 0;
+    struct JointData {
+        std::unique_ptr<BaseJoint>  joint;
+        BaseActor*                  actor1 = nullptr;
+        BaseActor*                  actor2 = nullptr;
     };
 
     struct ManifoldCache {
@@ -125,9 +111,9 @@ private:
     };
 
     struct PendingContact {
-        const ManifoldCache* mf_cache;
-        ManifoldPoint* mf_point;
-        uint32_t actor_index;
+        const ManifoldCache*    mf_cache;
+        ManifoldPoint*          mf_point;
+        BaseActor::LinearId     actor1_linear_id;
     };
 
     struct BroadphaseContext {
@@ -135,48 +121,64 @@ private:
     };
 
     struct NarrowphaseContext {
-        Narrowphase                             narrowphase;
-        NpContactPatch                          contact_patch;
-        Vector<PendingContact>                  pending_contacts;
-        Vector<std::pair<uint32_t, uint32_t>>   actor_contacts;
-        PairCache<ManifoldCache>                new_manifolds;
+        using ContactPair = std::pair<BaseActor::LinearId, BaseActor::LinearId>;
+
+        std::unique_ptr<Narrowphase>    narrowphase;
+        NpContactPatch                  contact_patch;
+        Vector<PendingContact>          pending_contacts;
+        Vector<ContactPair>             actor_contacts;
+        PairCache<ManifoldCache>        new_manifolds;
     };
 
     struct SolveContext {
-        ConstraintSolver solver;
+        ConstraintSolver        solver;
         Vector<PendingContact>  pending_contacts;
-        ConstraintIds normal_range;
-        ConstraintIds friction_range;
+        Vector<BaseJoint*>      pending_joints;
+        ConstraintId            normal_begin_id;
+        ConstraintId            friction_begin_id;
     };
 
     struct Island {
-        uint32_t root;
-        uint32_t size;
+        BaseActor::LinearId root;
+        uint32_t            size;
     };
+
+    template <class T>
+    T* create_actor_impl(Vector<std::unique_ptr<T>>& container);
+
+    template <class T>
+    void destroy_actor_impl(Vector<std::unique_ptr<T>>& container, BaseActor* actor);
+
+    void prepare_to_update();
 
     void setup_collision_detection(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence);
 
-    void merge_contacts();
+    void merge_joints();
+    void apply_joints(int worker_id);
+
+    void merge_islands();
     void randomize_contacts(int solver_id);
     void allocate_constraints();
     void apply_contacts(int worker_id, int concurrency, int solver_id);
     void apply_external_forces();
-    void collide(NarrowphaseContext& ctx, ActorId actor1_id, ActorId actor2_id);
+    void collide(NarrowphaseContext& ctx, BaseActor* actor1, BaseActor* actor2);
 
-    void apply_joints();
     void update_constraint_stats();
     void update_general_stats();
     void cache_lambdas(int worker_id, int concurrency);
     void integrate_bodies(int worker_id, int concurrency);
     void refresh_manifolds();
 
+    void finalize_update();
+
     void setup_solver();
     void setup_narrowphase();
     void reset_frame_stats();
 
     // TODO: optimize storage
-    Array<Vector<ActorData>, (int)ActorKind::Count> m_actors;
-    Vector<std::unique_ptr<BaseJoint>>              m_joints;
+    Vector<std::unique_ptr<StaticActor>>    m_static_actors;
+    Vector<std::unique_ptr<DynamicActor>>   m_dynamic_actors;
+    Vector<JointData>                       m_joints;
 
     Vector<BroadphaseContext>       m_broadphase_ctx;
     Broadphase                      m_broadphase;
@@ -186,7 +188,7 @@ private:
     NpBackendHint                   m_np_backend_hint;
     PairCache<ManifoldCache>        m_manifolds;
 
-    DisjointSet                     m_islands_ds;
+    DisjointSet                     m_island_merger;
     Vector<Island>                  m_islands;
     Vector<uint32_t>                m_island_to_bin;
 
@@ -200,22 +202,6 @@ private:
 };
 
 template<class T>
-T* DynamicsWorld::create_actor()
-{
-    static_assert(std::is_base_of_v<BaseActor, T>);
-
-    auto actor_ptr = std::make_unique<T>();
-    auto* actor = actor_ptr.get();
-
-    auto& container = m_actors[(int)actor->kind()];
-    auto proxy_id = m_broadphase.add_proxy({actor->kind(), static_cast<uint32_t>(container.size())});
-
-    container.push_back({std::move(actor_ptr), proxy_id});
-
-    return actor;
-}
-
-template<class T>
 T* DynamicsWorld::create_joint(DynamicActor* actor1, DynamicActor* actor2)
 {
     static_assert(std::is_base_of_v<BaseJoint, T>);
@@ -224,7 +210,8 @@ T* DynamicsWorld::create_joint(DynamicActor* actor1, DynamicActor* actor2)
     auto* body2 = actor2 ? &actor2->body() : nullptr;
     auto joint_ptr = std::make_unique<T>(body1, body2);
     T* joint = joint_ptr.get();
-    m_joints.push_back(std::move(joint_ptr));
+
+    m_joints.push_back({ std::move(joint_ptr), actor1, actor2 });
 
     return joint;
 }

@@ -553,8 +553,6 @@ Constraint Constraint::generic(
 ConstraintSolver::ConstraintSolver()
 {
     set_concurrency(1);
-    //for (auto& group : m_groups)
-    //    group = std::make_unique<GroupData>();
 }
 
 void ConstraintSolver::register_body(RigidBody* body)
@@ -564,117 +562,100 @@ void ConstraintSolver::register_body(RigidBody* body)
     m_bodies_extra.emplace_back().body = body;
 }
 
-/*
-std::pair<ConstraintId, ConstraintSolver::ConstraintData*> ConstraintSolver::create_constraint(const Constraint& c, ConstraintGroup group)
+ConstraintId ConstraintSolver::allocate(ConstraintGroup group, int count)
 {
-    SL_ASSERT(c.body1->in_solver_index() != -1);
-    //if (c.body1->in_solver_index() == -1)
-    //    register_body(c.body1);
-
     auto& group_data = m_groups[(int)group];
+    ConstraintId begin_id = { group, group_data.size };
 
-    auto& data = group_data.constraints.emplace_back();
+    group_data.size += count;
 
-    data.body1_idx = c.body1->in_solver_index();
-    data.jacobian11 = c.jacobian1[0];
-    data.jacobian12 = c.jacobian1[1];
-
-    if (c.body2) {
-        SL_ASSERT(c.body2->in_solver_index() != -1);
-        //if (c.body2->in_solver_index() == -1)
-        //    register_body(c.body2);
-
-        data.body2_idx = c.body2->in_solver_index();
-        data.jacobian21 = c.jacobian2[0];
-        data.jacobian22 = c.jacobian2[1];
+    if (group_data.constraints.size() < group_data.size) {
+        group_data.constraints.resize(group_data.size);
+        group_data.lambda.resize(group_data.size);
     }
 
-    group_data.lambda.push_back(c.init_lambda);
-
-    return { { group, static_cast<int>(group_data.constraints.size() - 1) }, &data };
+    return begin_id;
 }
 
-ConstraintId ConstraintSolver::add_constraint(const Constraint& c)
+void ConstraintSolver::setup_constraint(ConstraintId constr_id, const Constraint& c)
 {
-    auto [constr_id, data] = create_constraint(c, ConstraintGroup::General);
+    SL_ASSERT(constr_id.group() == ConstraintGroup::General);
 
-    data->min_bound = c.min_bound;
-    data->max_bound = c.max_bound;
-    data->cfm_inv_dt = c.cfm * m_inv_dt;
+    auto& data = basic_setup(constr_id, c);
+    data.min_bound = c.min_bound;
+    data.max_bound = c.max_bound;
+    data.cfm_inv_dt = c.cfm * m_inv_dt;
 
     // TODO: reconsider
     if (c.min_bound == 0.f) {
         // unilateral case
         if (c.pos_error > c.unilateral_penetration)
-            data->bg_error = (c.pos_error - c.unilateral_penetration) * c.erp;
+            data.bg_error = (c.pos_error - c.unilateral_penetration) * c.erp;
         else
-            data->bg_error = c.pos_error - c.unilateral_penetration;
+            data.bg_error = c.pos_error - c.unilateral_penetration;
     } else {
         // bilateral case
-        data->bg_error = c.pos_error * c.erp;
+        data.bg_error = c.pos_error * c.erp;
     }
-
-    return constr_id;
 }
 
-ConstraintId ConstraintSolver::join_friction_1d(const Constraint& c, float friction_ratio, ConstraintId normal_constr_id)
+void ConstraintSolver::setup_friction_1d(ConstraintId constr_id, const Constraint& c, float friction_ratio, ConstraintId normal_constr_id)
 {
-    auto [constr_id, data] = create_constraint(c, ConstraintGroup::Friction1D);
+    SL_ASSERT(constr_id.group() == ConstraintGroup::Friction1D);
 
-    data->cfm_inv_dt = c.cfm * m_inv_dt;
-    data->bg_error = 0.f;
+    auto& data = basic_setup(constr_id, c);
 
-    data->friction_ratio = friction_ratio;
-    data->normal_constr_idx = normal_constr_id.index();
+    data.cfm_inv_dt = c.cfm * m_inv_dt;
+    data.bg_error = 0.f;
 
-    return constr_id;
+    data.friction_ratio = friction_ratio;
+    data.normal_constr_idx = normal_constr_id.index();
 }
 
-ConstraintIds ConstraintSolver::join_friction_2d(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id)
+void ConstraintSolver::setup_friction_2d(ConstraintIds ids, const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id)
 {
-    auto setup_constraint = [this, normal_constr_id](ConstraintData* data, const Constraint& c, float friction_ratio) {
-        data->cfm_inv_dt = c.cfm * m_inv_dt;
-        data->bg_error = 0.f;
+    SL_ASSERT(constr_id.group() == ConstraintGroup::Friction2D);
 
-        data->friction_ratio = friction_ratio;
-        data->normal_constr_idx = normal_constr_id.index();
+    auto setup_constraint = [this, normal_id](ConstraintData& data, const Constraint& c, float ratio) {
+        data.cfm_inv_dt = c.cfm * m_inv_dt;
+        data.bg_error = 0.f;
+
+        data.friction_ratio = ratio;
+        data.normal_constr_idx = normal_id.index();
     };
 
-    auto [constr1_id, data1] = create_constraint(c1, ConstraintGroup::Friction2D);
-    setup_constraint(data1, c1, friction_ratio.x);
+    auto& data1 = basic_setup(ids.first, c1);
+    setup_constraint(data1, c1, ratio.x);
 
-    auto [constr2_id, data2] = create_constraint(c2, ConstraintGroup::Friction2D);
-    setup_constraint(data2, c2, friction_ratio.y);
-
-    return { constr1_id, constr2_id };
+    auto& data2 = basic_setup(ids.second, c2);
+    setup_constraint(data2, c2, ratio.y);
 }
 
-ConstraintIds ConstraintSolver::join_friction_cone(const Constraint& c1, const Constraint& c2, vec2 friction_ratio, ConstraintId normal_constr_id)
+void ConstraintSolver::setup_friction_cone(ConstraintIds ids, const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id)
 {
-    auto setup_constraint = [this, normal_constr_id](ConstraintData* data, const Constraint& c, float friction_ratio) {
-        data->cfm_inv_dt = c.cfm * m_inv_dt;
-        data->bg_error = 0.f;
+    SL_ASSERT(constr_id.group() == ConstraintGroup::FrictionCone);
 
-        data->friction_ratio = friction_ratio;
-        data->normal_constr_idx = normal_constr_id.index();
+    auto setup_constraint = [this, normal_id](ConstraintData& data, const Constraint& c, float ratio) {
+        data.cfm_inv_dt = c.cfm * m_inv_dt;
+        data.bg_error = 0.f;
+
+        data.friction_ratio = ratio;
+        data.normal_constr_idx = normal_id.index();
     };
 
-    auto [constr1_id, data1] = create_constraint(c1, ConstraintGroup::FrictionCone);
-    setup_constraint(data1, c1, friction_ratio.x);
+    auto& data1 = basic_setup(ids.first, c1);
+    setup_constraint(data1, c1, ratio.x);
 
-    auto [constr2_id, data2] = create_constraint(c2, ConstraintGroup::FrictionCone);
-    setup_constraint(data2, c2, friction_ratio.y);
-
-    return { constr1_id, constr2_id };
+    auto& data2 = basic_setup(ids.second, c2);
+    setup_constraint(data2, c2, ratio.y);
 }
- */
 
-ConstraintSolver::ConstraintData& ConstraintSolver::basic_setup(ConstraintId constr_id, const Constraint& c)
+ConstraintSolver::ConstraintData& ConstraintSolver::basic_setup(ConstraintId id, const Constraint& c)
 {
     SL_ASSERT(c.body1->in_solver_index() != -1);
 
-    auto& group = m_groups[(int)constr_id.group()];
-    auto& data = group.constraints[constr_id.index()];
+    auto& group = m_groups[(int)id.group()];
+    auto& data = group.constraints[id.index()];
 
     data.body1_idx = c.body1->in_solver_index();
     data.jacobian11 = c.jacobian1[0];
@@ -694,7 +675,7 @@ ConstraintSolver::ConstraintData& ConstraintSolver::basic_setup(ConstraintId con
 
     data.normal_constr_idx = -1;
 
-    group.lambda[constr_id.index()] = c.init_lambda;
+    group.lambda[id.index()] = c.init_lambda;
 
     return data;
 }

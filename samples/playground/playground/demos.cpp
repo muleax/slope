@@ -19,7 +19,7 @@ void Demo::create_floor()
     tc->transform = mat44::translate({0.f, -1.f, 0.f});
 
     auto* pc = w()->create<PhysicsComponent>(e);
-    pc->actor = dynamics_world()->create_actor<StaticActor>();
+    pc->actor = dynamics_world()->create_static_actor();
     pc->actor->set_shape<BoxShape>(vec3{floor_size, 1.f, floor_size});
     pc->actor->set_friction(0.5f);
     pc->actor->set_transform(tc->transform);
@@ -121,7 +121,7 @@ void CollisionDemo::init()
     tc->transform = mat44::translate({0.f, 5.f, 0.f});
 
     auto* pc = w()->create<PhysicsComponent>(e);
-    pc->actor = dynamics_world()->create_actor<DynamicActor>();
+    pc->actor = dynamics_world()->create_dynamic_actor();
     //actor->set_shape<ConvexPolyhedronShape>(box);
     pc->actor->set_shape<BoxShape>(vec3{1.f, 1.f, 1.f});
     pc->actor->set_transform(tc->transform);
@@ -137,7 +137,7 @@ void CollisionDemo::init()
     float offs = 0.f;
     stc->transform = mat44::translate({0.98f - offs, 5.f - offs, 0.f - offs});
 
-    m_control_actor = dynamics_world()->create_actor<DynamicActor>();
+    m_control_actor = dynamics_world()->create_dynamic_actor();
     m_control_actor->set_shape<SphereShape>(1.f);
     m_control_actor->set_transform(stc->transform);
     auto* pc2 = w()->create<PhysicsComponent>(se);
