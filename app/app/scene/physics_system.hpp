@@ -13,7 +13,6 @@ struct PhysicsSingleton : public Component<PhysicsSingleton> {
 
     bool pause = false;
     bool real_time_sync = true;
-    float time_step = 1.f / 60.f;
     float time_factor = 1.f;
 
     int concurrency = 4;

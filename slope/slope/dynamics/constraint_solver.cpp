@@ -3,8 +3,6 @@
 #include "slope/debug/log.hpp"
 #include <immintrin.h>
 
-// #define SLOPE_DISABLE_SIMD
-
 // TODO: make portable
 #ifdef _MSC_VER
 #define SLOPE_FORCEINLINE __forceinline
@@ -228,8 +226,6 @@ struct ConstraintHelper {
         lambda1 = new_lambda1;
         lambda2 = new_lambda2;
     }
-
-#ifndef SLOPE_DISABLE_SIMD
 
     SLOPE_FORCEINLINE
     __m128 clamp_simd(__m128 value, __m128 min_bound, __m128 max_bound)
@@ -498,30 +494,6 @@ struct ConstraintHelper {
         lambda1_s = _mm_cvtss_f32(lambda1);
         lambda2_s = _mm_cvtss_f32(lambda2);
     }
-
-#else // SLOPE_DISABLE_SIMD
-
-    SLOPE_FORCEINLINE
-    void solve_constraint_simd(ConstraintData& c, float& lambda, float min_bound, float max_bound)
-    {
-        solve_constraint(c, lambda, min_bound, max_bound);
-    }
-
-    SLOPE_FORCEINLINE
-    void solve_constraint_friction_1d_simd(ConstraintData& c, float& lambda, float normal_lambda)
-    {
-        solve_constraint_friction_1d(c, lambda, normal_lambda);
-    }
-
-    SLOPE_FORCEINLINE
-    void solve_constraint_friction_2d_simd(
-        ConstraintData& c1, ConstraintData& c2, float& lambda1, float& lambda2, float normal_lambda)
-    {
-        solve_constraint_friction_2d(c1, c2, lambda1, lambda2, normal_lambda);
-    }
-
-#endif // SLOPE_DISABLE_SIMD
-
 };
 
 Constraint Constraint::generic(
@@ -550,9 +522,32 @@ Constraint Constraint::generic(
     return c;
 }
 
-ConstraintSolver::ConstraintSolver()
+ConstraintSolver::ConstraintSolver(int concurrency)
 {
-    set_concurrency(1);
+    set_concurrency(concurrency);
+    set_time_interval(m_config.time_interval);
+}
+
+void ConstraintSolver::update_config(const ConstraintSolverConfig& config)
+{
+    set_time_interval(config.time_interval);
+    m_config = config;
+}
+
+int ConstraintSolver::concurrency() const
+{
+    return static_cast<int>(m_worker_ctx.size());
+}
+
+void ConstraintSolver::set_concurrency(int concurrency)
+{
+    m_worker_ctx.resize(concurrency);
+}
+
+void ConstraintSolver::set_time_interval(float time_interval)
+{
+    m_dt = time_interval;
+    m_inv_dt = 1.f / time_interval;
 }
 
 void ConstraintSolver::register_body(RigidBody* body)

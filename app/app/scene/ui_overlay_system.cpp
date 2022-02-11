@@ -12,17 +12,20 @@ void UIOverlaySystem::update(float dt)
     if (!ps)
         return;
 
-    auto& np = ps->dynamics_world.narrowphase();
+    //auto& np = ps->dynamics_world.narrowphase();
 
-    auto& world_stats = ps->dynamics_world.stats();
-    auto& gjk_stats = np.gjk_solver().stats();
-    auto& epa_stats = np.epa_solver().stats();
-    auto& sat_stats = np.sat_solver().stats();
+    auto& stats = ps->dynamics_world.stats();
+    auto& np_stats = stats.np_stats;
 
-    auto& world_config = ps->dynamics_world.config();
+    auto& gjk_stats = np_stats.gjk_stats;
+    auto& epa_stats = np_stats.epa_stats;
+    auto& sat_stats = np_stats.sat_stats;
+
+    DynamicsWorldConfig world_config = ps->dynamics_world.config();
     auto& solver_config = world_config.solver_config;
-    auto& gjk_config = np.gjk_solver().config();
-    auto& epa_config = np.epa_solver().config();
+    auto& np_config = world_config.np_config;
+    auto& gjk_config = np_config.gjk_config;
+    auto& epa_config = np_config.epa_config;
 
     auto treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen;
 
@@ -30,16 +33,16 @@ void UIOverlaySystem::update(float dt)
 
     // ImGui::SetNextItemOpen(true);
     if (ImGui::CollapsingHeader("General", treeNodeFlags)) {
-        ImGui::Text("Simulation Time: %.1f s", world_stats.simulation_time);
+        ImGui::Text("Simulation Time: %.1f s", stats.simulation_time);
         ImGui::Text("CPU Frame Time: %.1f ms", ps->cpu_time.instantaneous() * 1000);
-        ImGui::Text("Static Actors: %d", world_stats.actor_count[(int)ActorKind::Static]);
-        ImGui::Text("Dynamic Actors: %d", world_stats.actor_count[(int)ActorKind::Dynamic]);
+        ImGui::Text("Static Actors: %d", stats.static_actor_count);
+        ImGui::Text("Dynamic Actors: %d", stats.dynamic_actor_count);
     }
 
     if (ImGui::CollapsingHeader("Narrowphase", treeNodeFlags)) {
-        ImGui::Text("Narrowphase Tests: %d", world_stats.np_test_count);
-        ImGui::Text("Collisions: %d", world_stats.collision_count);
-        ImGui::Text("Contacts: %d", world_stats.contact_count);
+        ImGui::Text("Narrowphase Tests: %d", np_stats.test_count);
+        ImGui::Text("Collisions: %d", np_stats.collision_count);
+        ImGui::Text("Contacts: %d", np_stats.contact_count);
 
         ImGui::Text("GJK Tests: %llu", gjk_stats.cum_test_count);
         ImGui::Text("GJK Total Fails: %llu", gjk_stats.total_fail_count);
@@ -53,11 +56,6 @@ void UIOverlaySystem::update(float dt)
 
         ImGui::Text("SAT Tests: %llu", sat_stats.cum_test_count);
         ImGui::Text("SAT Avg Projections: %f", float(sat_stats.cum_projection_count) / float(sat_stats.cum_test_count));
-    }
-
-    if (ImGui::CollapsingHeader("Constraints", treeNodeFlags)) {
-        ImGui::Text("Max solver error: %f", world_stats.max_constraint_solver_error.smoothed());
-        ImGui::Text("Avg solver error: %f", world_stats.avg_constraint_solver_error.smoothed());
     }
 
     ImGui::End();
@@ -76,17 +74,17 @@ void UIOverlaySystem::update(float dt)
         ImGui::Checkbox("Gyroscopic Torque", &world_config.enable_gyroscopic_torque);
         ImGui::Checkbox("Use SIMD solver", &world_config.solver_config.use_simd);
 
-        bool use_mixed = (world_config.np_backend_hint == DynamicsWorld::NpBackendHint::Mixed);
+        bool use_mixed = (world_config.np_backend_hint == NpBackendHint::Mixed);
         if (ImGui::RadioButton("Mixed", use_mixed))
-            world_config.np_backend_hint = DynamicsWorld::NpBackendHint::Mixed;
+            world_config.np_backend_hint = NpBackendHint::Mixed;
         ImGui::SameLine();
-        bool use_gjk = (world_config.np_backend_hint == DynamicsWorld::NpBackendHint::GJK_EPA);
+        bool use_gjk = (world_config.np_backend_hint == NpBackendHint::GJK_EPA);
         if (ImGui::RadioButton("GJK/EPA", use_gjk))
-            world_config.np_backend_hint = DynamicsWorld::NpBackendHint::GJK_EPA;
+            world_config.np_backend_hint = NpBackendHint::GJK_EPA;
         ImGui::SameLine();
-        bool use_sat = (world_config.np_backend_hint == DynamicsWorld::NpBackendHint::SAT);
+        bool use_sat = (world_config.np_backend_hint == NpBackendHint::SAT);
         if (ImGui::RadioButton("SAT", use_sat))
-            world_config.np_backend_hint = DynamicsWorld::NpBackendHint::SAT;
+            world_config.np_backend_hint = NpBackendHint::SAT;
 
         ImGui::DragInt("Concurrency", &ps->concurrency, 1.f, 1, 8);
         ImGui::DragScalar("GJK Max Iters", ImGuiDataType_U32, &gjk_config.max_iteration_count);
@@ -96,9 +94,9 @@ void UIOverlaySystem::update(float dt)
         ImGui::DragFloat("EPA Final Threshold", &epa_config.final_threshold, 1e-4f, -1.f, 1.f, "%.8f");
 
         ImGui::DragFloat("Time Factor", &ps->time_factor, 0.01f, 0.001f, 100.f);
-        float time_step_ms = ps->time_step * 1000.f;
+        float time_step_ms = world_config.solver_config.time_interval * 1000.f;
         ImGui::DragFloat("Time Step", &time_step_ms, 0.1f, 0.1f, 1000.f);
-        ps->time_step = time_step_ms * 0.001f;
+        world_config.solver_config.time_interval = time_step_ms * 0.001f;
 
         ImGui::DragInt("Iterations", &solver_config.iteration_count, 0.5f, 1, 300);
         ImGui::DragFloat("WS Normal", &world_config.warmstarting_normal, 0.002f, 0.f, 1.f);
@@ -121,6 +119,8 @@ void UIOverlaySystem::update(float dt)
     }
 
     ImGui::End();
+
+    ps->dynamics_world.update_config(world_config);
 
     // ImGui::ShowDemoWindow();
 }

@@ -2,33 +2,46 @@
 #include "slope/collision/shape/collision_shape.hpp"
 #include "slope/collision/gjk.hpp"
 #include "slope/core/vector.hpp"
+#include "slope/core/stats_holder.hpp"
+#include "slope/core/config_holder.hpp"
 #include <optional>
 
 namespace slope {
 
-class EPASolver {
+struct EPAConfig {
+    uint32_t max_iteration_count = 80;
+    float support_bloat = 0.f;
+    float early_threshold = 1e-6f;
+    float final_threshold = 0.01f;
+};
+
+struct EPAStats {
+    uint64_t total_fail_count = 0;
+    uint64_t cum_test_count = 0;
+    uint64_t cum_iterations_count = 0;
+    uint32_t max_iteration_count = 0;
+
+    void reset()
+    {
+        cum_test_count = 0;
+        cum_iterations_count = 0;
+        max_iteration_count = 0;
+    }
+
+    void merge(const EPAStats& other)
+    {
+        total_fail_count +=     other.total_fail_count;
+        cum_test_count +=       other.cum_test_count;
+        cum_iterations_count += other.cum_iterations_count;
+        max_iteration_count =   std::max(max_iteration_count, other.max_iteration_count);
+    }
+};
+
+class EPASolver : public ConfigHolder<EPAConfig>, public StatsHolder<EPAStats> {
 public:
     using Simplex = GJKSolver::Simplex;
 
-    struct Config {
-        uint32_t max_iteration_count = 80;
-        float support_bloat = 0.f;
-        float early_threshold = 1e-6f;
-        float final_threshold = 0.01f;
-    };
-
-    struct Stats {
-        uint64_t total_fail_count = 0;
-        uint64_t cum_test_count = 0;
-        uint64_t cum_iterations_count = 0;
-        uint32_t max_iteration_count = 0;
-    };
-
     std::optional<vec3> find_penetration_axis(const CollisionShape* shape1, const CollisionShape* shape2, const Simplex& simplex);
-
-    Config&             config() { return m_config; }
-    const Stats&        stats() const { return m_stats; }
-    void                reset_stats();
 
 private:
     struct Face {
@@ -51,9 +64,6 @@ private:
     Vector<Face>        m_heap;
     Vector<uint64_t>    m_edges;
     vec3                m_inner_point;
-
-    Config              m_config;
-    Stats               m_stats;
 };
 
 } // slope

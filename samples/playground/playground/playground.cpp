@@ -178,7 +178,7 @@ public:
         });
 
         auto* physics_single = m_world->modify_singleton<PhysicsSingleton>();
-        physics_single->dynamics_world.config() = {};
+        physics_single->dynamics_world.update_config({});
         // TODO: use fini view instead
         physics_single->dynamics_world.clear();
 

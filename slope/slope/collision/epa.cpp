@@ -20,13 +20,6 @@ inline std::pair<uint32_t, uint32_t> decode_edge(uint64_t code)
 
 } // unnamed
 
-void EPASolver::reset_stats()
-{
-    m_stats.cum_test_count = 0;
-    m_stats.cum_iterations_count = 0;
-    m_stats.max_iteration_count = 0;
-}
-
 void EPASolver::collect_stats(uint32_t iteration_count, bool fail)
 {
     m_stats.cum_test_count++;

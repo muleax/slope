@@ -4,10 +4,10 @@ namespace slope {
 
 Narrowphase::Narrowphase()
 {
-    reset_all_backends();
+    remove_all_backends();
 }
 
-void Narrowphase::reset_all_backends()
+void Narrowphase::remove_all_backends()
 {
     for (auto& container : m_backend_map)
         container.fill(&m_null_backend);

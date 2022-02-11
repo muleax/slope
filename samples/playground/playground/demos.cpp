@@ -41,11 +41,12 @@ void TriangleStackDemo::init()
 {
     create_floor();
 
-    auto& config = dynamics_world()->config();
+    auto config = dynamics_world()->config();
     config.randomize_order = true;
     config.enable_velocity_dependent_friction = true;
     config.solver_config.use_simd = true;
     config.solver_config.iteration_count = 30;
+    dynamics_world()->update_config(config);
 
     //auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
     float spacing = 0.f;
@@ -67,7 +68,7 @@ void StressTestDemo::init()
 {
     create_floor();
 
-    auto& config = dynamics_world()->config();
+    auto config = dynamics_world()->config();
     //physics_single->dynamics_world.config().enable_constraint_resolving = false;
     //physics_single->dynamics_world.config().enable_integration = false;
 
@@ -79,6 +80,7 @@ void StressTestDemo::init()
     config.enable_velocity_dependent_friction = true;
     config.solver_config.iteration_count = 5;
     config.solver_config.use_simd = true;
+    dynamics_world()->update_config(config);
 
 
     //float spacing = 0.99f;
@@ -100,10 +102,11 @@ void StressTestDemo::init()
 
 void CollisionDemo::init()
 {
-    auto& config = dynamics_world()->config();
+    auto config = dynamics_world()->config();
     config.gravity.set_zero();
     config.enable_constraint_resolving = false;
     config.delay_integration = true;
+    dynamics_world()->update_config(config);
 
     MeshFactory mesh_factory;
     ConvexPolyhedronFactory poly_factory;
@@ -171,8 +174,9 @@ void CollisionDemo::update(float dt)
 
 void TennisRacketDemo::init()
 {
-    auto& config = dynamics_world()->config();
+    auto config = dynamics_world()->config();
     config.gravity.set_zero();
+    dynamics_world()->update_config(config);
 
     auto actor = m_spawner->spawn_box(mat44::translate({0.f, 5.f, 0.f}), {}, 1.f, vec3{2.f, 4.f, 0.4f});
     actor->body().set_ang_velocity({8.f, 5.85f, 1.f});
@@ -187,8 +191,9 @@ void SphericalJointDemo::init()
 
     create_floor();
 
-    auto& config = dynamics_world()->config();
+    auto config = dynamics_world()->config();
     config.solver_config.iteration_count = 30;
+    dynamics_world()->update_config(config);
 
     float y = 14.f;
     float x = 0.f;

@@ -1,6 +1,7 @@
 #pragma once
 #include "slope/core/vector.hpp"
 #include "slope/core/array.hpp"
+#include "slope/core/config_holder.hpp"
 #include "slope/dynamics/rigid_body.hpp"
 
 namespace slope {
@@ -79,25 +80,24 @@ struct Constraint {
     float       pos_error = 0.f;
 };
 
+struct ConstraintSolverConfig {
+    bool        use_simd = false;
+    // Successive over-relaxation
+    float       sor = 1.f;
+    int         iteration_count = 10;
+    float       time_interval = 1.f / 60.f;
+};
+
 // Projected Gauss-Seidel constraint solver
-class ConstraintSolver
+class ConstraintSolver : public ConfigHolder<ConstraintSolverConfig>
 {
 public:
-    struct Config {
-        bool        use_simd = false;
-        // Successive over-relaxation
-        float       sor = 1.f;
-        int         iteration_count = 10;
-    };
+    explicit ConstraintSolver(int concurrency = 1);
 
-    ConstraintSolver();
-    virtual ~ConstraintSolver() = default;
+    void            set_concurrency(int concurrency);
+    int             concurrency() const;
 
-    Config&         config() { return m_config; }
-    const Config&   config() const { return m_config; }
-
-    void            set_time_interval(float value);
-    float           time_interval() const { return m_dt; }
+    void            update_config(const ConstraintSolverConfig& config) override;
 
     void            register_body(RigidBody* body);
 
@@ -114,10 +114,9 @@ public:
     ConstraintIds   add_friction_cone(const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id);
 
     float           get_lambda(ConstraintId constr_id) const;
+    const vec3&     get_linear_axis(ConstraintId constr_id) const;
+    const vec3&     get_angular_axis(ConstraintId constr_id) const;
     void            clear();
-
-    void            set_concurrency(int concurrency) { m_worker_ctx.resize(concurrency); }
-    int             concurrency() const { return static_cast<int>(m_worker_ctx.size()); }
 
     void            solve_pass0();
     void            solve_pass1(int worker_id);
@@ -175,6 +174,7 @@ protected:
 
     using Groups = Array<GroupData, (int)ConstraintGroup::Count>;
 
+    void set_time_interval(float time_interval);
     ConstraintData& basic_setup(ConstraintId id, const Constraint& c);
 
     void apply_impulses();
@@ -184,7 +184,6 @@ protected:
 
     float                   m_dt = 1.f;
     float                   m_inv_dt = 1.f;
-    Config                  m_config;
 
     Vector<BodyData>        m_bodies;
     Vector<BodyExtraData>   m_bodies_extra;
@@ -193,12 +192,6 @@ protected:
 
     friend struct ConstraintHelper;
 };
-
-inline void ConstraintSolver::set_time_interval(float value)
-{
-    m_dt = value;
-    m_inv_dt = 1.f / value;
-}
 
 inline ConstraintId ConstraintSolver::add_constraint(const Constraint& c)
 {
@@ -273,6 +266,16 @@ inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, const Cons
 inline float ConstraintSolver::get_lambda(ConstraintId constr_id) const
 {
     return m_groups[(int)constr_id.group()].lambda[constr_id.index()];
+}
+
+inline const vec3& ConstraintSolver::get_linear_axis(ConstraintId constr_id) const
+{
+    return m_groups[(int)constr_id.group()].constraints[constr_id.index()].jacobian11;
+}
+
+inline const vec3& ConstraintSolver::get_angular_axis(ConstraintId constr_id) const
+{
+    return m_groups[(int)constr_id.group()].constraints[constr_id.index()].jacobian12;
 }
 
 } // slope

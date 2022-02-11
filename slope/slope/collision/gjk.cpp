@@ -4,13 +4,6 @@
 
 namespace slope {
 
-void GJKSolver::reset_stats()
-{
-    m_stats.cum_test_count = 0;
-    m_stats.cum_iterations_count = 0;
-    m_stats.max_iteration_count = 0;
-}
-
 void GJKSolver::collect_stats(uint32_t iteration_count, bool fail)
 {
     m_stats.cum_test_count++;

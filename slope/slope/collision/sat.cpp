@@ -25,12 +25,6 @@ inline IntervalPenetration get_interval_penetration(const Interval& a, const Int
 
 } // unnamed
 
-void SATSolver::reset_stats()
-{
-    m_stats.cum_test_count = 0;
-    m_stats.cum_projection_count = 0;
-}
-
 template <class Shape1, class Shape2>
 std::optional<vec3> SATSolver::find_penetration_axis_impl(const Shape1* shape1, const Shape2* shape2)
 {

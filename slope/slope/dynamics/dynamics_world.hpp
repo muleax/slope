@@ -16,53 +16,58 @@
 
 namespace slope {
 
-class DynamicsWorld {
+enum class NpBackendHint {
+    Mixed,
+    GJK_EPA,
+    SAT
+};
+
+struct DynamicsWorldConfig {
+    bool enable_gravity = true;
+    bool enable_constraint_resolving = true;
+    bool enable_integration = true;
+    bool randomize_order = true;
+    bool enable_gyroscopic_torque = true;
+    bool enable_velocity_dependent_friction = true;
+    bool enable_cone_friction = false;
+    float warmstarting_normal = 0.83f;
+    float warmstarting_friction = 0.75f;
+    float warmstarting_joint = 0.8f;
+    vec3 gravity = {0.f, -9.81f, 0.f};
+
+    NpBackendHint           np_backend_hint = NpBackendHint::Mixed;
+    NarrowphaseConfig       np_config;
+
+    ConstraintSolverConfig  solver_config;
+
+    // debug draw
+    bool draw_contact_normals1 = false;
+    bool draw_contact_friction1 = false;
+    bool draw_contact_normals2 = false;
+    bool draw_contact_friction2 = false;
+    bool delay_integration = false;
+};
+
+struct DynamicsWorldStats {
+    uint32_t static_actor_count = 0;
+    uint32_t dynamic_actor_count = 0;
+    float simulation_time = 0.f;
+
+    NarrowphaseStats np_stats;
+
+    void reset()
+    {
+        np_stats.reset();
+    }
+};
+
+class DynamicsWorld : public ConfigHolder<DynamicsWorldConfig>, public StatsHolder<DynamicsWorldStats> {
 public:
-    enum class NpBackendHint {
-        Mixed,
-        GJK_EPA,
-        SAT
-    };
+    explicit DynamicsWorld(std::optional<DynamicsWorldConfig> init_config = std::nullopt);
 
-    struct Stats {
-        Array<uint32_t, (int)ActorKind::Count> actor_count = {};
-        uint32_t np_test_count = 0;
-        uint32_t collision_count = 0;
-        uint32_t contact_count = 0;
-        float simulation_time = 0.f;
+    void                    setup_executor(TaskExecutor& executor);
 
-        MovingAverage<float> max_constraint_solver_error;
-        MovingAverage<float> avg_constraint_solver_error;
-    };
-
-    struct Config {
-        float time_interval = 0.02f;
-
-        bool enable_gravity = true;
-        bool enable_constraint_resolving = true;
-        bool enable_integration = true;
-        bool randomize_order = true;
-        bool enable_gyroscopic_torque = true;
-        bool enable_velocity_dependent_friction = true;
-        bool enable_cone_friction = false;
-        float warmstarting_normal = 0.83f;
-        float warmstarting_friction = 0.75f;
-        float warmstarting_joint = 0.8f;
-        vec3 gravity = {0.f, -9.81f, 0.f};
-
-        NpBackendHint np_backend_hint = NpBackendHint::Mixed;
-
-        ConstraintSolver::Config solver_config;
-
-        // debug draw
-        bool draw_contact_normals1 = false;
-        bool draw_contact_friction1 = false;
-        bool draw_contact_normals2 = false;
-        bool draw_contact_friction2 = false;
-        bool delay_integration = false;
-    };
-
-    explicit DynamicsWorld(std::optional<Config> init_config = std::nullopt);
+    void                    update_config(const DynamicsWorldConfig& config) final;
 
     StaticActor*            create_static_actor();
     DynamicActor*           create_dynamic_actor();
@@ -76,23 +81,10 @@ public:
     // Remove all actors and joints
     void                    clear();
 
-    void                    setup_executor(TaskExecutor& executor);
-
     void                    set_debug_drawer(std::shared_ptr<DebugDrawer> drawer);
     DebugDrawer*            debug_drawer() { return m_debug_drawer.get(); }
 
-    Config&                 config() { return m_config; }
-    const Config&           config() const { return m_config; }
-
-    const Stats&            stats() const { return m_stats; }
-
     uint32_t                frame_id() const { return m_frame_id; }
-
-    Narrowphase&            narrowphase() { return *m_narrowphase_ctx[0].narrowphase; }
-    const Narrowphase&      narrowphase() const { return *m_narrowphase_ctx[0].narrowphase; }
-
-    ConstraintSolver&       solver() { return m_solve_ctx[0].solver; }
-    const ConstraintSolver& solver() const { return m_solve_ctx[0].solver; }
 
 private:
     using Broadphase = Broadphase<BaseActor*>;
@@ -156,6 +148,7 @@ private:
     void merge_joints();
     void apply_joints(int worker_id);
 
+    void debug_draw();
     void merge_islands();
     void randomize_contacts(int solver_id);
     void allocate_constraints();
@@ -163,17 +156,17 @@ private:
     void apply_external_forces();
     void collide(NarrowphaseContext& ctx, BaseActor* actor1, BaseActor* actor2);
 
-    void update_constraint_stats();
     void update_general_stats();
     void cache_lambdas(int worker_id, int concurrency);
     void integrate_bodies(int worker_id, int concurrency);
     void refresh_manifolds();
 
+    void reset_stats() override;
+    void finalize_stats() override;
+
     void finalize_update();
 
-    void setup_solver();
-    void setup_narrowphase();
-    void reset_frame_stats();
+    void reset_narrowphase_backend(NpBackendHint hint);
 
     // TODO: optimize storage
     Vector<std::unique_ptr<StaticActor>>    m_static_actors;
@@ -185,7 +178,6 @@ private:
     Vector<Broadphase::Overlap>     m_overlaps;
 
     Vector<NarrowphaseContext>      m_narrowphase_ctx;
-    NpBackendHint                   m_np_backend_hint;
     PairCache<ManifoldCache>        m_manifolds;
 
     DisjointSet                     m_island_merger;
@@ -194,8 +186,6 @@ private:
 
     Vector<SolveContext>            m_solve_ctx;
 
-    Config                          m_config;
-    Stats                           m_stats;
     uint32_t                        m_frame_id = 0;
 
     std::shared_ptr<DebugDrawer>    m_debug_drawer;

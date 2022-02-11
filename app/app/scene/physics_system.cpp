@@ -13,19 +13,13 @@ void PhysicsSystem::step_simulation(PhysicsSingleton* ps) {
         ps->dynamics_world.setup_executor(*m_executor);
     }
 
-    auto& actors = view<PhysicsComponent, TransformComponent>();
-
     auto t1 = get_time();
 
-    ps->dynamics_world.config().time_interval = ps->time_step;
-
     m_executor->run().wait();
-    //m_executor->clear();
-    //ps->dynamics_world.update(ps->time_step);
 
     ps->cpu_time.update(get_time() - t1);
 
-    for (auto e: actors) {
+    for (auto e : view<PhysicsComponent, TransformComponent>()) {
         auto* pc = w().get<PhysicsComponent>(e);
         auto* tr = w().modify<TransformComponent>(e);
         tr->transform = pc->actor->transform();
@@ -35,11 +29,13 @@ void PhysicsSystem::step_simulation(PhysicsSingleton* ps) {
 void PhysicsSystem::update(float dt) {
     auto* ps = w().modify_singleton<PhysicsSingleton>();
 
+    float fixed_dt = ps->dynamics_world.config().solver_config.time_interval;
+
     if (!ps->pause) {
         if (ps->real_time_sync) {
             m_accum_time += dt * ps->time_factor;
-            if (m_accum_time >= ps->time_step) {
-                m_accum_time = fmod(m_accum_time, ps->time_step);
+            if (m_accum_time >= fixed_dt) {
+                m_accum_time = fmod(m_accum_time, fixed_dt);
                 step_simulation(ps);
             }
         } else {
