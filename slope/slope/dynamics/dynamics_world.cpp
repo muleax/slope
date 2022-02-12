@@ -1,5 +1,6 @@
 #include "slope/dynamics/dynamics_world.hpp"
 #include "slope/dynamics/constraint_solver.hpp"
+#include "slope/core/config.hpp"
 #include "slope/collision/narrowphase/polyhedra_backends.hpp"
 #include "slope/collision/narrowphase/capsule_backends.hpp"
 #include "slope/collision/narrowphase/sphere_backends.hpp"
@@ -39,21 +40,19 @@ std::optional<FrictionBasis> get_velocity_dependent_friction_basis(
 DynamicsWorld::DynamicsWorld(std::optional<DynamicsWorldConfig> init_config)
 {
     if (init_config)
-        m_config = *init_config;
+        update_config(*init_config);
 }
 
-void DynamicsWorld::update_config(const DynamicsWorldConfig& new_config)
+void DynamicsWorld::on_config_update(const DynamicsWorldConfig& prev_config)
 {
     for (auto& ctx: m_solve_ctx)
-        ctx.solver.update_config(new_config.solver_config);
+        ctx.solver.update_config(config().solver_config);
 
-    if (m_config.np_backend_hint != new_config.np_backend_hint)
-        reset_narrowphase_backend(new_config.np_backend_hint);
+    if (prev_config.np_backend_hint != config().np_backend_hint)
+        reset_narrowphase_backend(config().np_backend_hint);
 
     for (auto& ctx: m_narrowphase_ctx)
-        ctx.narrowphase->update_config(new_config.np_config);
-
-    m_config = new_config;
+        ctx.narrowphase->update_config(config().np_config);
 }
 
 void DynamicsWorld::reset_narrowphase_backend(NpBackendHint hint)
@@ -181,10 +180,10 @@ void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer)
 
 void DynamicsWorld::apply_external_forces()
 {
-    float dt = m_config.solver_config.time_interval;
+    float dt = config().solver_config.time_interval;
     for (auto& actor: m_dynamic_actors) {
         auto& body = actor->body();
-        body.apply_force_to_com(m_config.gravity * body.mass());
+        body.apply_force_to_com(config().gravity * body.mass());
         body.apply_gyroscopic_torque(dt);
     }
 }
@@ -252,7 +251,7 @@ void DynamicsWorld::apply_joints(int worker_id)
     auto& ctx = m_solve_ctx[worker_id];
 
     for (auto* joint: ctx.pending_joints) {
-        joint->set_warmstarting_ratio(m_config.warmstarting_joint);
+        joint->set_warmstarting_ratio(config().warmstarting_joint);
         joint->apply_constraints(&ctx.solver);
     }
 }
@@ -279,11 +278,11 @@ void DynamicsWorld::apply_contacts(int worker_id, int concurrency, int solver_id
         RigidBody* body2 = actor2->is<DynamicActor>() ? &actor2->cast<DynamicActor>()->body() : nullptr;
 
         auto nc = Constraint::stabilized_unilateral(body1, body2, geom);
-        nc.init_lambda = mf_point->normal_lambda * m_config.warmstarting_normal;
+        nc.init_lambda = mf_point->normal_lambda * config().warmstarting_normal;
         ctx.solver.setup_constraint(normal_id, nc);
 
         std::optional<FrictionBasis> basis;
-        if (m_config.enable_velocity_dependent_friction) {
+        if (config().enable_velocity_dependent_friction) {
             // TODO: reconsider threshold
             basis = get_velocity_dependent_friction_basis(body1, body2, geom, 0.3f);
         }
@@ -299,12 +298,12 @@ void DynamicsWorld::apply_contacts(int worker_id, int concurrency, int solver_id
         auto fc1 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis1});
         auto fc2 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis2});
 
-        fc1.init_lambda = mf_point->friction1_lambda * m_config.warmstarting_friction;
-        fc2.init_lambda = mf_point->friction2_lambda * m_config.warmstarting_friction;
+        fc1.init_lambda = mf_point->friction1_lambda * config().warmstarting_friction;
+        fc2.init_lambda = mf_point->friction2_lambda * config().warmstarting_friction;
 
         ConstraintIds friction_ids = {friction_id, friction_id + 1};
 
-        if (m_config.enable_cone_friction) {
+        if (config().enable_cone_friction) {
             ctx.solver.setup_friction_cone(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, normal_id);
         } else {
             ctx.solver.setup_friction_2d(friction_ids, fc1, fc2, {friction_ratio, friction_ratio}, normal_id);
@@ -321,7 +320,7 @@ void DynamicsWorld::apply_contacts(int worker_id, int concurrency, int solver_id
 
 void DynamicsWorld::randomize_contacts(int solver_id)
 {
-    if (!m_config.randomize_order)
+    if (!config().randomize_order)
         return;
 
     auto& ctx = m_solve_ctx[solver_id];
@@ -334,14 +333,14 @@ void DynamicsWorld::randomize_contacts(int solver_id)
 
 void DynamicsWorld::allocate_constraints()
 {
-    if (!m_config.enable_constraint_resolving)
+    if (!config().enable_constraint_resolving)
         return;
 
     for (auto& ctx: m_solve_ctx) {
-        int contact_count = ctx.pending_contacts.size();
+        int contact_count = static_cast<int>(ctx.pending_contacts.size());
         ctx.normal_begin_id = ctx.solver.allocate(ConstraintGroup::General, contact_count);
 
-        ConstraintGroup friction_group = m_config.enable_cone_friction
+        ConstraintGroup friction_group = config().enable_cone_friction
                                          ? ConstraintGroup::FrictionCone
                                          : ConstraintGroup::Friction2D;
         ctx.friction_begin_id = ctx.solver.allocate(friction_group, contact_count * 2);
@@ -350,7 +349,7 @@ void DynamicsWorld::allocate_constraints()
 
 void DynamicsWorld::cache_lambdas(int worker_id, int concurrency)
 {
-    if (!m_config.enable_constraint_resolving)
+    if (!config().enable_constraint_resolving)
         return;
 
     for (auto& ctx: m_solve_ctx) {
@@ -372,12 +371,12 @@ void DynamicsWorld::cache_lambdas(int worker_id, int concurrency)
 
 void DynamicsWorld::integrate_bodies(int worker_id, int concurrency)
 {
-    if (!m_config.enable_integration || m_config.delay_integration)
+    if (!config().enable_integration || config().delay_integration)
         return;
 
     auto[chunk_beg, chunk_end] = select_sequence_chunk(worker_id, concurrency, m_dynamic_actors);
 
-    float dt = m_config.solver_config.time_interval;
+    float dt = config().solver_config.time_interval;
     for (auto it = chunk_beg; it != chunk_end; it++) {
         auto* actor = it->get();
         auto& body = actor->body();
@@ -408,7 +407,7 @@ void DynamicsWorld::update_general_stats()
 {
     m_stats.static_actor_count = m_static_actors.size();
     m_stats.dynamic_actor_count = m_dynamic_actors.size();
-    m_stats.simulation_time += m_config.solver_config.time_interval;
+    m_stats.simulation_time += config().solver_config.time_interval;
 }
 
 void DynamicsWorld::merge_joints()
@@ -425,57 +424,85 @@ void DynamicsWorld::merge_joints()
 
 void DynamicsWorld::merge_islands()
 {
-    for (auto& ctx: m_narrowphase_ctx) {
-        for (auto[a, b]: ctx.actor_contacts) {
-            m_island_merger.merge(a, b);
+    {
+        SL_ZONE_SCOPED("build_disjoint_set")
+
+        for (auto& ctx: m_narrowphase_ctx) {
+            for (auto[a, b]: ctx.actor_contacts) {
+                m_island_merger.merge(a, b);
+            }
         }
     }
 
     size_t actor_count = m_dynamic_actors.size();
 
-    m_islands.clear();
-    for (uint32_t linear_id = 0; linear_id < actor_count; linear_id++) {
-        if (linear_id == m_island_merger.find_root(linear_id)) {
-            m_islands.push_back({linear_id, m_island_merger.get_size(linear_id)});
+    {
+        SL_ZONE_SCOPED("find_islands")
+
+        m_islands.clear();
+        for (uint32_t linear_id = 0; linear_id < actor_count; linear_id++) {
+            if (linear_id == m_island_merger.find_root(linear_id)) {
+                m_islands.push_back({linear_id, m_island_merger.get_size(linear_id)});
+            }
         }
     }
 
-    std::sort(m_islands.begin(), m_islands.end(), [](auto& a, auto& b) { return a.size > b.size; });
+    {
+        SL_ZONE_SCOPED("sort_islands")
 
-    m_island_to_bin.resize(actor_count);
-    int solve_concurrency = static_cast<int>(m_solve_ctx.size());
-    if (solve_concurrency == 1) {
-        for (auto& island: m_islands) {
-            m_island_to_bin[island.root] = 0;
-        }
-    } else {
-        // TODO: implement optimal packing
-        int bin_cnt = 0;
-        for (auto& island: m_islands) {
-            m_island_to_bin[island.root] = bin_cnt % solve_concurrency;
-            bin_cnt++;
+        std::sort(m_islands.begin(), m_islands.end(), [](auto& a, auto& b) { return a.size > b.size; });
+    }
+
+    {
+        SL_ZONE_SCOPED("form_bins")
+
+        m_island_to_bin.resize(actor_count);
+        int solve_concurrency = static_cast<int>(m_solve_ctx.size());
+        if (solve_concurrency == 1) {
+            for (auto& island: m_islands) {
+                m_island_to_bin[island.root] = 0;
+            }
+        } else {
+            // TODO: implement optimal packing
+            int bin_cnt = 0;
+            for (auto& island: m_islands) {
+                m_island_to_bin[island.root] = bin_cnt % solve_concurrency;
+                bin_cnt++;
+            }
         }
     }
 
-    for (uint32_t linear_id = 0; linear_id < actor_count; linear_id++) {
-        uint32_t root = m_island_merger.find_root(linear_id);
-        uint32_t bin = m_island_to_bin[root];
-        auto& body = m_dynamic_actors[linear_id]->body();
-        m_solve_ctx[bin].solver.register_body(&body);
-    }
+    {
+        SL_ZONE_SCOPED("register_bodies")
 
-    for (auto& ctx: m_narrowphase_ctx) {
-        for (auto& c: ctx.pending_contacts) {
-            uint32_t root = m_island_merger.find_root(c.actor1_linear_id);
+        for (uint32_t linear_id = 0; linear_id < actor_count; linear_id++) {
+            uint32_t root = m_island_merger.find_root(linear_id);
             uint32_t bin = m_island_to_bin[root];
-            m_solve_ctx[bin].pending_contacts.push_back(c);
+            auto& body = m_dynamic_actors[linear_id]->body();
+            m_solve_ctx[bin].solver.register_body(&body);
         }
     }
 
-    for (auto& data: m_joints) {
-        uint32_t root = m_island_merger.find_root(data.actor1->linear_id());
-        uint32_t bin = m_island_to_bin[root];
-        m_solve_ctx[bin].pending_joints.push_back(data.joint.get());
+    {
+        SL_ZONE_SCOPED("pending_contacts")
+
+        for (auto& ctx: m_narrowphase_ctx) {
+            for (auto& c: ctx.pending_contacts) {
+                uint32_t root = m_island_merger.find_root(c.actor1_linear_id);
+                uint32_t bin = m_island_to_bin[root];
+                m_solve_ctx[bin].pending_contacts.push_back(c);
+            }
+        }
+    }
+
+    {
+        SL_ZONE_SCOPED("pending_joints")
+
+        for (auto& data: m_joints) {
+            uint32_t root = m_island_merger.find_root(data.actor1->linear_id());
+            uint32_t bin = m_island_to_bin[root];
+            m_solve_ctx[bin].pending_joints.push_back(data.joint.get());
+        }
     }
 }
 
@@ -494,24 +521,24 @@ void DynamicsWorld::debug_draw()
 
             auto& geom = c.mf_point->geom;
 
-            if (m_config.draw_contact_normals1) {
+            if (config().draw_contact_normals1) {
                 debug_drawer->draw_line(geom.p1, geom.p1 + geom.normal * AXIS_LENGTH, NORMAL_COLOR);
             }
 
-            if (m_config.draw_contact_normals2) {
+            if (config().draw_contact_normals2) {
                 debug_drawer->draw_line(geom.p2, geom.p2 - geom.normal * AXIS_LENGTH, NORMAL_COLOR);
             }
 
-            if (m_config.draw_contact_friction1 || m_config.draw_contact_friction2) {
+            if (config().draw_contact_friction1 || config().draw_contact_friction2) {
                 auto& fr1_axis = ctx.solver.get_linear_axis(ConstraintId{c.mf_point->friction1_constr_id});
                 auto& fr2_axis = ctx.solver.get_linear_axis(ConstraintId{c.mf_point->friction2_constr_id});
 
-                if (m_config.draw_contact_friction1) {
+                if (config().draw_contact_friction1) {
                     debug_drawer->draw_line(geom.p1, geom.p1 + fr1_axis * AXIS_LENGTH, FRICTION_COLOR);
                     debug_drawer->draw_line(geom.p1, geom.p1 + fr2_axis * AXIS_LENGTH, FRICTION_COLOR);
                 }
 
-                if (m_config.draw_contact_friction2) {
+                if (config().draw_contact_friction2) {
                     debug_drawer->draw_line(geom.p2, geom.p2 + fr1_axis * AXIS_LENGTH, FRICTION_COLOR);
                     debug_drawer->draw_line(geom.p2, geom.p2 + fr2_axis * AXIS_LENGTH, FRICTION_COLOR);
                 }
@@ -520,14 +547,68 @@ void DynamicsWorld::debug_draw()
     }
 }
 
-void DynamicsWorld::setup_collision_detection(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence)
+void DynamicsWorld::prepare_to_update()
+{
+    if (m_debug_drawer)
+        m_debug_drawer->clear();
+
+    reset_stats();
+
+    if (config().enable_integration && config().delay_integration)
+        integrate_bodies(0, 1);
+}
+
+void DynamicsWorld::reset_stats()
+{
+    m_stats.reset();
+    for (auto& ctx: m_narrowphase_ctx)
+        ctx.narrowphase->reset_stats();
+}
+
+void DynamicsWorld::finalize_stats()
+{
+    update_general_stats();
+
+    for (auto& ctx : m_narrowphase_ctx) {
+        ctx.narrowphase->finalize_stats();
+        m_stats.np_stats.merge(ctx.narrowphase->stats());
+    }
+}
+
+void DynamicsWorld::finalize_update()
+{
+    finalize_stats();
+
+    debug_draw();
+
+    for (auto& ctx : m_narrowphase_ctx) {
+        ctx.pending_contacts.clear();
+        ctx.actor_contacts.clear();
+    }
+
+    for (auto& ctx : m_solve_ctx) {
+        ctx.solver.clear();
+        ctx.pending_contacts.clear();
+        ctx.pending_joints.clear();
+    }
+
+    refresh_manifolds();
+}
+
+void DynamicsWorld::setup_collision_flow(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence)
 {
     TaskId prepare_broadphase = executor.emplace([this](){
-        for (auto& actor : m_static_actors)
-            m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
+        {
+            SL_ZONE_SCOPED("update_static_actors")
+            for (auto& actor: m_static_actors)
+                m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
+        }
 
-        for (auto& actor : m_dynamic_actors)
-            m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
+        {
+            SL_ZONE_SCOPED("update_dynamic_actors")
+            for (auto& actor: m_dynamic_actors)
+                m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
+        }
 
         m_broadphase.find_overlaps_pass0();
     }, "prepare_broadphase");
@@ -565,103 +646,21 @@ void DynamicsWorld::setup_collision_detection(TaskExecutor& executor, TaskId pre
     }
 }
 
-void DynamicsWorld::prepare_to_update()
-{
-    if (m_debug_drawer)
-        m_debug_drawer->clear();
-
-    reset_stats();
-
-    if (m_config.enable_integration && m_config.delay_integration)
-        integrate_bodies(0, 1);
-}
-
-void DynamicsWorld::reset_stats()
-{
-    StatsHolder::reset_stats();
-    for (auto& ctx: m_narrowphase_ctx)
-        ctx.narrowphase->reset_stats();
-}
-
-void DynamicsWorld::finalize_stats()
-{
-    update_general_stats();
-
-    for (auto& ctx : m_narrowphase_ctx) {
-        ctx.narrowphase->finalize_stats();
-        m_stats.np_stats.merge(ctx.narrowphase->stats());
-    }
-}
-
-void DynamicsWorld::finalize_update()
-{
-    finalize_stats();
-
-    debug_draw();
-
-    for (auto& ctx : m_narrowphase_ctx) {
-        ctx.pending_contacts.clear();
-    }
-
-    for (auto& ctx : m_solve_ctx) {
-        ctx.solver.clear();
-        ctx.pending_contacts.clear();
-        ctx.pending_joints.clear();
-    }
-
-    refresh_manifolds();
-}
-
-void DynamicsWorld::setup_executor(TaskExecutor& executor)
+void DynamicsWorld::setup_apply_constraints_flow(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence)
 {
     int concurrency = executor.concurrency();
-    SL_VERIFY(concurrency > 0);
-
-    int bp_concurrency = (concurrency > 1) ? concurrency * 4 : 1;
-    m_broadphase_ctx.resize(bp_concurrency);
-    m_broadphase.set_concurrency(bp_concurrency);
-
-    int np_concurrency = (concurrency > 1) ? concurrency * 4 : 1;
-    m_narrowphase_ctx.resize(np_concurrency);
-    reset_narrowphase_backend(m_config.np_backend_hint);
-
-    update_config(m_config);
-
-    m_solve_ctx.resize(concurrency);
-    for (auto& ctx : m_solve_ctx)
-        ctx.solver.set_concurrency(concurrency);
-
-    TaskId prepare_task = executor.emplace([this]() {
-        prepare_to_update();
-    }, "prepare");
-
-    TaskId external_forces_task = executor.emplace([this]() {
-        apply_external_forces();
-    }, "external_forces");
-
-    TaskId merge_joints_task = executor.emplace([this]() {
-        merge_joints();
-    }, "merge_joints");
-
-    TaskId merge_contacts_task = executor.emplace([this]() {
-        merge_islands();
-    }, "merge_islands");
-
-    setup_collision_detection(executor, prepare_task, merge_contacts_task);
 
     TaskId allocate_task = executor.emplace([this]() {
         allocate_constraints();
     }, "allocate_constraints");
 
-    executor.set_order(merge_joints_task, merge_contacts_task, allocate_task);
-
-    executor.set_order(prepare_task, external_forces_task, allocate_task);
+    executor.set_order(pre_fence, allocate_task);
 
     TaskId after_randomize = executor.emplace([]() {}, "after_randomize");
     for (int solver_id = 0; solver_id < concurrency; solver_id++) {
         TaskId randomize = executor.emplace([this, solver_id]() {
             randomize_contacts(solver_id);
-        }, "randomize");
+        }, "randomize_constraints");
         executor.set_order(allocate_task, randomize, after_randomize);
     }
 
@@ -680,21 +679,25 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
         executor.set_order(pre, after_contacts_apply);
     }
 
-    TaskId before_pass0 = executor.emplace([]() {}, "before_solver_pass0");
-    TaskId after_pass0 = executor.emplace([]() {}, "before_solver_pass0");
-
     for (int worker_id = 0; worker_id < concurrency; worker_id++) {
         TaskId task = executor.emplace([this, worker_id]() {
             apply_joints(worker_id);
         }, "apply_joints");
-        executor.set_order(after_contacts_apply, task, before_pass0);
+        executor.set_order(after_contacts_apply, task, post_fence);
     }
+}
+
+void DynamicsWorld::setup_solve_flow(TaskExecutor& executor, TaskId pre_fence, TaskId post_fence)
+{
+    int concurrency = executor.concurrency();
+
+    TaskId after_pass0 = executor.emplace([]() {}, "after_solver_pass0");
 
     for (int worker_id = 0; worker_id < concurrency; worker_id++) {
         TaskId task = executor.emplace([this, worker_id]() {
             m_solve_ctx[worker_id].solver.solve_pass0();
         }, "solver_pass0");
-        executor.set_order(before_pass0, task, after_pass0);
+        executor.set_order(pre_fence, task, after_pass0);
     }
 
     TaskId after_pass1 = executor.emplace([]() {}, "after_solver_pass1");
@@ -712,14 +715,17 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
         executor.set_order(pre, after_pass1);
     }
 
-    TaskId after_solver = executor.emplace([]() {}, "after_solver");
-
     for (int worker_id = 0; worker_id < concurrency; worker_id++) {
         TaskId pass2 = executor.emplace([this, worker_id]() {
             m_solve_ctx[worker_id].solver.solve_pass2();
         }, "solver_pass2");
-        executor.set_order(after_pass1, pass2, after_solver);
+        executor.set_order(after_pass1, pass2, post_fence);
     }
+}
+
+void DynamicsWorld::setup_post_solve_flow(TaskExecutor& executor, TaskId pre_fence)
+{
+    int concurrency = executor.concurrency();
 
     TaskId after_cache_lambda = executor.emplace([]() {}, "after_cache_lambda");
 
@@ -728,14 +734,8 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
             cache_lambdas(worker_id, concurrency);
         }, "cache_lambda");
 
-        executor.set_order(after_solver, cache_lambda_task, after_cache_lambda);
+        executor.set_order(pre_fence, cache_lambda_task, after_cache_lambda);
     }
-
-    TaskId cleanup = executor.emplace([this]() {
-        finalize_update();
-    }, "finalize_update");
-
-    executor.set_order(after_cache_lambda, cleanup);
 
     int integrate_concurrency = concurrency * 3;
     for (int worker_id = 0; worker_id < integrate_concurrency; worker_id++) {
@@ -744,6 +744,56 @@ void DynamicsWorld::setup_executor(TaskExecutor& executor)
         }, "integrate");
         executor.set_order(after_cache_lambda, integrate_task);
     }
+
+    TaskId finalize = executor.emplace([this]() { finalize_update(); }, "finalize_update");
+
+    executor.set_order(after_cache_lambda, finalize);
+}
+
+void DynamicsWorld::setup_flow(TaskExecutor& executor)
+{
+    int concurrency = executor.concurrency();
+
+    TaskId prepare_task = executor.emplace([this]() { prepare_to_update(); }, "prepare");
+    TaskId external_forces_task = executor.emplace([this]() { apply_external_forces(); }, "external_forces");
+    TaskId merge_joints_task = executor.emplace([this]() { merge_joints(); }, "merge_joints");
+    TaskId merge_islands_task = executor.emplace([this]() { merge_islands(); }, "merge_islands");
+
+    TaskId before_solver = executor.emplace([]() {}, "before_solver");
+    TaskId after_solver = executor.emplace([]() {}, "after_solver");
+
+    executor.set_order(merge_joints_task, merge_islands_task);
+    executor.set_order(prepare_task, external_forces_task, merge_islands_task);
+
+    setup_collision_flow(executor, prepare_task, merge_islands_task);
+
+    setup_apply_constraints_flow(executor, merge_islands_task, before_solver);
+
+    setup_solve_flow(executor, before_solver, after_solver);
+
+    setup_post_solve_flow(executor, after_solver);
+}
+
+void DynamicsWorld::setup_executor(TaskExecutor& executor)
+{
+    int concurrency = executor.concurrency();
+    SL_VERIFY(concurrency > 0);
+
+    int bp_concurrency = (concurrency > 1) ? concurrency * 4 : 1;
+    m_broadphase_ctx.resize(bp_concurrency);
+    m_broadphase.set_concurrency(bp_concurrency);
+
+    int np_concurrency = (concurrency > 1) ? concurrency * 4 : 1;
+    m_narrowphase_ctx.resize(np_concurrency);
+    reset_narrowphase_backend(config().np_backend_hint);
+
+    update_config(config());
+
+    m_solve_ctx.resize(concurrency);
+    for (auto& ctx : m_solve_ctx)
+        ctx.solver.set_concurrency(concurrency);
+
+    setup_flow(executor);
 }
 
 } // slope

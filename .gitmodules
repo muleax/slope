@@ -22,3 +22,6 @@
 [submodule "deps/taskflow/taskflow"]
 	path = deps/taskflow/taskflow
 	url = https://github.com/taskflow/taskflow.git
+[submodule "deps/tracy/tracy"]
+	path = deps/tracy/tracy
+	url = https://github.com/wolfpld/tracy.git

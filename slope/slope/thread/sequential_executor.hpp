@@ -1,5 +1,6 @@
 #pragma once
 #include "slope/thread/task_executor.hpp"
+#include "slope/core/config.hpp"
 #include "slope/core/vector.hpp"
 #include <cstdint>
 
@@ -9,7 +10,14 @@ class SequentialExecutor : public TaskExecutor {
 public:
     TaskId emplace(Callback&& task, std::string_view name) final
     {
+#ifdef SL_TRACY_ENABLE
+        m_tasks.push_back({[task = std::move(task), name = String(name)]() {
+            SL_ZONE_SCOPED_TEXT(name.c_str(), name.size())
+            task();
+        }});
+#else
         m_tasks.push_back({std::move(task)});
+#endif
         return static_cast<TaskId>(m_tasks.size() - 1);
     }
 

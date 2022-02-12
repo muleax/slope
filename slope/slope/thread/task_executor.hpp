@@ -17,17 +17,11 @@ public:
 
     virtual int     concurrency() const = 0;
 
-    void            set_order(TaskId a, TaskId b, TaskId c)
+    template<class... Ts>
+    void            set_order(TaskId a, TaskId b, Ts... tail)
     {
         set_order(a, b);
-        set_order(b, c);
-    }
-
-    void            set_order(TaskId a, TaskId b, TaskId c, TaskId d)
-    {
-        set_order(a, b);
-        set_order(b, c);
-        set_order(c, d);
+        set_order(b, tail...);
     }
 };
 

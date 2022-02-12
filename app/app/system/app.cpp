@@ -1,5 +1,6 @@
 #include "app/system/app.hpp"
 #include "app/system/utils.hpp"
+#include "slope/core/config.hpp"
 #include "slope/debug/log.hpp"
 #include "slope/debug/assert.hpp"
 #include "glad/gl.h"
@@ -112,6 +113,9 @@ void App::run() {
     double prev_time = get_time() - 1e-4;
 
     while (!glfwWindowShouldClose(m_window)) {
+        SL_FRAME_MARK;
+
+        glfwPollEvents();
         update_window_size();
 
         glViewport(0, 0, m_win_width, m_win_height);
@@ -131,7 +135,6 @@ void App::run() {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(m_window);
-        glfwPollEvents();
     }
 
     ImGui_ImplGlfw_Shutdown();

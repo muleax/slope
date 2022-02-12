@@ -1,6 +1,7 @@
 #include "app/scene/physics_system.hpp"
 #include "app/scene/transform.hpp"
 #include "app/system/utils.hpp"
+#include "slope/core/config.hpp"
 
 namespace slope::app {
 
@@ -15,7 +16,13 @@ void PhysicsSystem::step_simulation(PhysicsSingleton* ps) {
 
     auto t1 = get_time();
 
-    m_executor->run().wait();
+    {
+        SL_FRAME_MARK_START("Physics")
+
+        m_executor->run().wait();
+
+        SL_FRAME_MARK_END("Physics")
+    }
 
     ps->cpu_time.update(get_time() - t1);
 

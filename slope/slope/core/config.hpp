@@ -1,5 +1,21 @@
 #pragma once
+#include "tracy/Tracy.hpp"
 #include <cstdint>
+
+#ifdef SL_TRACY_ENABLE
+#define SL_ZONE_SCOPED(name) ZoneScopedN(name)
+#define SL_ZONE_SCOPED_DYNAMIC(text, size) ZoneScoped ZoneName(text, size)
+#define SL_FRAME_MARK FrameMark
+#define SL_FRAME_MARK_START(name) FrameMarkStart(name)
+#define SL_FRAME_MARK_END(name) FrameMarkEnd(name)
+#else
+#define SL_ZONE_SCOPED(name)
+#define SL_ZONE_SCOPED_DYNAMIC(text, size)
+#define SL_FRAME_MARK
+#define SL_FRAME_MARK_START(name)
+#define SL_FRAME_MARK_END(name)
+
+#endif
 
 namespace slope {
 

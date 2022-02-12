@@ -1,8 +1,10 @@
-#include "task_executor.hpp"
 #include "slope/thread/task_executor.hpp"
+#include "slope/core/config.hpp"
+#include "slope/core/string.hpp"
 #include "slope/core/vector.hpp"
 #include "taskflow/taskflow.hpp"
 #include <memory>
+
 
 namespace slope {
 
@@ -14,7 +16,15 @@ public:
 
     TaskId emplace(Callback&& task, std::string_view name) final
     {
-        m_tasks.push_back(m_taskflow.emplace(std::move(task)));
+#ifdef SL_TRACY_ENABLE
+        auto tf_task = m_taskflow.emplace([task = std::move(task), name = String(name)]() {
+            SL_ZONE_SCOPED_DYNAMIC(name.c_str(), name.size())
+            task();
+        });
+#else
+        auto tf_task = m_taskflow.emplace(std::move(task));
+#endif
+        m_tasks.push_back(tf_task);
         m_tasks.back().name(std::string{name});
         return static_cast<TaskId>(m_tasks.size() - 1);
     }

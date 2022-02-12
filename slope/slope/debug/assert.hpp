@@ -18,12 +18,10 @@ inline void raise_impl() {
 
 
 #define SL_VERIFY(expression, ...)                                          \
-do {                                                                        \
     if (!(expression)) {                                                    \
         slope::assert_details::assert_handler(#expression, ##__VA_ARGS__);  \
         slope::assert_details::raise_impl();                                \
-    }                                                                       \
-} while (false)
+    }
 
 #ifdef SLOPE_DEBUG
 #define SL_ASSERT(expression, ...) SL_VERIFY(expression, ##__VA_ARGS__)

@@ -1,7 +1,6 @@
 #pragma once
 #include "slope/collision/narrowphase/narrowphase_backend.hpp"
 #include "slope/core/array.hpp"
-#include "slope/core/stats_holder.hpp"
 #include "slope/core/config_holder.hpp"
 #include "slope/debug/log.hpp"
 #include <memory>
@@ -22,30 +21,11 @@ struct NarrowphaseStats {
     EPAStats epa_stats;
     SATStats sat_stats;
 
-    void reset()
-    {
-        test_count = 0;
-        collision_count = 0;
-        contact_count = 0;
-
-        gjk_stats.reset();
-        epa_stats.reset();
-        sat_stats.reset();
-    }
-
-    void merge(const NarrowphaseStats& other)
-    {
-        test_count += other.test_count;
-        collision_count += other.collision_count;
-        contact_count += other.contact_count;
-
-        gjk_stats.merge(other.gjk_stats);
-        epa_stats.merge(other.epa_stats);
-        sat_stats.merge(other.sat_stats);
-    }
+    void reset();
+    void merge(const NarrowphaseStats& other);
 };
 
-class Narrowphase : public ConfigHolder<NarrowphaseConfig>, public StatsHolder<NarrowphaseStats> {
+class Narrowphase : public ConfigHolder<NarrowphaseConfig> {
 public:
     Narrowphase();
 
@@ -56,29 +36,23 @@ public:
     bool        intersect(const CollisionShape* shape1, const CollisionShape* shape2);
     bool        collide(const CollisionShape* shape1, const CollisionShape* shape2, NpContactPatch& patch);
 
-    void        reset_stats() override
-    {
-        StatsHolder::reset_stats();
-        m_context.gjk_solver.reset_stats();
-        m_context.epa_solver.reset_stats();
-        m_context.sat_solver.reset_stats();
-    }
-
-    void        finalize_stats() override
-    {
-        m_stats.gjk_stats = m_context.gjk_solver.stats();
-        m_stats.epa_stats = m_context.epa_solver.stats();
-        m_stats.sat_stats = m_context.sat_solver.stats();
-    }
+    void        reset_stats();
+    void        finalize_stats();
+    const auto& stats() const { return m_stats; }
 
 private:
+    using Backends = Vector<std::unique_ptr<INpBackendWrapper>>;
+    using BackendMap = Array<Array<INpBackendWrapper*, (int)ShapeKind::Count>, (int)ShapeKind::Count>;
+
     INpBackendWrapper* find_backend(const CollisionShape* shape1, const CollisionShape* shape2);
     void remove_backend(int type1, int type2);
 
-    NpContext m_context;
-    NpNullBackend m_null_backend;
-    Vector<std::unique_ptr<INpBackendWrapper>> m_backends;
-    Array<Array<INpBackendWrapper*, (int)ShapeKind::Count>, (int)ShapeKind::Count> m_backend_map;
+    NpContext           m_context;
+    NpNullBackend       m_null_backend;
+    Backends            m_backends;
+    BackendMap          m_backend_map;
+
+    NarrowphaseStats    m_stats;
 };
 
 template<class Backend>

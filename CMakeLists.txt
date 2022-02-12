@@ -1,9 +1,16 @@
 cmake_minimum_required(VERSION 3.20)
 
+option(TracyEnable "TracyEnable" OFF)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
 
 set(SLOPE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+if (TracyEnable)
+    add_compile_definitions(TRACY_ENABLE)
+    add_compile_definitions(SL_TRACY_ENABLE)
+endif()
 
 function(slope_library target)
     file(GLOB_RECURSE LIB_HEADERS "*.hpp")

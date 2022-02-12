@@ -4,6 +4,21 @@
 
 namespace slope {
 
+void GJKStats::reset()
+{
+    cum_test_count = 0;
+    cum_iterations_count = 0;
+    max_iteration_count = 0;
+}
+
+void GJKStats::merge(const GJKStats& other)
+{
+    total_fail_count +=     other.total_fail_count;
+    cum_test_count +=       other.cum_test_count;
+    cum_iterations_count += other.cum_iterations_count;
+    max_iteration_count =   std::max(max_iteration_count, other.max_iteration_count);
+}
+
 void GJKSolver::collect_stats(uint32_t iteration_count, bool fail)
 {
     m_stats.cum_test_count++;
@@ -93,7 +108,7 @@ bool GJKSolver::intersect(const CollisionShape* shape1, const CollisionShape* sh
     m_simplex[0] = shape1->support_diff(shape2, init_axis, 0.f, false);
     m_simplex_size = 1;
 
-    for (uint32_t iter = 0; iter < m_config.max_iteration_count; iter++) {
+    for (uint32_t iter = 0; iter < config().max_iteration_count; iter++) {
         std::optional<vec3> axis;
 
         switch (m_simplex_size) {
@@ -137,7 +152,7 @@ bool GJKSolver::intersect(const CollisionShape* shape1, const CollisionShape* sh
         m_simplex[m_simplex_size++] = new_pt;
     }
 
-    collect_stats(m_config.max_iteration_count, true);
+    collect_stats(config().max_iteration_count, true);
     return false;
 }
 

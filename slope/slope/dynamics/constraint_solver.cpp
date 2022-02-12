@@ -525,13 +525,12 @@ Constraint Constraint::generic(
 ConstraintSolver::ConstraintSolver(int concurrency)
 {
     set_concurrency(concurrency);
-    set_time_interval(m_config.time_interval);
+    set_time_interval(config().time_interval);
 }
 
-void ConstraintSolver::update_config(const ConstraintSolverConfig& config)
+void ConstraintSolver::on_config_update(const ConstraintSolverConfig& prev_config)
 {
-    set_time_interval(config.time_interval);
-    m_config = config;
+    set_time_interval(config().time_interval);
 }
 
 int ConstraintSolver::concurrency() const
@@ -752,7 +751,7 @@ void ConstraintSolver::solve_pass1(int worker_id)
             c->rhs = m_inv_dt * m_inv_dt * c->bg_error - j_v_delta;
 
             float rcp = c->cfm_inv_dt + j_inv_m_j;
-            c->inv_diag = rcp * rcp > INV_DIAG_EPSILON ? m_config.sor / rcp : 0.f;
+            c->inv_diag = rcp * rcp > INV_DIAG_EPSILON ? config().sor / rcp : 0.f;
         }
     }
 }
@@ -771,7 +770,7 @@ void ConstraintSolver::solve_pass2()
         }
     }
 
-    if (m_config.use_simd)
+    if (config().use_simd)
         solve_iterations<true>();
     else
         solve_iterations<false>();
@@ -784,7 +783,7 @@ void ConstraintSolver::solve_iterations()
 {
     ConstraintHelper helper{m_bodies};
 
-    for(uint32_t iter = 0; iter < m_config.iteration_count; ++iter) {
+    for(uint32_t iter = 0; iter < config().iteration_count; ++iter) {
 
         auto& general_group = m_groups[(int) ConstraintGroup::General];
         auto& general_lambda = general_group.lambda;

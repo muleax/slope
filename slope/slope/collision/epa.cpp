@@ -20,6 +20,21 @@ inline std::pair<uint32_t, uint32_t> decode_edge(uint64_t code)
 
 } // unnamed
 
+void EPAStats::reset()
+{
+    cum_test_count = 0;
+    cum_iterations_count = 0;
+    max_iteration_count = 0;
+}
+
+void EPAStats::merge(const EPAStats& other)
+{
+    total_fail_count +=     other.total_fail_count;
+    cum_test_count +=       other.cum_test_count;
+    cum_iterations_count += other.cum_iterations_count;
+    max_iteration_count =   std::max(max_iteration_count, other.max_iteration_count);
+}
+
 void EPASolver::collect_stats(uint32_t iteration_count, bool fail)
 {
     m_stats.cum_test_count++;
@@ -87,17 +102,17 @@ std::optional<vec3> EPASolver::find_penetration_axis(
         std::pop_heap(m_heap.begin(), m_heap.end());
         m_heap.pop_back();
 
-        auto new_pt = shape1->support_diff(shape2, face.normal, m_config.support_bloat, true);
+        auto new_pt = shape1->support_diff(shape2, face.normal, config().support_bloat, true);
 
         float proximity = face.normal.dot(new_pt - m_points[face.a]);
 
-        if (proximity < m_config.early_threshold) {
+        if (proximity < config().early_threshold) {
             collect_stats(iter, false);
             return face.normal;
         }
 
-        if (iter == m_config.max_iteration_count) {
-            if (proximity < m_config.final_threshold) {
+        if (iter == config().max_iteration_count) {
+            if (proximity < config().final_threshold) {
                 collect_stats(iter, false);
                 return face.normal;
             }
@@ -141,7 +156,7 @@ std::optional<vec3> EPASolver::find_penetration_axis(
         }
     }
 
-    collect_stats(m_config.max_iteration_count, true);
+    collect_stats(config().max_iteration_count, true);
     return std::nullopt;
 }
 

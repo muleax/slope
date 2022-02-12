@@ -2,7 +2,6 @@
 #include "slope/collision/shape/collision_shape.hpp"
 #include "slope/collision/gjk.hpp"
 #include "slope/core/vector.hpp"
-#include "slope/core/stats_holder.hpp"
 #include "slope/core/config_holder.hpp"
 #include <optional>
 
@@ -21,27 +20,18 @@ struct EPAStats {
     uint64_t cum_iterations_count = 0;
     uint32_t max_iteration_count = 0;
 
-    void reset()
-    {
-        cum_test_count = 0;
-        cum_iterations_count = 0;
-        max_iteration_count = 0;
-    }
-
-    void merge(const EPAStats& other)
-    {
-        total_fail_count +=     other.total_fail_count;
-        cum_test_count +=       other.cum_test_count;
-        cum_iterations_count += other.cum_iterations_count;
-        max_iteration_count =   std::max(max_iteration_count, other.max_iteration_count);
-    }
+    void reset();
+    void merge(const EPAStats& other);
 };
 
-class EPASolver : public ConfigHolder<EPAConfig>, public StatsHolder<EPAStats> {
+class EPASolver : public ConfigHolder<EPAConfig> {
 public:
     using Simplex = GJKSolver::Simplex;
 
     std::optional<vec3> find_penetration_axis(const CollisionShape* shape1, const CollisionShape* shape2, const Simplex& simplex);
+
+    void                reset_stats() { m_stats.reset(); }
+    const auto&         stats() const { return m_stats; }
 
 private:
     struct Face {
@@ -64,6 +54,8 @@ private:
     Vector<Face>        m_heap;
     Vector<uint64_t>    m_edges;
     vec3                m_inner_point;
+
+    EPAStats            m_stats;
 };
 
 } // slope

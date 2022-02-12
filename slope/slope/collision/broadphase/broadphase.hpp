@@ -1,6 +1,7 @@
 #pragma once
-#include "slope/collision/aabb.hpp"
+#include "slope/core/config.hpp"
 #include "slope/core/vector.hpp"
+#include "slope/collision/aabb.hpp"
 #include "slope/thread/utils.hpp"
 #include "slope/debug/log.hpp"
 #include <algorithm>
@@ -96,30 +97,38 @@ void Broadphase<T>::find_overlaps_pass0()
     float mean1 = 0.f;
     float mean2 = 0.f;
 
-    m_traverse_order.clear();
-    for (ProxyId i = 0; i < m_proxies.size(); i++) {
-        auto& p = m_proxies[i];
-        if (p.active) {
-            m_traverse_order.push_back({p.data, p.aabb});
-            mean0 += p.aabb.min.x;
-            mean1 += p.aabb.min.y;
-            mean2 += p.aabb.min.z;
-        }
-    }
+    {
+        SL_ZONE_SCOPED("compute_mean")
 
-    mean0 /= m_traverse_order.size();
-    mean1 /= m_traverse_order.size();
-    mean2 /= m_traverse_order.size();
+        m_traverse_order.clear();
+        for (ProxyId i = 0; i < m_proxies.size(); i++) {
+            auto& p = m_proxies[i];
+            if (p.active) {
+                m_traverse_order.push_back({p.data, p.aabb});
+                mean0 += p.aabb.min.x;
+                mean1 += p.aabb.min.y;
+                mean2 += p.aabb.min.z;
+            }
+        }
+
+        mean0 /= m_traverse_order.size();
+        mean1 /= m_traverse_order.size();
+        mean2 /= m_traverse_order.size();
+    }
 
     float var0 = 0.f;
     float var1 = 0.f;
     float var2 = 0.f;
 
-    for (auto& data : m_traverse_order) {
-        auto& v = data.aabb.min;
-        var0 += sqr(v.x - mean0);
-        var1 += sqr(v.y - mean1);
-        var2 += sqr(v.z - mean2);
+    {
+        SL_ZONE_SCOPED("compute_variance")
+
+        for (auto& data: m_traverse_order) {
+            auto& v = data.aabb.min;
+            var0 += sqr(v.x - mean0);
+            var1 += sqr(v.y - mean1);
+            var2 += sqr(v.z - mean2);
+        }
     }
 
     // find max variance axis
@@ -136,9 +145,13 @@ void Broadphase<T>::find_overlaps_pass0()
         m_sort_axis = 2;
     }
 
-    std::sort(m_traverse_order.begin(), m_traverse_order.end(), [this](auto& a, auto& b) {
-        return a.aabb.min[m_sort_axis] < b.aabb.min[m_sort_axis];
-    });
+    {
+        SL_ZONE_SCOPED("sap_sort")
+
+        std::sort(m_traverse_order.begin(), m_traverse_order.end(), [this](auto& a, auto& b) {
+            return a.aabb.min[m_sort_axis] < b.aabb.min[m_sort_axis];
+        });
+    }
 }
 
 template <class T>

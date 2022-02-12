@@ -97,8 +97,6 @@ public:
     void            set_concurrency(int concurrency);
     int             concurrency() const;
 
-    void            update_config(const ConstraintSolverConfig& config) override;
-
     void            register_body(RigidBody* body);
 
     ConstraintId    allocate(ConstraintGroup group, int count);
@@ -174,7 +172,8 @@ protected:
 
     using Groups = Array<GroupData, (int)ConstraintGroup::Count>;
 
-    void set_time_interval(float time_interval);
+    void            on_config_update(const ConstraintSolverConfig& prev_config) override;
+    void            set_time_interval(float time_interval);
     ConstraintData& basic_setup(ConstraintId id, const Constraint& c);
 
     void apply_impulses();
