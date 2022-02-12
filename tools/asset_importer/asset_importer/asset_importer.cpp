@@ -2,7 +2,6 @@
 #include "slope/core/vector.hpp"
 #include "slope/debug/log.hpp"
 #include "slope/math/math.hpp"
-#include "nlohmann/json.hpp"
 #include "cxxopts/include/cxxopts.hpp"
 #include <iostream>
 #include <fstream>
