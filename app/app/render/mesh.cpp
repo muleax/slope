@@ -1,7 +1,6 @@
 #include "app/render/mesh.hpp"
 #include "slope/debug/log.hpp"
 #include "glad/gl.h"
-#include "glm/mat2x4.hpp"
 
 namespace slope::app {
 

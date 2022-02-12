@@ -10,9 +10,6 @@
 [submodule "deps/stb/stb"]
 	path = deps/stb/stb
 	url = https://github.com/nothings/stb.git
-[submodule "deps/glm/glm"]
-	path = deps/glm/glm
-	url = https://github.com/g-truc/glm.git
 [submodule "deps/fmt/fmt"]
 	path = deps/fmt/fmt
 	url = https://github.com/fmtlib/fmt.git
