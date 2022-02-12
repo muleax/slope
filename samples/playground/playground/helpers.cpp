@@ -245,7 +245,8 @@ DynamicActor* BodySpawner::spawn_box(const mat44& tr, const vec3& velocity, floa
     auto* actor = m_dynamics_world->create_dynamic_actor();
 
     vec3 collision_size = {size.x + COLLISION_BLOAT, size.y + COLLISION_BLOAT, size.z + COLLISION_BLOAT};
-    actor->set_shape<BoxShape>(collision_size);
+
+    m_dynamics_world->set_shape(actor, BoxShape(collision_size));
 
     actor->set_transform(tc->transform);
     actor->body().set_velocity(velocity);
@@ -254,8 +255,6 @@ DynamicActor* BodySpawner::spawn_box(const mat44& tr, const vec3& velocity, floa
     actor->body().set_local_inertia({inertia, inertia, inertia});
 
     actor->set_friction(0.5f);
-
-    actor->shape().set_transform(actor->body().transform());
 
     pc->actor = actor;
     return actor;
@@ -283,7 +282,8 @@ DynamicActor* BodySpawner::spawn_sphere(const mat44& tr, const vec3& velocity, f
     float collision_radius = radius + COLLISION_BLOAT;
 
     auto* actor = m_dynamics_world->create_dynamic_actor();
-    actor->set_shape<SphereShape>(collision_radius);
+    m_dynamics_world->set_shape(actor, SphereShape(collision_radius));
+
     actor->set_transform(tc->transform);
     actor->body().set_velocity(velocity);
     actor->body().set_mass(mass);
@@ -319,7 +319,8 @@ DynamicActor* BodySpawner::spawn_capsule(
     float collision_radius = radius + COLLISION_BLOAT;
 
     auto* actor = m_dynamics_world->create_dynamic_actor();
-    actor->set_shape<CapsuleShape>(collision_radius, height);
+    m_dynamics_world->set_shape(actor, CapsuleShape(collision_radius, height));
+
     actor->set_transform(tc->transform);
     actor->body().set_velocity(velocity);
     actor->body().set_ang_velocity(ang_velocity);

@@ -69,8 +69,11 @@ public:
     // Note: any attached joint will be destroyed along with the actor
     void                    destroy_actor(BaseActor* actor);
 
-    template<class T>
-    T*                      create_joint(DynamicActor* actor1, DynamicActor* actor2 = nullptr);
+    template<class Shape>
+    void                    set_shape(BaseActor* actor, Shape&& shape);
+
+    template<class Joint>
+    Joint*                  create_joint(DynamicActor* actor1, DynamicActor* actor2 = nullptr);
     void                    destroy_joint(BaseJoint* joint);
 
     // Remove all actors and joints
@@ -132,16 +135,25 @@ private:
         uint32_t            size;
     };
 
+    template <class Actor>
+    struct ActorData {
+        std::unique_ptr<Actor>          actor;
+        std::unique_ptr<CollisionShape> shape;
+    };
+
     void on_config_update(const DynamicsWorldConfig& prev_config) final;
 
     void reset_stats();
     void finalize_stats();
 
-    template <class T>
-    T* create_actor_impl(Vector<std::unique_ptr<T>>& container);
+    template <class Actor>
+    Actor* create_actor_impl(Vector<ActorData<Actor>>& container);
 
-    template <class T>
-    void destroy_actor_impl(Vector<std::unique_ptr<T>>& container, BaseActor* actor);
+    template <class Actor>
+    void destroy_actor_impl(Vector<ActorData<Actor>>& container, BaseActor* actor);
+
+    template <class Actor, class Shape>
+    void set_shape_impl(Vector<ActorData<Actor>>& container, BaseActor* actor, Shape&& shape);
 
     void reset_narrowphase_backend(NpBackendHint hint);
 
@@ -169,9 +181,9 @@ private:
     void finalize_update();
 
     // TODO: optimize storage
-    Vector<std::unique_ptr<StaticActor>>    m_static_actors;
-    Vector<std::unique_ptr<DynamicActor>>   m_dynamic_actors;
-    Vector<JointData>                       m_joints;
+    Vector<ActorData<StaticActor>>    m_static_actors;
+    Vector<ActorData<DynamicActor>>   m_dynamic_actors;
+    Vector<JointData>                 m_joints;
 
     Vector<BroadphaseContext>       m_broadphase_ctx;
     Broadphase                      m_broadphase;
@@ -206,6 +218,23 @@ T* DynamicsWorld::create_joint(DynamicActor* actor1, DynamicActor* actor2)
     m_joints.push_back({ std::move(joint_ptr), actor1, actor2 });
 
     return joint;
+}
+
+template<class Shape>
+void DynamicsWorld::set_shape(BaseActor* actor, Shape&& shape)
+{
+    if (actor->is<DynamicActor>())
+        set_shape_impl(m_dynamic_actors, actor, std::forward<Shape>(shape));
+    else
+        set_shape_impl(m_static_actors, actor, std::forward<Shape>(shape));
+}
+
+template <class Actor, class Shape>
+void DynamicsWorld::set_shape_impl(Vector<ActorData<Actor>>& container, BaseActor* actor, Shape&& shape)
+{
+    auto& data = container[actor->linear_id()];
+    data.shape = std::make_unique<std::remove_reference_t<Shape>>(std::forward<Shape>(shape));
+    actor->assign_shape(data.shape.get());
 }
 
 } // slope

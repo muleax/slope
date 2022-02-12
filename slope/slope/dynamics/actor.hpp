@@ -20,11 +20,6 @@ public:
     using TypedBase::TypedBase;
     virtual ~BaseActor() = default;
 
-    void                    set_shape(std::unique_ptr<CollisionShape>&& shape);
-
-    template<class T, class... Args>
-    void                    set_shape(Args&&... args);
-
     bool                    has_shape() const { return m_shape != nullptr; }
     const CollisionShape&   shape() const { return *m_shape; }
     CollisionShape&         shape() { return *m_shape; }
@@ -36,19 +31,22 @@ public:
     virtual const           mat44& transform() = 0;
     virtual const           mat44& inv_transform() = 0;
 
-    // Interface for DynamicsWorld
-    LinearId                linear_id() const { return m_linear_id; }
-    void                    set_linear_id(LinearId id) { m_linear_id = id; }
-
-    ProxyId                 proxy_id() const { return m_proxy_id; }
-    void                    set_proxy_id(ProxyId id) { m_proxy_id = id; }
-
 protected:
-    std::unique_ptr<CollisionShape> m_shape;
-    float                           m_friction = 0.5f;
+    // Interface for DynamicsWorld
+    LinearId        linear_id() const { return m_linear_id; }
+    void            set_linear_id(LinearId id) { m_linear_id = id; }
+    ProxyId         proxy_id() const { return m_proxy_id; }
+    void            set_proxy_id(ProxyId id) { m_proxy_id = id; }
+    void            assign_shape(CollisionShape* shape);
 
-    LinearId                        m_linear_id = 0;
-    ProxyId                         m_proxy_id = 0;
+    // TODO: reconsider using friend
+    friend class DynamicsWorld;
+
+    CollisionShape* m_shape = nullptr;
+    float           m_friction = 0.5f;
+
+    LinearId        m_linear_id = 0;
+    ProxyId         m_proxy_id = 0;
 };
 
 class StaticActor : public TypedObject<BaseActor, ActorKind::Static> {
@@ -75,14 +73,9 @@ private:
     RigidBody m_body;
 };
 
-inline void BaseActor::set_shape(std::unique_ptr<CollisionShape>&& shape) {
-    m_shape = std::move(shape);
+inline void BaseActor::assign_shape(CollisionShape* shape) {
+    m_shape = shape;
     m_shape->set_transform(transform());
-}
-
-template<class T, class... Args>
-void BaseActor::set_shape(Args&&... args) {
-    set_shape(std::make_unique<T>(std::forward<Args>(args)...));
 }
 
 inline void StaticActor::set_transform(const mat44& transform) {

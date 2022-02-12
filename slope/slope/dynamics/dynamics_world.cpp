@@ -93,7 +93,7 @@ void DynamicsWorld::reset_narrowphase_backend(NpBackendHint hint)
 }
 
 template<class T>
-T* DynamicsWorld::create_actor_impl(Vector<std::unique_ptr<T>>& container)
+T* DynamicsWorld::create_actor_impl(Vector<ActorData<T>>& container)
 {
     auto actor_ptr = std::make_unique<T>();
     T* actor = actor_ptr.get();
@@ -117,18 +117,9 @@ DynamicActor* DynamicsWorld::create_dynamic_actor()
 }
 
 template<class T>
-void DynamicsWorld::destroy_actor_impl(Vector<std::unique_ptr<T>>& container, BaseActor* actor)
+void DynamicsWorld::destroy_actor_impl(Vector<ActorData<T>>& container, BaseActor* actor)
 {
-    // TODO: optimize
-    auto it = std::find_if(container.begin(), container.end(), [actor](auto& a) { return a.get() == actor; });
-    if (it == container.end()) {
-        log::error("Destroy actor: actor not found");
-        return;
-    }
-
-    m_broadphase.remove_proxy((*it)->proxy_id());
-
-    auto linear_id = (*it)->linear_id();
+    auto linear_id = actor->linear_id();
 
     if constexpr (std::is_same_v<T, DynamicActor>) {
         SL_ASSERT(actor->is<DynamicActor>());
@@ -140,10 +131,12 @@ void DynamicsWorld::destroy_actor_impl(Vector<std::unique_ptr<T>>& container, Ba
         m_joints.erase(joint_it, m_joints.end());
     }
 
-    std::swap(*it, container.back());
+    m_broadphase.remove_proxy(actor->proxy_id());
+
+    std::swap(container[linear_id], container.back());
     container.pop_back();
 
-    (*it)->set_linear_id(linear_id);
+    container[linear_id].actor->set_linear_id(linear_id);
 }
 
 void DynamicsWorld::destroy_actor(BaseActor* actor)
@@ -181,8 +174,8 @@ void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer)
 void DynamicsWorld::apply_external_forces()
 {
     float dt = config().solver_config.time_interval;
-    for (auto& actor: m_dynamic_actors) {
-        auto& body = actor->body();
+    for (auto& data : m_dynamic_actors) {
+        auto& body = data.actor->body();
         body.apply_force_to_com(config().gravity * body.mass());
         body.apply_gyroscopic_torque(dt);
     }
@@ -190,6 +183,8 @@ void DynamicsWorld::apply_external_forces()
 
 void DynamicsWorld::collide(NarrowphaseContext& ctx, BaseActor* actor1, BaseActor* actor2)
 {
+    SL_ASSERT(actor1->has_shape() && actor2->has_shape());
+
     if (!actor1->is<DynamicActor>()) {
         if (!actor2->is<DynamicActor>()) {
             // ignore static to static collisions
@@ -378,10 +373,11 @@ void DynamicsWorld::integrate_bodies(int worker_id, int concurrency)
 
     float dt = config().solver_config.time_interval;
     for (auto it = chunk_beg; it != chunk_end; it++) {
-        auto* actor = it->get();
+        auto* actor = it->actor.get();
         auto& body = actor->body();
         body.integrate(dt);
-        actor->shape().set_transform(body.transform());
+        if (actor->has_shape())
+            actor->shape().set_transform(body.transform());
     }
 }
 
@@ -478,7 +474,7 @@ void DynamicsWorld::merge_islands()
         for (uint32_t linear_id = 0; linear_id < actor_count; linear_id++) {
             uint32_t root = m_island_merger.find_root(linear_id);
             uint32_t bin = m_island_to_bin[root];
-            auto& body = m_dynamic_actors[linear_id]->body();
+            auto& body = m_dynamic_actors[linear_id].actor->body();
             m_solve_ctx[bin].solver.register_body(&body);
         }
     }
@@ -600,14 +596,20 @@ void DynamicsWorld::setup_collision_flow(TaskExecutor& executor, TaskId pre_fenc
     TaskId prepare_broadphase = executor.emplace([this](){
         {
             SL_ZONE_SCOPED("update_static_actors")
-            for (auto& actor: m_static_actors)
-                m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
+            for (auto& data : m_static_actors) {
+                auto& actor = data.actor;
+                if (actor->has_shape())
+                    m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
+            }
         }
 
         {
             SL_ZONE_SCOPED("update_dynamic_actors")
-            for (auto& actor: m_dynamic_actors)
-                m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
+            for (auto& data : m_dynamic_actors) {
+                auto& actor = data.actor;
+                if (actor->has_shape())
+                    m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
+            }
         }
 
         m_broadphase.find_overlaps_pass0();
