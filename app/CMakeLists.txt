@@ -4,4 +4,4 @@ slope_library(app)
 
 target_link_libraries(app
         PUBLIC slope imgui
-        PRIVATE glad glfw stb)
+        PRIVATE glad glfw)

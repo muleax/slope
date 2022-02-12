@@ -60,7 +60,7 @@ void UIOverlaySystem::update(float dt)
 
     ImGui::End();
 
-    ImGui::Begin("Controls");
+    ImGui::Begin("Config");
 
     if (ImGui::CollapsingHeader("Simulation", treeNodeFlags)) {
         ImGui::Checkbox("Pause", &ps->pause);
@@ -99,10 +99,14 @@ void UIOverlaySystem::update(float dt)
         world_config.solver_config.time_interval = time_step_ms * 0.001f;
 
         ImGui::DragInt("Iterations", &solver_config.iteration_count, 0.5f, 1, 300);
-        ImGui::DragFloat("WS Normal", &world_config.warmstarting_normal, 0.002f, 0.f, 1.f);
-        ImGui::DragFloat("WS Friction", &world_config.warmstarting_friction, 0.002f, 0.f, 1.f);
-        ImGui::DragFloat("WS Joint", &world_config.warmstarting_joint, 0.002f, 0.f, 1.f);
         ImGui::DragFloat("SOR", &solver_config.sor, 0.001f, 0.f, 1.f);
+        ImGui::DragFloat("Normal WS", &world_config.normal_warmstarting, 0.002f, 0.f, 1.f);
+        ImGui::DragFloat("Friction WS", &world_config.friction_warmstarting, 0.002f, 0.f, 1.f);
+        ImGui::DragFloat("Contact ERP", &world_config.contact_erp, 0.001f, 0.f, 1.f);
+        ImGui::DragFloat("Contact CFM", &world_config.contact_cfm, 0.001f, 0.f, 1.f);
+        ImGui::DragFloat("Contact penetration", &world_config.contact_penetration, 0.001f, 0.f, 1.f);
+        ImGui::DragFloat("Joint WS", &world_config.joint_warmstarting, 0.002f, 0.f, 1.f);
+        ImGui::DragFloat("Joint ERP", &world_config.joint_erp, 0.002f, 0.f, 1.f);
         ImGui::InputFloat3("Gravity", world_config.gravity.data);
     }
 

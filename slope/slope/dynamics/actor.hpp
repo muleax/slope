@@ -27,6 +27,9 @@ public:
     void                    set_friction(float value) { m_friction = value; }
     float                   friction() const { return m_friction; }
 
+    void                    set_restitution(float value) { m_restitution = value; }
+    float                   restitution() const { return m_restitution; }
+
     virtual void            set_transform(const mat44& transform) = 0;
     virtual const           mat44& transform() = 0;
     virtual const           mat44& inv_transform() = 0;
@@ -44,6 +47,7 @@ protected:
 
     CollisionShape* m_shape = nullptr;
     float           m_friction = 0.5f;
+    float           m_restitution = 0.f;
 
     LinearId        m_linear_id = 0;
     ProxyId         m_proxy_id = 0;

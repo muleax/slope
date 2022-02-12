@@ -1,7 +1,6 @@
 #pragma once
-
 #include "playground/helpers.hpp"
-#include "slope/dynamics/joint.hpp"
+#include "slope/dynamics/joint/spherical_joint.hpp"
 #include <optional>
 
 class Demo {

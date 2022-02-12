@@ -591,6 +591,8 @@ void ConstraintSolver::setup_constraint(ConstraintId constr_id, const Constraint
         // bilateral case
         data.bg_error = c.pos_error * c.erp;
     }
+
+    data.restitution = c.restitution;
 }
 
 void ConstraintSolver::setup_friction_1d(ConstraintId constr_id, const Constraint& c, float friction_ratio, ConstraintId normal_constr_id)
@@ -601,6 +603,7 @@ void ConstraintSolver::setup_friction_1d(ConstraintId constr_id, const Constrain
 
     data.cfm_inv_dt = c.cfm * m_inv_dt;
     data.bg_error = 0.f;
+    data.restitution = c.restitution;
 
     data.friction_ratio = friction_ratio;
     data.normal_constr_idx = normal_constr_id.index();
@@ -613,6 +616,7 @@ void ConstraintSolver::setup_friction_2d(ConstraintIds ids, const Constraint& c1
     auto setup_constraint = [this, normal_id](ConstraintData& data, const Constraint& c, float ratio) {
         data.cfm_inv_dt = c.cfm * m_inv_dt;
         data.bg_error = 0.f;
+        data.restitution = c.restitution;
 
         data.friction_ratio = ratio;
         data.normal_constr_idx = normal_id.index();
@@ -632,6 +636,7 @@ void ConstraintSolver::setup_friction_cone(ConstraintIds ids, const Constraint& 
     auto setup_constraint = [this, normal_id](ConstraintData& data, const Constraint& c, float ratio) {
         data.cfm_inv_dt = c.cfm * m_inv_dt;
         data.bg_error = 0.f;
+        data.restitution = c.restitution;
 
         data.friction_ratio = ratio;
         data.normal_constr_idx = normal_id.index();
@@ -683,8 +688,6 @@ void ConstraintSolver::clear()
     m_bodies_extra.clear();
 
     for (auto& container : m_groups) {
-        //container.constraints.clear();
-        //container.lambda.clear();
         container.size = 0;
     }
 }
@@ -748,7 +751,7 @@ void ConstraintSolver::solve_pass1(int worker_id)
                 b2.inv_m_f2 += c->inv_m_j22 * *lambda;
             }
 
-            c->rhs = m_inv_dt * m_inv_dt * c->bg_error - j_v_delta;
+            c->rhs = m_inv_dt * m_inv_dt * c->bg_error - j_v_delta * (c->restitution + 1.f);
 
             float rcp = c->cfm_inv_dt + j_inv_m_j;
             c->inv_diag = rcp * rcp > INV_DIAG_EPSILON ? config().sor / rcp : 0.f;

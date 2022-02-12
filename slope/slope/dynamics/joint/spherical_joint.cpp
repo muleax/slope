@@ -1,4 +1,4 @@
-#include "slope/dynamics/joint.hpp"
+#include "slope/dynamics/joint/spherical_joint.hpp"
 
 namespace slope {
 
@@ -11,16 +11,13 @@ void SphericalJoint::apply_constraints(ConstraintSolver* solver)
     geom.p2 = m_body2 ? m_body2->transform().apply_point(m_anchor2) : m_anchor2;
 
     for (int i = 0; i < 3; i++) {
-        auto& cache = m_cache[i];
         geom.axis = transform1.apply_to_unit_axis(i);
         auto conf = Constraint::stabilized_bilateral(m_body1, m_body2, geom);
-        conf.init_lambda = cache.lambda * m_warmstarting_ratio;
-        cache.constraint_id = solver->add_constraint(conf);
+        conf.erp = m_erp;
+        add_constraint_warm(i, solver, conf);
     }
 
     if (m_damping > 0.f) {
-        auto& damping_cache = m_cache[3];
-
         vec3 dw = m_body1->ang_velocity();
         if (m_body2)
             dw -= m_body2->ang_velocity();
@@ -32,9 +29,8 @@ void SphericalJoint::apply_constraints(ConstraintSolver* solver)
         damping_conf.jacobian2[1] = -dw;
         damping_conf.min_bound = -m_damping;
         damping_conf.max_bound = m_damping;
-        damping_conf.init_lambda = damping_cache.lambda * m_warmstarting_ratio;
 
-        damping_cache.constraint_id = solver->add_constraint(damping_conf);
+        add_constraint_warm(3, solver, damping_conf);
     }
 }
 

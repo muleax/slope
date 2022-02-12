@@ -1,7 +1,7 @@
 #pragma once
 #include "slope/dynamics/constraint_solver.hpp"
 #include "slope/dynamics/actor.hpp"
-#include "slope/dynamics/joint.hpp"
+#include "slope/dynamics/joint/base_joint.hpp"
 #include "slope/core/vector.hpp"
 #include "slope/core/unordered_map.hpp"
 #include "slope/core/array.hpp"
@@ -29,16 +29,20 @@ struct DynamicsWorldConfig {
     ConstraintSolverConfig  solver_config;
 
     bool    enable_gravity = true;
+    vec3    gravity = {0.f, -9.81f, 0.f};
     bool    enable_constraint_resolving = true;
     bool    enable_integration = true;
     bool    randomize_order = true;
     bool    enable_gyroscopic_torque = true;
     bool    enable_velocity_dependent_friction = true;
     bool    enable_cone_friction = false;
-    float   warmstarting_normal = 0.83f;
-    float   warmstarting_friction = 0.75f;
-    float   warmstarting_joint = 0.8f;
-    vec3    gravity = {0.f, -9.81f, 0.f};
+    float   normal_warmstarting = 0.83f;
+    float   friction_warmstarting = 0.75f;
+    float   contact_erp = 0.2f;
+    float   contact_cfm = 0.f;
+    float   contact_penetration = 0.01f;
+    float   joint_warmstarting = 0.8f;
+    float   joint_erp = 0.15f;
 
     // debug draw
     bool    draw_contact_normals1 = false;

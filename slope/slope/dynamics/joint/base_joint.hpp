@@ -1,5 +1,4 @@
 #pragma once
-
 #include "slope/dynamics/constraint_solver.hpp"
 #include "slope/dynamics/rigid_body.hpp"
 #include "slope/core/array.hpp"
@@ -13,6 +12,7 @@ public:
     virtual ~BaseJoint() = default;
 
     void            set_warmstarting_ratio(float ratio) { m_warmstarting_ratio = ratio; }
+    void            set_erp(float erp) { m_erp = erp; }
 
     virtual void    apply_constraints(ConstraintSolver* solver) = 0;
     virtual void    cache_lambdas(ConstraintSolver* solver) = 0;
@@ -25,10 +25,11 @@ protected:
     RigidBody* m_body2 = nullptr;
 
     float m_warmstarting_ratio = 0.8f;
+    float m_erp = 0.2f;
 };
 
 template <int CACHE_SIZE>
-class CachedJoint : public BaseJoint {
+class WarmStartJoint : public BaseJoint {
 public:
     using BaseJoint::BaseJoint;
 
@@ -40,31 +41,13 @@ protected:
         float lambda = 0.f;
     };
 
+    ConstraintId add_constraint_warm(int cache_id, ConstraintSolver* solver, Constraint& conf);
+
     Array<LambdaCache, CACHE_SIZE> m_cache;
 };
 
-class SphericalJoint : public CachedJoint<4> {
-public:
-    using CachedJoint::CachedJoint;
-
-    void        set_damping(const float value) { m_damping = value; }
-    void        set_anchor1(const vec3& value) { m_anchor1 = value; }
-    void        set_anchor2(const vec3& value) { m_anchor2 = value; }
-
-    const vec3& anchor1() const { return m_anchor1; }
-    const vec3& anchor2() const { return m_anchor2; }
-
-    void        apply_constraints(ConstraintSolver* solver) final;
-
-private:
-    vec3 m_anchor1;
-    vec3 m_anchor2;
-
-    float m_damping = 0.f;
-};
-
 template <int CACHE_SIZE>
-void CachedJoint<CACHE_SIZE>::cache_lambdas(ConstraintSolver* solver)
+void WarmStartJoint<CACHE_SIZE>::cache_lambdas(ConstraintSolver* solver)
 {
     for (auto& cache: m_cache) {
         if (cache.constraint_id.has_value()) {
@@ -74,6 +57,16 @@ void CachedJoint<CACHE_SIZE>::cache_lambdas(ConstraintSolver* solver)
             cache.lambda = 0.f;
         }
     }
+}
+
+template <int CACHE_SIZE>
+ConstraintId WarmStartJoint<CACHE_SIZE>::add_constraint_warm(int cache_id, ConstraintSolver* solver, Constraint& conf)
+{
+    SL_ASSERT(cache_id < CACHE_SIZE);
+    auto& cache = m_cache[cache_id];
+    conf.init_lambda = cache.lambda * m_warmstarting_ratio;
+    cache.constraint_id = solver->add_constraint(conf);
+    return *cache.constraint_id;
 }
 
 } // slope

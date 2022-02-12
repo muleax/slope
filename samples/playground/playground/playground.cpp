@@ -187,7 +187,7 @@ public:
 
     void fire_box()
     {
-        static constexpr float BOX_SPEED = 25.f;
+        static constexpr float BOX_SPEED = 15.f;
 
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
         auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -BOX_SPEED});

@@ -134,9 +134,10 @@ void DynamicsWorld::destroy_actor_impl(Vector<ActorData<T>>& container, BaseActo
     m_broadphase.remove_proxy(actor->proxy_id());
 
     std::swap(container[linear_id], container.back());
-    container.pop_back();
 
     container[linear_id].actor->set_linear_id(linear_id);
+
+    container.pop_back();
 }
 
 void DynamicsWorld::destroy_actor(BaseActor* actor)
@@ -246,7 +247,8 @@ void DynamicsWorld::apply_joints(int worker_id)
     auto& ctx = m_solve_ctx[worker_id];
 
     for (auto* joint: ctx.pending_joints) {
-        joint->set_warmstarting_ratio(config().warmstarting_joint);
+        joint->set_warmstarting_ratio(config().joint_warmstarting);
+        joint->set_erp(config().joint_erp);
         joint->apply_constraints(&ctx.solver);
     }
 }
@@ -272,8 +274,15 @@ void DynamicsWorld::apply_contacts(int worker_id, int concurrency, int solver_id
         RigidBody* body1 = &actor1->cast<DynamicActor>()->body();
         RigidBody* body2 = actor2->is<DynamicActor>() ? &actor2->cast<DynamicActor>()->body() : nullptr;
 
+        // TODO: implement policies
+        float restitution = std::max(actor1->restitution(), actor2->restitution());
+
         auto nc = Constraint::stabilized_unilateral(body1, body2, geom);
-        nc.init_lambda = mf_point->normal_lambda * config().warmstarting_normal;
+        nc.erp = config().contact_erp;
+        nc.cfm = config().contact_cfm;
+        nc.restitution = restitution;
+        nc.unilateral_penetration = config().contact_penetration;
+        nc.init_lambda = mf_point->normal_lambda * config().normal_warmstarting;
         ctx.solver.setup_constraint(normal_id, nc);
 
         std::optional<FrictionBasis> basis;
@@ -293,8 +302,8 @@ void DynamicsWorld::apply_contacts(int worker_id, int concurrency, int solver_id
         auto fc1 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis1});
         auto fc2 = Constraint::bilateral(body1, body2, {geom.p1, geom.p2, basis->axis2});
 
-        fc1.init_lambda = mf_point->friction1_lambda * config().warmstarting_friction;
-        fc2.init_lambda = mf_point->friction2_lambda * config().warmstarting_friction;
+        fc1.init_lambda = mf_point->friction1_lambda * config().friction_warmstarting;
+        fc2.init_lambda = mf_point->friction2_lambda * config().friction_warmstarting;
 
         ConstraintIds friction_ids = {friction_id, friction_id + 1};
 

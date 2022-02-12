@@ -78,6 +78,7 @@ struct Constraint {
     float       erp = 0.2f;
     float       unilateral_penetration = 0.01f;
     float       pos_error = 0.f;
+    float       restitution = 0.f;
 };
 
 struct ConstraintSolverConfig {
@@ -140,6 +141,7 @@ protected:
 
         float   cfm_inv_dt;
         float   bg_error;
+        float   restitution;
 
         float   rhs;
         float   inv_diag;
@@ -254,6 +256,7 @@ inline Constraint Constraint::stabilized_bilateral(RigidBody* body1, const Const
 
 inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, RigidBody* body2, const ConstraintGeom& geom)
 {
+    return generic(body1, body2, geom, geom.pos_error(), 0.f, FLOAT_MAX);
     return generic(body1, body2, geom, geom.pos_error(), 0.f, FLOAT_MAX);
 }
 
