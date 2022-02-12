@@ -3,7 +3,7 @@
 #include "app/ecs/system.hpp"
 #include "slope/dynamics/actor.hpp"
 #include "slope/dynamics/dynamics_world.hpp"
-#include "slope/thread/parallel_executor.hpp"
+#include "slope/flow/parallel_executor.hpp"
 #include <memory>
 
 namespace slope::app {
