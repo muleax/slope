@@ -29,6 +29,12 @@ Narrowphase::Narrowphase()
     remove_all_backends();
 }
 
+void Narrowphase::on_config_update(const NarrowphaseConfig& prev_config)
+{
+    m_context.gjk_solver.update_config(config().gjk_config);
+    m_context.epa_solver.update_config(config().epa_config);
+}
+
 void Narrowphase::remove_all_backends()
 {
     for (auto& container : m_backend_map)

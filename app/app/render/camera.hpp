@@ -33,7 +33,7 @@ struct CameraComponent : public Component<CameraComponent> {
 };
 
 struct CameraControllerComponent : public Component<CameraControllerComponent> {
-    float velocity = 8.f;
+    float velocity = 10.f;
 
     bool move_fwd = false;
     bool move_bkwd = false;

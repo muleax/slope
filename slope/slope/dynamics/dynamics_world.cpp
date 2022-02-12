@@ -106,9 +106,9 @@ T* DynamicsWorld::create_actor_impl(Vector<ActorData<T>>& container)
     return actor;
 }
 
-StaticActor* DynamicsWorld::create_static_actor()
+KinematicActor* DynamicsWorld::create_kinematic_actor()
 {
-    return create_actor_impl(m_static_actors);
+    return create_actor_impl(m_kinematic_actors);
 }
 
 DynamicActor* DynamicsWorld::create_dynamic_actor()
@@ -145,7 +145,7 @@ void DynamicsWorld::destroy_actor(BaseActor* actor)
     if (actor->is<DynamicActor>())
         destroy_actor_impl(m_dynamic_actors, actor);
     else
-        destroy_actor_impl(m_static_actors, actor);
+        destroy_actor_impl(m_kinematic_actors, actor);
 
 }
 
@@ -161,7 +161,7 @@ void DynamicsWorld::clear()
 {
     m_broadphase.clear();
 
-    m_static_actors.clear();
+    m_kinematic_actors.clear();
     m_dynamic_actors.clear();
 
     m_joints.clear();
@@ -177,8 +177,10 @@ void DynamicsWorld::apply_external_forces()
     float dt = config().solver_config.time_interval;
     for (auto& data : m_dynamic_actors) {
         auto& body = data.actor->body();
-        body.apply_force_to_com(config().gravity * body.mass());
-        body.apply_gyroscopic_torque(dt);
+        if (config().enable_gravity)
+            body.apply_force_to_com(config().gravity * body.mass());
+        if (config().enable_gyroscopic_torque)
+            body.apply_gyroscopic_torque(dt);
     }
 }
 
@@ -188,7 +190,7 @@ void DynamicsWorld::collide(NarrowphaseContext& ctx, BaseActor* actor1, BaseActo
 
     if (!actor1->is<DynamicActor>()) {
         if (!actor2->is<DynamicActor>()) {
-            // ignore static to static collisions
+            // ignore kinematic to kinematic collisions
             // TODO: filter out this case earlier in broadphase
             return;
         } else {
@@ -222,7 +224,7 @@ void DynamicsWorld::collide(NarrowphaseContext& ctx, BaseActor* actor1, BaseActo
         cache->touch_frame_id = m_frame_id;
 
         if (actor2->is<DynamicActor>()) {
-            ctx.actor_contacts.push_back({actor1->linear_id(), actor2->linear_id()});
+            ctx.actor_pairs.push_back({actor1->linear_id(), actor2->linear_id()});
         }
 
         auto& manifold = cache->manifold;
@@ -375,7 +377,7 @@ void DynamicsWorld::cache_lambdas(int worker_id, int concurrency)
 
 void DynamicsWorld::integrate_bodies(int worker_id, int concurrency)
 {
-    if (!config().enable_integration || config().delay_integration)
+    if (!config().enable_integration)
         return;
 
     auto[chunk_beg, chunk_end] = select_sequence_chunk(worker_id, concurrency, m_dynamic_actors);
@@ -410,8 +412,9 @@ void DynamicsWorld::refresh_manifolds()
 
 void DynamicsWorld::update_general_stats()
 {
-    m_stats.static_actor_count = m_static_actors.size();
+    m_stats.kinematic_actor_count = m_kinematic_actors.size();
     m_stats.dynamic_actor_count = m_dynamic_actors.size();
+    m_stats.joint_count = m_joints.size();
     m_stats.simulation_time += config().solver_config.time_interval;
 }
 
@@ -433,8 +436,8 @@ void DynamicsWorld::merge_islands()
         SL_ZONE_SCOPED("build_disjoint_set")
 
         for (auto& ctx: m_narrowphase_ctx) {
-            for (auto[a, b]: ctx.actor_contacts) {
-                m_island_merger.merge(a, b);
+            for (auto [actor1, actor2] : ctx.actor_pairs) {
+                m_island_merger.merge(actor1, actor2);
             }
         }
     }
@@ -457,6 +460,10 @@ void DynamicsWorld::merge_islands()
 
         std::sort(m_islands.begin(), m_islands.end(), [](auto& a, auto& b) { return a.size > b.size; });
     }
+
+    m_stats.island_count = m_islands.size();
+    for (int i = 0; i < m_stats.larges_islands.size(); i++)
+        m_stats.larges_islands[i] = i < m_islands.size() ?  m_islands[i].size : 0;
 
     {
         SL_ZONE_SCOPED("form_bins")
@@ -559,7 +566,7 @@ void DynamicsWorld::prepare_to_update()
 
     reset_stats();
 
-    if (config().enable_integration && config().delay_integration)
+    if (config().delay_integration)
         integrate_bodies(0, 1);
 }
 
@@ -578,6 +585,14 @@ void DynamicsWorld::finalize_stats()
         ctx.narrowphase->finalize_stats();
         m_stats.np_stats.merge(ctx.narrowphase->stats());
     }
+
+    m_stats.constraint_count = 0;
+    for (auto& ctx : m_solve_ctx) {
+        for (int i = 0; i < static_cast<int>(ConstraintGroup::Count); i++) {
+            m_stats.constraint_count += ctx.solver.get_constraint_count(static_cast<ConstraintGroup>(i));
+            m_stats.constraint_count += ctx.solver.get_constraint_count(static_cast<ConstraintGroup>(i));
+        }
+    }
 }
 
 void DynamicsWorld::finalize_update()
@@ -588,7 +603,7 @@ void DynamicsWorld::finalize_update()
 
     for (auto& ctx : m_narrowphase_ctx) {
         ctx.pending_contacts.clear();
-        ctx.actor_contacts.clear();
+        ctx.actor_pairs.clear();
     }
 
     for (auto& ctx : m_solve_ctx) {
@@ -604,8 +619,8 @@ void DynamicsWorld::setup_collision_flow(TaskExecutor& executor, TaskId pre_fenc
 {
     TaskId prepare_broadphase = executor.emplace([this](){
         {
-            SL_ZONE_SCOPED("update_static_actors")
-            for (auto& data : m_static_actors) {
+            SL_ZONE_SCOPED("update_kinematic_actors")
+            for (auto& data : m_kinematic_actors) {
                 auto& actor = data.actor;
                 if (actor->has_shape())
                     m_broadphase.update_proxy(actor->proxy_id(), actor->shape().aabb());
@@ -751,7 +766,8 @@ void DynamicsWorld::setup_post_solve_flow(TaskExecutor& executor, TaskId pre_fen
     int integrate_concurrency = concurrency * 3;
     for (int worker_id = 0; worker_id < integrate_concurrency; worker_id++) {
         TaskId integrate_task = executor.emplace([this, worker_id, integrate_concurrency]() {
-            integrate_bodies(worker_id, integrate_concurrency);
+            if (!config().delay_integration)
+                integrate_bodies(worker_id, integrate_concurrency);
         }, "integrate");
         executor.set_order(after_cache_lambda, integrate_task);
     }

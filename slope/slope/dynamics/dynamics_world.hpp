@@ -53,11 +53,15 @@ struct DynamicsWorldConfig {
 };
 
 struct DynamicsWorldStats {
-    uint32_t    static_actor_count = 0;
-    uint32_t    dynamic_actor_count = 0;
-    float       simulation_time = 0.f;
+    float               simulation_time = 0.f;
+    uint32_t            kinematic_actor_count = 0;
+    uint32_t            dynamic_actor_count = 0;
+    uint32_t            joint_count = 0;
+    uint32_t            island_count = 0;
+    Array<uint32_t, 4>  larges_islands = {};
+    uint32_t            constraint_count = 0;
 
-    NarrowphaseStats np_stats;
+    NarrowphaseStats    np_stats;
 
     void reset() { np_stats.reset(); }
 };
@@ -68,7 +72,7 @@ public:
 
     void                    setup_executor(TaskExecutor& executor);
 
-    StaticActor*            create_static_actor();
+    KinematicActor*         create_kinematic_actor();
     DynamicActor*           create_dynamic_actor();
     // Note: any attached joint will be destroyed along with the actor
     void                    destroy_actor(BaseActor* actor);
@@ -122,7 +126,7 @@ private:
         std::unique_ptr<Narrowphase>    narrowphase;
         NpContactPatch                  contact_patch;
         Vector<PendingContact>          pending_contacts;
-        Vector<ContactPair>             actor_contacts;
+        Vector<ContactPair>             actor_pairs;
         PairCache<ManifoldCache>        new_manifolds;
     };
 
@@ -185,9 +189,9 @@ private:
     void finalize_update();
 
     // TODO: optimize storage
-    Vector<ActorData<StaticActor>>    m_static_actors;
-    Vector<ActorData<DynamicActor>>   m_dynamic_actors;
-    Vector<JointData>                 m_joints;
+    Vector<ActorData<KinematicActor>>   m_kinematic_actors;
+    Vector<ActorData<DynamicActor>>     m_dynamic_actors;
+    Vector<JointData>                   m_joints;
 
     Vector<BroadphaseContext>       m_broadphase_ctx;
     Broadphase                      m_broadphase;
@@ -230,7 +234,7 @@ void DynamicsWorld::set_shape(BaseActor* actor, Shape&& shape)
     if (actor->is<DynamicActor>())
         set_shape_impl(m_dynamic_actors, actor, std::forward<Shape>(shape));
     else
-        set_shape_impl(m_static_actors, actor, std::forward<Shape>(shape));
+        set_shape_impl(m_kinematic_actors, actor, std::forward<Shape>(shape));
 }
 
 template <class Actor, class Shape>

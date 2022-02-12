@@ -19,12 +19,6 @@ class PlaygroundApp : public App {
 public:
     ~PlaygroundApp() override = default;
 
-    template<class... Ts>
-    void register_demos()
-    {
-        (m_demos.push_back(std::make_unique<Ts>(m_spawner.get())), ...);
-    }
-
     void on_init() override
     {
         m_world = std::make_unique<World>();
@@ -51,7 +45,7 @@ public:
         m_world->create<TransformComponent>(le)->transform = mat44::translate({50.f, 100.f, 70.f});
 
         // create camera
-        vec3 eye = {4.f, 5.f, 10.f};
+        vec3 eye = {0.f, 8.f, 10.f};
         m_cam_entity = m_world->create_entity();
         m_static_entities.push_back(m_cam_entity);
         m_world->create<TransformComponent>(m_cam_entity)->transform = mat44::translate(eye);
@@ -61,16 +55,24 @@ public:
         m_spawner = std::make_unique<BodySpawner>(m_world.get());
 
         // create demos
-        register_demos<TriangleStackDemo, StackDemo, StressTestDemo, CollisionDemo, TennisRacketDemo, SphericalJointDemo>();
+        register_demos<
+            TriangleStackDemo,
+            StackDemo,
+            Stress1KDemo,
+            Stress6KDemo,
+            Stress10KDemo,
+            SphericalJointDemo,
+            TennisRacketDemo,
+            ContactGenerationDemo>();
 
-        m_current_demo = m_demos[2].get();
+        m_selected_demo = m_demos[0].get();
         reset_demo();
     }
 
     void update(float dt) override
     {
-        show_demos_ui();
-        m_current_demo->update(dt);
+        show_ui();
+        m_selected_demo->update(dt);
         m_world->update(dt);
     }
 
@@ -100,25 +102,9 @@ public:
             cam_ctl->move_bkwd = is_pressed;
             break;
 
-        case Key::LeftShift: {
-            auto* cam = m_world->modify<CameraControllerComponent>(m_cam_entity);
-            cam->velocity = is_pressed ? 1.f : 8.f;
-            break;
-        }
-
         case Key::F:
             if (is_pressed)
-                fire_box();
-            break;
-
-        case Key::G:
-            if (is_pressed)
-                fire_sphere();
-            break;
-
-        case Key::H:
-            if (is_pressed)
-                fire_capsule();
+                fire_object();
             break;
 
         case Key::Space:
@@ -147,24 +133,66 @@ public:
         }
     }
 
-    void show_demos_ui()
+private:
+    template<class... Ts>
+    void register_demos()
     {
-        ImGui::Begin("Demos");
+        (m_demos.push_back(std::make_unique<Ts>(m_spawner.get())), ...);
+    }
 
-        if (ImGui::BeginCombo("##demos_combo", m_current_demo->name())) {
-            for (auto& demo: m_demos) {
-                bool is_selected = (m_current_demo == demo.get());
-                if (ImGui::Selectable(demo->name(), is_selected))
-                    m_current_demo = demo.get();
+    void show_ui()
+    {
+        auto treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen;
 
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
+        ImGui::SetNextWindowPos(ImVec2(340, 580), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(230, 440), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Playground");
+
+        if (ImGui::CollapsingHeader("Demos", treeNodeFlags)) {
+            if (ImGui::BeginCombo("##demos_combo", m_selected_demo->name())) {
+                for (auto& demo: m_demos) {
+                    bool is_selected = (m_selected_demo == demo.get());
+                    if (ImGui::Selectable(demo->name(), is_selected))
+                        m_selected_demo = demo.get();
+
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
             }
-            ImGui::EndCombo();
+
+            if (ImGui::Button(" RESET ")) {
+                reset_demo();
+            }
+            ImGui::Checkbox("Default Config", &m_apply_default_demo_config);
         }
 
-        if (ImGui::Button("Reset")) {
-            reset_demo();
+        if (ImGui::CollapsingHeader("Controls", treeNodeFlags)) {
+            ImGui::Text("WASD         Camera move");
+            ImGui::Text("LMB + Mouse  Camera rotation");
+            ImGui::Text("Space        Pause simulation");
+            ImGui::Text("F            Fire object");
+        }
+
+        if (ImGui::CollapsingHeader("Fire Object", treeNodeFlags)) {
+            bool use_box = (m_fire_object_kind == ShapeKind::Box);
+            if (ImGui::RadioButton("Box", use_box))
+                m_fire_object_kind = ShapeKind::Box;
+            bool use_sphere = (m_fire_object_kind == ShapeKind::Sphere);
+            if (ImGui::RadioButton("Sphere", use_sphere))
+                m_fire_object_kind = ShapeKind::Sphere;
+            bool use_capsule = (m_fire_object_kind == ShapeKind::Capsule);
+            if (ImGui::RadioButton("Capsule", use_capsule))
+                m_fire_object_kind = ShapeKind::Capsule;
+
+            ImGui::DragFloat("Speed", &m_fire_object_speed, 0.1f, 0.f, 1000.f);
+            ImGui::DragFloat("Mass", &m_fire_object_mass, 0.1f, 0.1f, 10000.f);
+            ImGui::DragFloat("Size", &m_fire_object_size, 0.1f, 0.1f, 100.f);
+        }
+
+        if (ImGui::CollapsingHeader("Camera", treeNodeFlags)) {
+            auto* ctl = m_world->modify<CameraControllerComponent>(m_cam_entity);
+            ImGui::DragFloat("Cam Speed", &ctl->velocity, 0.2f, 0.f, 100.f);
         }
 
         ImGui::End();
@@ -172,45 +200,58 @@ public:
 
     void reset_demo()
     {
+        if (m_current_demo) {
+            m_current_demo->fini();
+        }
+
         m_world->visit_entities([this](Entity e) {
             if (std::find(m_static_entities.begin(), m_static_entities.end(), e) == m_static_entities.end())
                 m_world->destroy_entity(e);
         });
 
         auto* physics_single = m_world->modify_singleton<PhysicsSingleton>();
-        physics_single->dynamics_world.update_config({});
         // TODO: use fini view instead
         physics_single->dynamics_world.clear();
 
-        m_current_demo->init();
+        m_selected_demo->init();
+
+        if (m_apply_default_demo_config)
+            m_selected_demo->apply_default_config();
+
+        m_current_demo = m_selected_demo;
+    }
+
+    void fire_object()
+    {
+        switch (m_fire_object_kind) {
+        case ShapeKind::Box: fire_box(); break;
+        case ShapeKind::Sphere: fire_sphere(); break;
+        case ShapeKind::Capsule: fire_capsule(); break;
+        default: break;
+        }
     }
 
     void fire_box()
     {
-        static constexpr float BOX_SPEED = 15.f;
-
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
-        auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -BOX_SPEED});
-        m_spawner->spawn_box(cam_tr->transform, vel, 5.f, vec3{1.5f});
+        auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -m_fire_object_speed});
+        m_spawner->spawn_box(cam_tr->transform, vel, m_fire_object_mass, vec3{m_fire_object_size});
     }
 
     void fire_sphere()
     {
-        static constexpr float SPHERE_SPEED = 15.f;
-
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
-        auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -SPHERE_SPEED});
-        m_spawner->spawn_sphere(cam_tr->transform, vel, 1.f, 1.f);
+        auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -m_fire_object_speed});
+        m_spawner->spawn_sphere(cam_tr->transform, vel, m_fire_object_mass, m_fire_object_size);
     }
 
     void fire_capsule()
     {
-        static constexpr float CAPSULE_SPEED = 20.f;
-
         auto* cam_tr = m_world->get<TransformComponent>(m_cam_entity);
-        auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -CAPSULE_SPEED});
-        vec3 ang_vel = cam_tr->transform.apply_normal({0.f, 8.f, 0.f});
-        m_spawner->spawn_capsule(cam_tr->transform, vel, ang_vel, 1.f, 1.f, 2.f);
+        auto vel = cam_tr->transform.apply_normal({0.f, 0.f, -m_fire_object_speed});
+        vec3 ang_vel = cam_tr->transform.apply_normal({0.f, 0.f, 0.f});
+        m_spawner->spawn_capsule(cam_tr->transform, vel, ang_vel,
+                                 m_fire_object_mass, m_fire_object_size * 0.5f, m_fire_object_size);
     }
 
     bool m_cam_move_mode = false;
@@ -221,6 +262,13 @@ public:
     std::unique_ptr<BodySpawner> m_spawner;
     Vector<std::unique_ptr<Demo>> m_demos;
     Demo* m_current_demo = nullptr;
+    Demo* m_selected_demo = nullptr;
+    bool m_apply_default_demo_config = true;
+
+    float m_fire_object_speed = 15.f;
+    float m_fire_object_mass = 4.f;
+    float m_fire_object_size = 1.5f;
+    ShapeKind m_fire_object_kind = ShapeKind::Box;
 
     std::unique_ptr<World> m_world;
 };

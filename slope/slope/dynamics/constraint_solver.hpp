@@ -82,7 +82,7 @@ struct Constraint {
 };
 
 struct ConstraintSolverConfig {
-    bool        use_simd = false;
+    bool        use_simd = true;
     // Successive over-relaxation
     float       sor = 1.f;
     int         iteration_count = 10;
@@ -112,6 +112,7 @@ public:
     ConstraintIds   add_friction_2d(const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id);
     ConstraintIds   add_friction_cone(const Constraint& c1, const Constraint& c2, vec2 ratio, ConstraintId normal_id);
 
+    int             get_constraint_count(ConstraintGroup group) const;
     float           get_lambda(ConstraintId constr_id) const;
     const vec3&     get_linear_axis(ConstraintId constr_id) const;
     const vec3&     get_angular_axis(ConstraintId constr_id) const;
@@ -263,6 +264,11 @@ inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, RigidBody*
 inline Constraint Constraint::stabilized_unilateral(RigidBody* body1, const ConstraintGeom& geom)
 {
     return generic(body1, nullptr, geom, geom.pos_error(), 0.f, FLOAT_MAX);
+}
+
+inline int ConstraintSolver::get_constraint_count(ConstraintGroup group) const
+{
+    return m_groups[(int)group].size;
 }
 
 inline float ConstraintSolver::get_lambda(ConstraintId constr_id) const

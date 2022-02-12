@@ -25,6 +25,9 @@ std::shared_ptr<Mesh> MeshFactory::from_sphere(float radius)
     constexpr int YN = 30;
     constexpr int PN = 15;
 
+    auto color1 = vec4{0.6, 0.8, 0.2, 0.f};
+    auto color2 = vec4{0.8, 0.6, 0.2, 0.f};
+
     auto up = vec3{0.f, 1.f, 0.f};
     auto side = vec3{1.f, 0.f, 0.f};
 
@@ -45,9 +48,15 @@ std::shared_ptr<Mesh> MeshFactory::from_sphere(float radius)
             auto dr = ur + 2;
             auto dl = ur + 3;
 
-            vec4 color = pitch > 0 ? vec4{0.6, 0.8, 0.2, 0.f} : vec4{0.8, 0.6, 0.2, 0.f};
-            if (yaw > slope::PI)
-                color.z = 0.7;
+            vec4 color;
+            if (prev_yaw < slope::PI * 0.5f)
+                color = color1;
+            else if (prev_yaw < slope::PI)
+                color = color2;
+            else if (prev_yaw < slope::PI * 1.5f)
+                color = color1;
+            else
+                color = color2;
 
             auto& vur = vertices.emplace_back();
             vur.position = (mat44::rotation(side, pitch) * mat44::rotation(up, yaw)).apply_normal(
@@ -99,6 +108,9 @@ std::shared_ptr<Mesh> MeshFactory::from_capsule(float radius, float axis_length)
     constexpr int YN = 30;
     constexpr int PN = 16;
 
+    auto color1 = vec4{0.6, 0.8, 0.2, 0.f};
+    auto color2 = vec4{0.8, 0.6, 0.2, 0.f};
+
     auto up = vec3{0.f, 1.f, 0.f};
     auto side = vec3{1.f, 0.f, 0.f};
 
@@ -121,7 +133,7 @@ std::shared_ptr<Mesh> MeshFactory::from_capsule(float radius, float axis_length)
             auto dr = ur + 2;
             auto dl = ur + 3;
 
-            vec4 color = (yaw > slope::PI) ? vec4{0.6, 0.8, 0.2, 0.f} : vec4{0.8, 0.6, 0.2, 0.f};
+            vec4 color = (prev_yaw > slope::PI) ? color1 : color2;
 
             auto& vur = vertices.emplace_back();
             vur.position = (mat44::rotation(side, pitch) * mat44::rotation(up, yaw)).apply_normal(
@@ -180,7 +192,7 @@ std::shared_ptr<Mesh> MeshFactory::from_capsule(float radius, float axis_length)
         auto dr = ur + 2;
         auto dl = ur + 3;
 
-        vec4 color = (yaw > slope::PI) ? vec4{0.6, 0.8, 0.2, 0.f} : vec4{0.8, 0.6, 0.2, 0.f};
+        vec4 color = (prev_yaw > slope::PI) ? color1 : color2;
 
         auto& vur = vertices.emplace_back();
         vur.position = mat44::rotation(up, yaw).apply_normal({0.f, 0.f, radius}) + hemisphere_offset;
@@ -251,8 +263,9 @@ DynamicActor* BodySpawner::spawn_box(const mat44& tr, const vec3& velocity, floa
     actor->set_transform(tc->transform);
     actor->body().set_velocity(velocity);
     actor->body().set_mass(mass);
-    float inertia = mass / 6.f;
-    actor->body().set_local_inertia({inertia, inertia, inertia});
+
+    vec3 inertia = (mass / 12.f) * vec3(sqr(size.y) + sqr(size.z), sqr(size.x) + sqr(size.z), sqr(size.x) + sqr(size.y));
+    actor->body().set_local_inertia(inertia);
 
     actor->set_friction(0.5f);
 
@@ -287,7 +300,7 @@ DynamicActor* BodySpawner::spawn_sphere(const mat44& tr, const vec3& velocity, f
     actor->set_transform(tc->transform);
     actor->body().set_velocity(velocity);
     actor->body().set_mass(mass);
-    float inertia = 0.4f * mass * radius * radius;
+    float inertia = 0.4f * mass * sqr(radius);
     actor->body().set_local_inertia({inertia, inertia, inertia});
 
     actor->set_friction(0.5f);
@@ -326,14 +339,11 @@ DynamicActor* BodySpawner::spawn_capsule(
     actor->body().set_ang_velocity(ang_velocity);
     actor->body().set_mass(mass);
 
-    float h = height + radius * 0.5f;
-    float xz_inertia = mass * (3.f * radius * radius + h * h) / 12.f;
-    float y_inertia = mass * radius * radius / 2.f;
-    vec3 localInertia = {xz_inertia, y_inertia, xz_inertia};
-    //localInertia = {1.666666f, 0.666667f, 1.666666f};
-    //localInertia = {1.666666f, 0.666667f, 5.666666f};
-    localInertia = {1.666666f, 0.666667f, 1.666666f};
-    actor->body().set_local_inertia(localInertia);
+    // TODO: exact formula for capsule
+    float ix = (mass / 12.f) * (3 * sqr(radius) + sqr(height + radius * 0.8f));
+    float iy = mass * sqr(radius) / 2.f;
+    vec3 inertia = {ix, iy, ix};
+    actor->body().set_local_inertia(inertia);
 
     actor->set_friction(0.5f);
 

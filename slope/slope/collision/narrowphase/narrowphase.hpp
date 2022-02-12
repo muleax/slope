@@ -47,6 +47,8 @@ private:
     INpBackendWrapper* find_backend(const CollisionShape* shape1, const CollisionShape* shape2);
     void remove_backend(int type1, int type2);
 
+    void on_config_update(const NarrowphaseConfig& prev_config) override;
+
     NpContext           m_context;
     NpNullBackend       m_null_backend;
     Backends            m_backends;

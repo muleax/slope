@@ -8,7 +8,7 @@
 namespace slope {
 
 enum class ActorKind : int {
-    Static,
+    Kinematic,
     Dynamic,
     Count
 };
@@ -53,7 +53,7 @@ protected:
     ProxyId         m_proxy_id = 0;
 };
 
-class StaticActor : public TypedObject<BaseActor, ActorKind::Static> {
+class KinematicActor : public TypedObject<BaseActor, ActorKind::Kinematic> {
 public:
     void            set_transform(const mat44& transform) final;
     const mat44&    transform() final { return m_transform; }
@@ -82,7 +82,7 @@ inline void BaseActor::assign_shape(CollisionShape* shape) {
     m_shape->set_transform(transform());
 }
 
-inline void StaticActor::set_transform(const mat44& transform) {
+inline void KinematicActor::set_transform(const mat44& transform) {
     m_transform = transform;
     m_inv_transform = transform.inverted_orthonormal();
 

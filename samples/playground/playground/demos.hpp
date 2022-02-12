@@ -2,6 +2,7 @@
 #include "playground/helpers.hpp"
 #include "slope/dynamics/joint/spherical_joint.hpp"
 #include <optional>
+#include <random>
 
 class Demo {
 public:
@@ -9,7 +10,8 @@ public:
     virtual ~Demo() = default;
 
     virtual void        init() { create_floor(); }
-    virtual void        fini() { }
+    virtual void        apply_default_config() {}
+    virtual void        fini() {}
     virtual void        update(float dt) {}
     virtual const char* name() = 0;
 
@@ -22,63 +24,50 @@ protected:
     BodySpawner* m_spawner = nullptr;
 };
 
-class StackDemo : public Demo {
-public:
-    using Demo::Demo;
-
-    void        init() override;
-    const char* name() override { return "Stack"; }
-
-private:
-    int m_height = 5;
-};
-
 class TriangleStackDemo : public Demo {
 public:
     using Demo::Demo;
 
     void        init() override;
+    void        apply_default_config() override;
     const char* name() override { return "Triangle Stack"; }
-
-private:
-    int m_height = 30;
 };
 
-class StressTestDemo : public Demo {
+class StackDemo : public Demo {
 public:
     using Demo::Demo;
 
     void        init() override;
-    const char* name() override { return "Stress Test"; }
-
-private:
-    int m_height = 10;
-    int m_width = 25;
+    void        apply_default_config() override;
+    const char* name() override { return "Stack"; }
 };
 
-class CollisionDemo : public Demo {
+
+class Stress1KDemo : public Demo {
 public:
     using Demo::Demo;
 
     void        init() override;
-    void        update(float dt) override;
-    const char* name() override { return "Contact Generation"; }
-
-private:
-    vec3 m_control_euler;
-    DynamicActor* m_control_actor = nullptr;
+    void        apply_default_config() override;
+    const char* name() override { return "1K Boxes"; }
 };
 
-class TennisRacketDemo : public Demo {
+class Stress6KDemo : public Demo {
 public:
     using Demo::Demo;
 
     void        init() override;
-    const char* name() override { return "Tennis Racket"; }
+    void        apply_default_config() override;
+    const char* name() override { return "6K Boxes"; }
+};
 
-private:
-    int m_height = 47;
-    int m_width = 8;
+class Stress10KDemo : public Demo {
+public:
+    using Demo::Demo;
+
+    void        init() override;
+    void        apply_default_config() override;
+    const char* name() override { return "10K Boxes"; }
 };
 
 class SphericalJointDemo : public Demo {
@@ -86,7 +75,37 @@ public:
     using Demo::Demo;
 
     void        init() override;
+    void        apply_default_config() override;
     const char* name() override { return "Spherical Joint"; }
 
 private:
+};
+
+class TennisRacketDemo : public Demo {
+public:
+    using Demo::Demo;
+
+    void        init() override;
+    void        fini() override;
+    const char* name() override { return "Tennis Racket"; }
+
+private:
+    int m_height = 47;
+    int m_width = 8;
+
+    std::mt19937 m_mt_engine;
+};
+
+class ContactGenerationDemo : public Demo {
+public:
+    using Demo::Demo;
+
+    void        init() override;
+    void        fini() override;
+    void        update(float dt) override;
+    const char* name() override { return "Contact Generation"; }
+
+private:
+    vec3 m_control_euler;
+    DynamicActor* m_controlled_actor = nullptr;
 };

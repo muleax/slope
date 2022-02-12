@@ -1,5 +1,6 @@
 #include "playground/demos.hpp"
 #include "imgui/imgui.h"
+#include <random>
 
 void Demo::create_floor()
 {
@@ -16,92 +17,218 @@ void Demo::create_floor()
     rc->material->set_color({0.8, 0.8, 0.9});
 
     auto* tc = w()->create<TransformComponent>(e);
-    tc->transform = mat44::translate({0.f, -1.f, 0.f});
+    tc->transform = mat44::translate({0.f, -0.5f, 0.f});
 
     auto* pc = w()->create<PhysicsComponent>(e);
-    pc->actor = dynamics_world()->create_static_actor();
+    pc->actor = dynamics_world()->create_kinematic_actor();
     dynamics_world()->set_shape(pc->actor, BoxShape({floor_size, 1.f, floor_size}));
 
     pc->actor->set_friction(0.5f);
     pc->actor->set_transform(tc->transform);
 }
 
-void StackDemo::init()
+void TriangleStackDemo::apply_default_config()
 {
-    create_floor();
-
-    float skew = 0.f;
-    for (int j = 0; j < m_height; j++) {
-        mat44 tr = mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
-        tr.set_translation({skew * j, 0.5f + j * 2.02f, skew * j});
-        m_spawner->spawn_sphere(tr, {}, 1.f, 1.f);
-    }
+    auto config = dynamics_world()->config();
+    config.randomize_order = true;
+    config.solver_config.iteration_count = 30;
+    dynamics_world()->update_config(config);
 }
 
 void TriangleStackDemo::init()
 {
     create_floor();
 
-    auto config = dynamics_world()->config();
-    config.randomize_order = true;
-    config.enable_velocity_dependent_friction = true;
-    config.solver_config.use_simd = true;
-    config.solver_config.iteration_count = 30;
-    dynamics_world()->update_config(config);
+    int height = 30;
 
-    //auto rot = Mat44::rotation({0.f, 1.f, 0.f}, 0.5f);
     float spacing = 0.f;
-    for (int j = 0; j < m_height; j++) {
-        for (int i = 0; i < m_height - j; i++) {
+    for (int j = 0; j < height; j++) {
+        for (int i = 0; i < height - j; i++) {
             for (int k = 0; k < 1; k++) {
-                mat44 tr = mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
-                tr.set_translation(
-                    {-float(m_height) / 2 + i * (1.f + spacing) + j * (0.5f + spacing / 2), -0.001f + j * 0.999f,
-                     (j % 2) * spacing * 0.f + k * 1.0f});
-                //tr *= rot;
+                auto tr = mat44::translate({
+                    static_cast<float>(-height / 2 + i * (1.f + spacing) + j * (0.5f + spacing / 2)),
+                    static_cast<float>(j * 0.999f + 0.49f),
+                    static_cast<float>((j % 2) * spacing * 0.f + k * 1.0f)
+                });
                 m_spawner->spawn_box(tr, {}, 1.f, vec3{1.f});
             }
         }
     }
 }
 
-void StressTestDemo::init()
+void StackDemo::apply_default_config()
+{
+    auto config = dynamics_world()->config();
+    config.randomize_order = true;
+    config.solver_config.iteration_count = 30;
+    dynamics_world()->update_config(config);
+}
+
+void StackDemo::init()
 {
     create_floor();
 
+    for (int i = 0; i < 5; i++) {
+        m_spawner->spawn_sphere(mat44::translate({0.f, 1.f + i * 2.02f, 0.f}), vec3::zero(), 1.f, 1.f);
+    }
+
+    for (int i = 0; i < 10; i++) {
+        m_spawner->spawn_box(mat44::translate({5.f, 0.5f + i * 1.01f, 0.f}), vec3::zero(), 1.f, {1.f, 1.f, 1.f});
+    }
+}
+
+void Stress1KDemo::init()
+{
     auto config = dynamics_world()->config();
-    //physics_single->dynamics_world.config().enable_constraint_resolving = false;
-    //physics_single->dynamics_world.config().enable_integration = false;
-
-    //config.enable_integration = false;
-    //config.enable_constraint_resolving = false;
-    //config.enable_gravity = false;
-
     config.randomize_order = true;
-    config.enable_velocity_dependent_friction = true;
-    config.solver_config.iteration_count = 5;
-    config.solver_config.use_simd = true;
+    config.solver_config.iteration_count = 10;
     dynamics_world()->update_config(config);
+}
 
+void Stress1KDemo::apply_default_config()
+{
+    create_floor();
 
-    //float spacing = 0.99f;
-    float y_spacing = 1.2f;
-    float xz_spacing = 4.2f;
-    float skew = 0.f;
-    for (int i = 0; i < m_width; i++) {
-        for (int j = 0; j < m_height; j++) {
-            for (int k = 0; k < m_width; k++) {
-                mat44 tr = mat44::rotation({0.f, 1.f, 0.f}, j * PI * 0.f);
-                tr.set_translation(
-                    {(float) i * xz_spacing + j * skew, (float) j * y_spacing + 0.2f, (float) k * xz_spacing + j * skew});
+    int height = 10;
+    int width = 10;
+    int depth = 10;
 
-                m_spawner->spawn_box(tr, {}, 1.f, vec3{1.f});
+    for (int i = 0; i < width; i++) {
+        for (int j = 0; j < height; j++) {
+            for (int k = 0; k < depth; k++) {
+                auto tr = mat44::translate({
+                    static_cast<float>((i - width / 2) * 1.f + 0.5f * (j % 2)),
+                    static_cast<float>(j * 1.f + 0.49f),
+                    static_cast<float>(k * 1.f + 0.5f * (i % 2) - 10.f)
+                });
+
+                m_spawner->spawn_box(tr, vec3::zero(), 1.f, vec3{1.f});
             }
         }
     }
 }
 
-void CollisionDemo::init()
+void Stress6KDemo::init()
+{
+    auto config = dynamics_world()->config();
+    config.randomize_order = true;
+    config.solver_config.iteration_count = 5;
+    dynamics_world()->update_config(config);
+}
+
+void Stress6KDemo::apply_default_config()
+{
+    create_floor();
+
+    int height = 60;
+    int width = 10;
+    int depth = 10;
+
+    float skew = 0.2f;
+    float spacing = 1.2f;
+    for (int i = 0; i < width; i++) {
+        for (int j = 0; j < height; j++) {
+            for (int k = 0; k < depth; k++) {
+                auto tr = mat44::translate({
+                    static_cast<float>(i * spacing + j * skew - 20.f),
+                    static_cast<float>(j * spacing + 0.5f),
+                    static_cast<float>(k * spacing + j * skew - 50.f)
+                });
+
+                m_spawner->spawn_box(tr, vec3::zero(), 1.f, vec3{1.f});
+            }
+        }
+    }
+}
+
+void Stress10KDemo::apply_default_config()
+{
+    auto config = dynamics_world()->config();
+    config.randomize_order = true;
+    config.solver_config.iteration_count = 5;
+    dynamics_world()->update_config(config);
+}
+
+void Stress10KDemo::init()
+{
+    create_floor();
+
+    int height = 5;
+    int width = 40;
+    int depth = 50;
+
+    float y_spacing = 1.f;
+    float xz_spacing = 4.2f;
+    for (int i = 0; i < width; i++) {
+        for (int j = 0; j < height; j++) {
+            for (int k = 0; k < depth; k++) {
+                auto tr = mat44::translate({
+                    static_cast<float>((i - width / 2) * xz_spacing),
+                    static_cast<float>(j * y_spacing + 0.5f),
+                    static_cast<float>((k - depth / 2) * xz_spacing)
+                });
+
+                m_spawner->spawn_box(tr, vec3::zero(), 1.f, vec3{1.f});
+            }
+        }
+    }
+}
+
+void SphericalJointDemo::apply_default_config()
+{
+    auto config = dynamics_world()->config();
+    config.solver_config.iteration_count = 30;
+    dynamics_world()->update_config(config);
+}
+
+void SphericalJointDemo::init()
+{
+    static constexpr int CHAIN_LENGTH = 12;
+
+    create_floor();
+
+    float y = 14.f;
+    float x = 0.f;
+
+    float offset = 0.9f;
+
+    DynamicActor* prev_actor = nullptr;
+    for (int i = 0; i < CHAIN_LENGTH; i++) {
+        //auto* new_actor = m_spawner->spawn_box(mat44::translate({x, y, 0.f}), {}, 1.f, vec3{1.2f, 0.5f, 0.5f});
+        auto tr = mat44::rotation({0.f, 0.f, 1.f}, -slope::PI * 0.5f) * mat44::translate({x, y, 0.f});
+        auto* new_actor = m_spawner->spawn_capsule(tr, vec3::zero(), vec3::zero(), 0.5f, 0.25f, 0.8f);
+
+        auto* joint = dynamics_world()->create_joint<SphericalJoint>(new_actor, prev_actor);
+
+        joint->set_damping(0.5f);
+        joint->set_anchor1({ 0.f, offset, 0.f });
+        joint->set_anchor2(prev_actor ? vec3{0.f, -offset, 0.f} : vec3{x + offset, y, 0.f});
+
+        x -= 2.f * offset;
+        prev_actor = new_actor;
+    }
+}
+
+void TennisRacketDemo::init()
+{
+    std::uniform_real_distribution<float> dist(-8.f, 8.f);
+
+    auto config = dynamics_world()->config();
+    config.gravity.set_zero();
+    dynamics_world()->update_config(config);
+
+    auto actor = m_spawner->spawn_box(mat44::translate({0.f, 5.f, 0.f}), {}, 1.f, vec3{2.f, 4.f, 0.4f});
+    actor->body().set_ang_velocity({dist(m_mt_engine), dist(m_mt_engine), dist(m_mt_engine)});
+}
+
+void TennisRacketDemo::fini()
+{
+    auto config = dynamics_world()->config();
+    config.gravity = {0.f, -9.81f, 0.f};
+    dynamics_world()->update_config(config);
+}
+
+void ContactGenerationDemo::init()
 {
     auto config = dynamics_world()->config();
     config.gravity.set_zero();
@@ -109,51 +236,87 @@ void CollisionDemo::init()
     config.delay_integration = true;
     dynamics_world()->update_config(config);
 
-    MeshFactory mesh_factory;
-    ConvexPolyhedronFactory poly_factory;
-    auto box = poly_factory.box(vec3{1.f, 1.f, 1.f}, vec3{0.f, 0.f, 0.f});
-
     auto material = std::make_shared<Material>(DefaultShaders::mesh_shader());
     material->set_ambient_strength(0.2f);
     material->set_color({0.9, 0.75, 0.0});
 
-    auto e = w()->create_entity();
-    auto* rc = w()->create<RenderComponent>(e);
-    rc->mesh = mesh_factory.from_polyhedron(box);
-    rc->material = material;
-    auto* tc = w()->create<TransformComponent>(e);
-    tc->transform = mat44::translate({0.f, 5.f, 0.f});
+    MeshFactory mesh_factory;
+    ConvexPolyhedronFactory poly_factory;
 
-    auto* pc = w()->create<PhysicsComponent>(e);
-    pc->actor = dynamics_world()->create_dynamic_actor();
-    dynamics_world()->set_shape(pc->actor, BoxShape({1.f, 1.f, 1.f}));
+    {
+        vec3 static_box_size = {1.5f, 1.5f, 1.5f};
+        auto static_box = poly_factory.box(static_box_size, vec3{0.f, 0.f, 0.f});
 
-    pc->actor->set_transform(tc->transform);
+        auto e = w()->create_entity();
+        auto* rc = w()->create<RenderComponent>(e);
+        rc->mesh = mesh_factory.from_polyhedron(static_box);
+        rc->material = material;
+        auto* tc = w()->create<TransformComponent>(e);
+        tc->transform = mat44::translate({0.f, 5.f, 0.f});
 
-    auto box2 = poly_factory.box(vec3{1.f, 1.f, 1.f}, vec3{0.f, 0.f, 0.f});
+        auto* pc = w()->create<PhysicsComponent>(e);
+        pc->actor = dynamics_world()->create_dynamic_actor();
+        dynamics_world()->set_shape(pc->actor, BoxShape(static_box_size));
 
-    auto se = w()->create_entity();
-    auto* src = w()->create<RenderComponent>(se);
-    src->mesh = mesh_factory.from_sphere(1.f);
-    //src->mesh = mesh_factory.from_polyhedron(box2);
-    src->material = material;
-    auto* stc = w()->create<TransformComponent>(se);
-    float offs = 0.f;
-    stc->transform = mat44::translate({0.98f - offs, 5.f - offs, 0.f - offs});
+        pc->actor->set_transform(tc->transform);
+    }
 
-    m_control_actor = dynamics_world()->create_dynamic_actor();
-    dynamics_world()->set_shape(m_control_actor, SphereShape(1.f));
+    {
+        float static_sphere_radius = 1.2f;
 
-    m_control_actor->set_transform(stc->transform);
-    auto* pc2 = w()->create<PhysicsComponent>(se);
-    pc2->actor = m_control_actor;
+        auto e = w()->create_entity();
+        auto* rc = w()->create<RenderComponent>(e);
+        rc->mesh = mesh_factory.from_sphere(static_sphere_radius);
+        rc->material = material;
+        auto* tc = w()->create<TransformComponent>(e);
+        tc->transform = mat44::translate({5.f, 5.f, 0.f});
+
+        auto* pc = w()->create<PhysicsComponent>(e);
+        pc->actor = dynamics_world()->create_dynamic_actor();
+        dynamics_world()->set_shape(pc->actor, SphereShape(static_sphere_radius));
+
+        pc->actor->set_transform(tc->transform);
+    }
+
+    {
+        vec3 dynamic_box_size = {1.f, 1.f, 1.f};
+        auto dynamic_box = poly_factory.box(dynamic_box_size, vec3{0.f, 0.f, 0.f});
+
+        auto se = w()->create_entity();
+        auto* src = w()->create<RenderComponent>(se);
+        //src->mesh = mesh_factory.from_sphere(1.f);
+        src->mesh = mesh_factory.from_polyhedron(dynamic_box);
+        src->material = material;
+        auto* stc = w()->create<TransformComponent>(se);
+        float offs = 0.f;
+        stc->transform = mat44::translate({0.98f - offs, 5.f - offs, 0.f - offs});
+
+        m_controlled_actor = dynamics_world()->create_dynamic_actor();
+        dynamics_world()->set_shape(m_controlled_actor, BoxShape(dynamic_box_size));
+
+        m_controlled_actor->set_transform(stc->transform);
+        auto* pc = w()->create<PhysicsComponent>(se);
+        pc->actor = m_controlled_actor;
+    }
 }
 
-void CollisionDemo::update(float dt)
+void ContactGenerationDemo::fini()
 {
-    if (m_control_actor) {
-        ImGui::Begin("Control Actor");
-        auto& b = m_control_actor->body();
+    auto config = dynamics_world()->config();
+    config.gravity = {0.f, -9.81f, 0.f};
+    config.enable_constraint_resolving = true;
+    config.delay_integration = true;
+    dynamics_world()->update_config(config);
+}
+
+void ContactGenerationDemo::update(float dt)
+{
+    if (m_controlled_actor) {
+
+        ImGui::SetNextWindowPos(ImVec2(600, 15), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(230, 190), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Controlled Actor");
+        auto& b = m_controlled_actor->body();
         auto m = b.transform();
         auto p = b.transform().translation();
 
@@ -171,48 +334,5 @@ void CollisionDemo::update(float dt)
         m.set_translation(p);
         b.set_transform(m);
         ImGui::End();
-    }
-}
-
-void TennisRacketDemo::init()
-{
-    auto config = dynamics_world()->config();
-    config.gravity.set_zero();
-    dynamics_world()->update_config(config);
-
-    auto actor = m_spawner->spawn_box(mat44::translate({0.f, 5.f, 0.f}), {}, 1.f, vec3{2.f, 4.f, 0.4f});
-    actor->body().set_ang_velocity({8.f, 5.85f, 1.f});
-
-    vec3 localInertia = {1.666666f, 0.666667f, 5.666666f};
-    actor->body().set_local_inertia(localInertia);
-}
-
-void SphericalJointDemo::init()
-{
-    static constexpr int CHAIN_LENGTH = 12;
-
-    create_floor();
-
-    auto config = dynamics_world()->config();
-    config.solver_config.iteration_count = 30;
-    dynamics_world()->update_config(config);
-
-    float y = 14.f;
-    float x = 0.f;
-
-    float offset = 0.9f;
-
-    DynamicActor* prev_box = nullptr;
-    for (int i = 0; i < CHAIN_LENGTH; i++) {
-        auto* new_box = m_spawner->spawn_box(mat44::translate({x, y, 0.f}), {}, 1.f, vec3{1.2f, 0.5f, 0.5f});
-
-        auto* joint = dynamics_world()->create_joint<SphericalJoint>(new_box, prev_box);
-
-        joint->set_damping(0.5f);
-        joint->set_anchor1({ offset, 0.f, 0.f });
-        joint->set_anchor2(prev_box ? vec3{-offset, 0.f, 0.f} : vec3{x + offset, y, 0.f});
-
-        x -= 2.f * offset;
-        prev_box = new_box;
     }
 }

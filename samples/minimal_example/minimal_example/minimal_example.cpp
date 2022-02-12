@@ -8,7 +8,7 @@ using namespace slope;
 int main()
 {
     // create an executor with single worker thread
-    ParallelExecutor executor{1};
+    ParallelExecutor executor(1);
 
     DynamicsWorldConfig config;
     // 30 Hz update interval
@@ -26,7 +26,7 @@ int main()
     actor->set_transform(mat44::translate({0.f, 3.f, 0.f}));
 
     // create floor
-    auto* floor = world.create_static_actor();
+    auto* floor = world.create_kinematic_actor();
     world.set_shape(floor, BoxShape({100.f, 1.f, 100.f}));
     floor->set_transform(mat44::translate({0.f, -0.5f, 0.f}));
 
