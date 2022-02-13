@@ -15,7 +15,7 @@ inline uint64_t encode_edge(uint32_t a, uint32_t b)
 
 inline std::pair<uint32_t, uint32_t> decode_edge(uint64_t code)
 {
-    return {code & 0xffffffff, code >> 32};
+    return {static_cast<uint32_t>(code & 0xffffffff), static_cast<uint32_t>(code >> 32)};
 }
 
 } // unnamed
