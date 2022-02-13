@@ -85,12 +85,19 @@ At the core of the simulation is a constraint solver
 based on a standard Linear Complementarity formulation for rigid body dynamics. 
 Projected Gauss-Seidel method is used. Position stabilization is done using Baumgarte technique. 
 
+Slope utilizes temporal coherence to improve PGS convergence. 
+Constraint information is cached for use on the next frame. 
+Note that this is not a full-fledged "Persistence Contact Manifold", 
+so stacking is not very stable for complex shapes.
+
 Three contact friction models are supported:
 * Axis-aligned pyramid
 * Velocity-aligned pyramid
 * Implicit cone
 
 Gyroscopic forces are supported through a stable implicit scheme.
+
+### Joints
 
 Joints are modeled using reaction constraints in spatial coordinates.
 Currently, only spherical (ball-socket) joint is supported. 
