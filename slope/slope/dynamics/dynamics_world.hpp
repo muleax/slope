@@ -36,7 +36,7 @@ struct DynamicsWorldConfig {
     bool    enable_gyroscopic_torque = true;
     bool    enable_velocity_dependent_friction = true;
     bool    enable_cone_friction = false;
-    float   normal_warmstarting = 0.83f;
+    float   normal_warmstarting = 0.8f;
     float   friction_warmstarting = 0.75f;
     float   contact_erp = 0.2f;
     float   contact_cfm = 0.f;
@@ -90,6 +90,7 @@ public:
     void                    set_debug_drawer(std::shared_ptr<DebugDrawer> drawer);
     DebugDrawer*            debug_drawer() { return m_debug_drawer.get(); }
 
+    void                    clear_stats();
     const auto&             stats() const { return m_stats; }
 
     uint32_t                frame_id() const { return m_frame_id; }

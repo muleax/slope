@@ -50,7 +50,7 @@ uint32_t ConvexPolyhedronFactory::add_vertex(const vec3& vertex) {
 }
 
 uint32_t ConvexPolyhedronFactory::add_face(VectorView<uint32_t> indices) {
-    SL_ASSERT(indicies.size() > 2);
+    SL_ASSERT(indicies.size() >= 3);
 
     auto& face = m_result.m_faces.emplace_back();
     face.first_vertex = static_cast<uint32_t>(m_result.m_face_indices.size());
@@ -60,7 +60,7 @@ uint32_t ConvexPolyhedronFactory::add_face(VectorView<uint32_t> indices) {
 
     const vec3& a = m_result.m_vertices[indices[0]];
     const vec3& b = m_result.m_vertices[indices[1]];
-    const vec3& c = m_result.m_vertices[indices[1]];
+    const vec3& c = m_result.m_vertices[indices[2]];
     vec3 normal = (b - a).cross(c - a);
     SL_ASSERT(normal.length_squared() > 1e-12f);
     normal = normal.normalized();

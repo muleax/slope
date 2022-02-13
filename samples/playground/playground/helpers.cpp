@@ -350,3 +350,88 @@ DynamicActor* BodySpawner::spawn_capsule(
     pc->actor = actor;
     return actor;
 }
+
+std::shared_ptr<ConvexPolyhedron> BodySpawner::create_polyhedron_geom(PolyhedronDimensions dims)
+{
+    m_poly_factory.clear();
+
+    float com_y_ratio = dims.w_lo / (dims.w_hi + dims.w_lo);
+
+    for (int i = 0; i < dims.corners; i++) {
+        float angle = (slope::PI * 2.f * i) / dims.corners;
+        float x = cos(angle);
+        float z = sinf(angle);
+
+        m_poly_factory.add_vertex({x * dims.w_lo, dims.h * (com_y_ratio - 1.f), z * dims.w_lo});
+        m_poly_factory.add_vertex({x * dims.w_hi, dims.h * com_y_ratio, z * dims.w_hi});
+    }
+
+    m_face_indices.clear();
+    for (int i = 0; i < dims.corners; i++)
+        m_face_indices.push_back(i * 2);
+    m_poly_factory.add_face(m_face_indices);
+
+    m_face_indices.clear();
+    for (int i = dims.corners - 1; i >= 0; i--)
+        m_face_indices.push_back(i * 2 + 1);
+    m_poly_factory.add_face(m_face_indices);
+
+    int prev = dims.corners - 1;
+    for (int i = 0; i < dims.corners; i++) {
+        m_face_indices.clear();
+        m_face_indices.push_back(i * 2);
+        m_face_indices.push_back(prev * 2);
+        m_face_indices.push_back(prev * 2 + 1);
+        m_face_indices.push_back(i * 2 + 1);
+        m_poly_factory.add_face(m_face_indices);
+
+        prev = i;
+    }
+
+    return m_poly_factory.build();
+}
+
+DynamicActor* BodySpawner::spawn_polyhedron(
+    const mat44& tr, const vec3& velocity, const vec3& ang_velocity, float mass, PolyhedronDimensions dims)
+{
+    if (!m_phd_material) {
+        m_phd_material = std::make_shared<Material>(DefaultShaders::mesh_shader());
+        m_phd_material->set_ambient_strength(0.2f);
+        m_phd_material->set_color({0.75, 0.55, 0.75});
+    }
+
+    auto phd_ctor = [this, dims]() { return m_mesh_factory.from_polyhedron(create_polyhedron_geom(dims)); };
+
+    auto e = m_world->create_entity();
+    auto* rc = m_world->create<RenderComponent>(e);
+    rc->mesh = get_mesh(m_phd_meshes, dims, phd_ctor);
+    rc->material = m_phd_material;
+
+    auto* tc = m_world->create<TransformComponent>(e);
+    tc->transform = tr;
+
+    PolyhedronDimensions coll_dims = dims;
+    coll_dims.h += COLLISION_BLOAT;
+    coll_dims.w_lo += COLLISION_BLOAT;
+    coll_dims.w_hi += COLLISION_BLOAT;
+    auto coll_geom = create_polyhedron_geom(coll_dims);
+
+    auto* pc = m_world->create<PhysicsComponent>(e);
+    auto* actor = m_dynamics_world->create_dynamic_actor();
+    m_dynamics_world->set_shape(actor, PolyhedronShape(coll_geom));
+
+    actor->set_transform(tc->transform);
+    actor->body().set_velocity(velocity);
+    actor->body().set_mass(mass);
+
+    float h = dims.h;
+    float r = (dims.w_lo + dims.w_hi) / 2.f;
+    float iy = mass * r * r / 2.f;
+    float ix = mass * (3.f * r * r + h * h) / 12.f;
+    actor->body().set_local_inertia({ix, iy, ix});
+
+    actor->set_friction(0.5f);
+
+    pc->actor = actor;
+    return actor;
+}

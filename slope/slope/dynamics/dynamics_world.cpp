@@ -168,6 +168,11 @@ void DynamicsWorld::clear()
     m_joints.clear();
 }
 
+void DynamicsWorld::clear_stats()
+{
+    m_stats = {};
+}
+
 void DynamicsWorld::set_debug_drawer(std::shared_ptr<DebugDrawer> drawer)
 {
     m_debug_drawer = std::move(drawer);
@@ -202,13 +207,9 @@ void DynamicsWorld::collide(NarrowphaseContext& ctx, BaseActor* actor1, BaseActo
     auto& shape1 = actor1->shape();
     auto& shape2 = actor2->shape();
 
-    //m_stats.np_test_count++;
-
     ctx.contact_patch.reset();
 
     if (ctx.narrowphase->collide(&shape1, &shape2, ctx.contact_patch)) {
-        //m_stats.collision_count++;
-
         ManifoldCache* cache = nullptr;
 
         PairCacheKey cache_key = {&shape1, &shape2};

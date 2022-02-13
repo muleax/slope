@@ -104,7 +104,17 @@ public:
 
         case Key::F:
             if (is_pressed)
-                fire_object();
+                fire_box();
+            break;
+
+        case Key::G:
+            if (is_pressed)
+                fire_sphere();
+            break;
+
+        case Key::H:
+            if (is_pressed)
+                fire_capsule();
             break;
 
         case Key::Space:
@@ -171,20 +181,12 @@ private:
             ImGui::Text("WASD         Camera move");
             ImGui::Text("LMB + Mouse  Camera rotation");
             ImGui::Text("Space        Pause simulation");
-            ImGui::Text("F            Fire object");
+            ImGui::Text("F            Fire box");
+            ImGui::Text("G            Fire sphere");
+            ImGui::Text("H            Fire capsule");
         }
 
         if (ImGui::CollapsingHeader("Fire Object", treeNodeFlags)) {
-            bool use_box = (m_fire_object_kind == ShapeKind::Box);
-            if (ImGui::RadioButton("Box", use_box))
-                m_fire_object_kind = ShapeKind::Box;
-            bool use_sphere = (m_fire_object_kind == ShapeKind::Sphere);
-            if (ImGui::RadioButton("Sphere", use_sphere))
-                m_fire_object_kind = ShapeKind::Sphere;
-            bool use_capsule = (m_fire_object_kind == ShapeKind::Capsule);
-            if (ImGui::RadioButton("Capsule", use_capsule))
-                m_fire_object_kind = ShapeKind::Capsule;
-
             ImGui::DragFloat("Speed", &m_fire_object_speed, 0.1f, 0.f, 1000.f);
             ImGui::DragFloat("Mass", &m_fire_object_mass, 0.1f, 0.1f, 10000.f);
             ImGui::DragFloat("Size", &m_fire_object_size, 0.1f, 0.1f, 100.f);
@@ -212,6 +214,7 @@ private:
         auto* physics_single = m_world->modify_singleton<PhysicsSingleton>();
         // TODO: use fini view instead
         physics_single->dynamics_world.clear();
+        physics_single->dynamics_world.clear_stats();
 
         m_selected_demo->init();
 
@@ -219,16 +222,6 @@ private:
             m_selected_demo->apply_default_config();
 
         m_current_demo = m_selected_demo;
-    }
-
-    void fire_object()
-    {
-        switch (m_fire_object_kind) {
-        case ShapeKind::Box: fire_box(); break;
-        case ShapeKind::Sphere: fire_sphere(); break;
-        case ShapeKind::Capsule: fire_capsule(); break;
-        default: break;
-        }
     }
 
     void fire_box()

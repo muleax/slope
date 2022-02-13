@@ -68,12 +68,38 @@ void StackDemo::init()
 {
     create_floor();
 
-    for (int i = 0; i < 5; i++) {
-        m_spawner->spawn_sphere(mat44::translate({0.f, 1.f + i * 2.02f, 0.f}), vec3::zero(), 1.f, 1.f);
+    for (int i = 0; i < 20; i++) {
+        m_spawner->spawn_capsule(mat44::translate({20.f, 2.f + i * 3.f, 0.f}), vec3::zero(), vec3::zero(), 1.f, 0.5f, 1.f);
+    }
+
+    for (int i = 0; i < 20; i++) {
+        m_spawner->spawn_sphere(mat44::translate({10.f, 1.f + i * 3.f, 0.f}), vec3::zero(), 2.f, 1.f);
     }
 
     for (int i = 0; i < 10; i++) {
-        m_spawner->spawn_box(mat44::translate({5.f, 0.5f + i * 1.01f, 0.f}), vec3::zero(), 1.f, {1.f, 1.f, 1.f});
+        m_spawner->spawn_box(mat44::translate({0.f, 0.5f + i * 1.5f, 0.f}), vec3::zero(), 1.5f, {1.f, 1.f, 1.f});
+    }
+
+    BodySpawner::PolyhedronDimensions dims;
+    dims.corners = 8;
+    dims.h = 1.f;
+    dims.w_lo = 1.f;
+    dims.w_hi = 1.7f;
+    for (int i = 0; i < 5; i++) {
+        float h = 1.f;
+        m_spawner->spawn_polyhedron(mat44::translate({-10.f, 0.8f * h + i * h * 1.5f, 0.f}), vec3::zero(), vec3::zero(), 2.f, dims);
+    }
+
+    dims.corners = 16;
+    for (int i = 0; i < 5; i++) {
+        float h = 1.f;
+        m_spawner->spawn_polyhedron(mat44::translate({-20.f, 0.8f * h + i * h * 1.5f, 0.f}), vec3::zero(), vec3::zero(), 2.f, dims);
+    }
+
+    dims.corners = 24;
+    for (int i = 0; i < 5; i++) {
+        float h = 1.f;
+        m_spawner->spawn_polyhedron(mat44::translate({-30.f, 0.8f * h + i * h * 1.5f, 0.f}), vec3::zero(), vec3::zero(), 2.f, dims);
     }
 }
 
