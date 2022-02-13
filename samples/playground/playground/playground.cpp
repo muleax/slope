@@ -155,7 +155,7 @@ private:
         auto treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen;
 
         ImGui::SetNextWindowPos(ImVec2(340, 580), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(230, 440), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(230, 400), ImGuiCond_FirstUseEver);
         ImGui::Begin("Playground");
 
         if (ImGui::CollapsingHeader("Demos", treeNodeFlags)) {
@@ -267,6 +267,6 @@ private:
 };
 
 int main() {
-    AppManager::run<PlaygroundApp>({1600, 1200, "Playground"});
+    AppManager::run<PlaygroundApp>({1800, 1000, "Playground"});
     return 0;
 }
