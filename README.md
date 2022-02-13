@@ -122,10 +122,12 @@ Slope also tries to divide the scene into disconnected islands which can then be
 
 The "1K Boxes" scene from samples/playground 
 is an example of a fully connected system with a lot of constraints:
+
 ![1K Boxes](https://i.imgur.com/fCWtpvb.png)
 
 On the contrary, the "10K Boxes" scene 
 can be perfectly divided into small islands:
+
 ![1K Boxes](https://i.imgur.com/xaI5Nob.png)
 
 ### Profiling
