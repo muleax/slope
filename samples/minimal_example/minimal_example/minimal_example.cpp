@@ -22,12 +22,12 @@ int main()
 
     // create dynamic actor with box shape
     auto* actor = world.create_dynamic_actor();
-    world.set_shape(actor, BoxShape({1.f, 1.f, 1.f}));
+    world.assign_shape(actor, BoxShape({1.f, 1.f, 1.f}));
     actor->set_transform(mat44::translate({0.f, 3.f, 0.f}));
 
     // create floor
     auto* floor = world.create_kinematic_actor();
-    world.set_shape(floor, BoxShape({100.f, 1.f, 100.f}));
+    world.assign_shape(floor, BoxShape({100.f, 1.f, 100.f}));
     floor->set_transform(mat44::translate({0.f, -0.5f, 0.f}));
 
     // simulate 30 frames

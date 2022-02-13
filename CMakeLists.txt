@@ -7,7 +7,7 @@ set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
 
 set(SLOPE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-if (TracyEnable)
+if (SlopeTracyEnable)
     add_compile_definitions(TRACY_ENABLE)
     add_compile_definitions(SL_TRACY_ENABLE)
 endif()

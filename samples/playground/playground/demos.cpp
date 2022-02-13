@@ -21,7 +21,7 @@ void Demo::create_floor()
 
     auto* pc = w()->create<PhysicsComponent>(e);
     pc->actor = dynamics_world()->create_kinematic_actor();
-    dynamics_world()->set_shape(pc->actor, BoxShape({floor_size, 1.f, floor_size}));
+    dynamics_world()->assign_shape(pc->actor, BoxShape({floor_size, 1.f, floor_size}));
 
     pc->actor->set_friction(0.5f);
     pc->actor->set_transform(tc->transform);
@@ -107,7 +107,7 @@ void Stress1KDemo::init()
 {
     auto config = dynamics_world()->config();
     config.randomize_order = true;
-    config.solver_config.iteration_count = 10;
+    config.solver_config.iteration_count = 5;
     dynamics_world()->update_config(config);
 }
 
@@ -281,7 +281,7 @@ void ContactGenerationDemo::init()
 
         auto* pc = w()->create<PhysicsComponent>(e);
         pc->actor = dynamics_world()->create_dynamic_actor();
-        dynamics_world()->set_shape(pc->actor, BoxShape(static_box_size));
+        dynamics_world()->assign_shape(pc->actor, BoxShape(static_box_size));
 
         pc->actor->set_transform(tc->transform);
     }
@@ -298,7 +298,7 @@ void ContactGenerationDemo::init()
 
         auto* pc = w()->create<PhysicsComponent>(e);
         pc->actor = dynamics_world()->create_dynamic_actor();
-        dynamics_world()->set_shape(pc->actor, SphereShape(static_sphere_radius));
+        dynamics_world()->assign_shape(pc->actor, SphereShape(static_sphere_radius));
 
         pc->actor->set_transform(tc->transform);
     }
@@ -317,7 +317,7 @@ void ContactGenerationDemo::init()
         stc->transform = mat44::translate({0.98f - offs, 5.f - offs, 0.f - offs});
 
         m_controlled_actor = dynamics_world()->create_dynamic_actor();
-        dynamics_world()->set_shape(m_controlled_actor, BoxShape(dynamic_box_size));
+        dynamics_world()->assign_shape(m_controlled_actor, BoxShape(dynamic_box_size));
 
         m_controlled_actor->set_transform(stc->transform);
         auto* pc = w()->create<PhysicsComponent>(se);

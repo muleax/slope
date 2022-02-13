@@ -78,7 +78,7 @@ public:
     void                    destroy_actor(BaseActor* actor);
 
     template<class Shape>
-    void                    set_shape(BaseActor* actor, Shape&& shape);
+    void                    assign_shape(BaseActor* actor, Shape&& shape);
 
     template<class Joint>
     Joint*                  create_joint(DynamicActor* actor1, DynamicActor* actor2 = nullptr);
@@ -239,7 +239,7 @@ T* DynamicsWorld::create_joint(DynamicActor* actor1, DynamicActor* actor2)
 }
 
 template<class Shape>
-void DynamicsWorld::set_shape(BaseActor* actor, Shape&& shape)
+void DynamicsWorld::assign_shape(BaseActor* actor, Shape&& shape)
 {
     if (actor->is<DynamicActor>())
         set_shape_impl(m_dynamic_actors, actor, std::forward<Shape>(shape));
