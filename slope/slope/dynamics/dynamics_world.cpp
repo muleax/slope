@@ -6,6 +6,7 @@
 #include "slope/collision/narrowphase/sphere_backends.hpp"
 #include "slope/debug/log.hpp"
 #include <optional>
+#include <algorithm>
 
 namespace slope {
 
@@ -474,13 +475,29 @@ void DynamicsWorld::merge_islands()
             for (auto& island: m_islands) {
                 m_island_to_bin[island.root] = 0;
             }
+
         } else {
-            // TODO: implement optimal packing
+            m_bin_heap.resize(solve_concurrency);
+            uint32_t bin_index = 0;
+            for (Bin& bin : m_bin_heap) {
+                bin.index = bin_index++;
+                bin.size = 0;
+            }
+
+            for (auto& island : m_islands) {
+                std::pop_heap(m_bin_heap.begin(), m_bin_heap.end());
+                m_island_to_bin[island.root] = m_bin_heap.back().index;
+                m_bin_heap.back().size += island.size;
+                std::push_heap(m_bin_heap.begin(), m_bin_heap.end());
+            }
+
+            /*
             int bin_cnt = 0;
             for (auto& island: m_islands) {
                 m_island_to_bin[island.root] = bin_cnt % solve_concurrency;
                 bin_cnt++;
             }
+             */
         }
     }
 

@@ -17,11 +17,11 @@ void PhysicsSystem::step_simulation(PhysicsSingleton* ps) {
     auto t1 = get_time();
 
     {
-        SL_FRAME_MARK_START("Physics")
+        SL_FRAME_MARK_START("Slope")
 
         m_executor->run().wait();
 
-        SL_FRAME_MARK_END("Physics")
+        SL_FRAME_MARK_END("Slope")
     }
 
     ps->cpu_time.update(get_time() - t1);

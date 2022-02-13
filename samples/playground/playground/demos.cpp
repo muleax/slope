@@ -158,7 +158,7 @@ void Stress10KDemo::init()
     int depth = 50;
 
     float y_spacing = 1.f;
-    float xz_spacing = 4.2f;
+    float xz_spacing = 3.f;
     for (int i = 0; i < width; i++) {
         for (int j = 0; j < height; j++) {
             for (int k = 0; k < depth; k++) {
@@ -194,7 +194,6 @@ void SphericalJointDemo::init()
 
     DynamicActor* prev_actor = nullptr;
     for (int i = 0; i < CHAIN_LENGTH; i++) {
-        //auto* new_actor = m_spawner->spawn_box(mat44::translate({x, y, 0.f}), {}, 1.f, vec3{1.2f, 0.5f, 0.5f});
         auto tr = mat44::rotation({0.f, 0.f, 1.f}, -slope::PI * 0.5f) * mat44::translate({x, y, 0.f});
         auto* new_actor = m_spawner->spawn_capsule(tr, vec3::zero(), vec3::zero(), 0.5f, 0.25f, 0.8f);
 

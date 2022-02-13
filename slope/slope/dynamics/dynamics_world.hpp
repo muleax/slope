@@ -143,6 +143,14 @@ private:
         uint32_t            size;
     };
 
+    struct Bin {
+        uint32_t index = 0;
+        uint32_t size = 0;
+
+        // for min-heap
+        bool operator<(const Bin& other) const { return size > other.size; }
+    };
+
     template <class Actor>
     struct ActorData {
         std::unique_ptr<Actor>          actor;
@@ -203,6 +211,7 @@ private:
     DisjointSet                     m_island_merger;
     Vector<Island>                  m_islands;
     Vector<uint32_t>                m_island_to_bin;
+    Vector<Bin>                     m_bin_heap;
 
     Vector<SolveContext>            m_solve_ctx;
 
