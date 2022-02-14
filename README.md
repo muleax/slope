@@ -3,7 +3,7 @@
 A tiny physics engine focused on rigid body simulation. 
 Work in progress, a lot still needs to be done (see ToDo section).
 
-[![Playground](https://i.imgur.com/9EqwEdo.png)](https://youtu.be/DUjnwRfaWA4 "Slope Playground")
+[![Playground](https://i.imgur.com/9EqwEdo.png)](https://youtu.be/Co2f-l-V3jM "Slope Playground")
 
 ### Supported OS
 Tested on MacOS and Windows.
