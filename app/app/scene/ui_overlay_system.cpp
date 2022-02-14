@@ -131,7 +131,7 @@ void UIOverlaySystem::update(float dt)
     }
 
     if (ImGui::CollapsingHeader("Performance", treeNodeFlags)) {
-        ImGui::DragInt("Concurrency", &ps->concurrency, 1.f, 1, 8);
+        ImGui::DragInt("Concurrency", &ps->concurrency, 1.f, 1, 16);
         ImGui::Checkbox("Use SIMD Solver", &world_config.solver_config.use_simd);
     }
 
