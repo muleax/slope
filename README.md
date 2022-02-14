@@ -24,7 +24,7 @@ cd .build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --config Release -j 8
 ```
-You'll find various samples in "playground" app.
+You'll find various demos in samples/playground app.
 
 ### Minimal example
 From samples/minimal_example:
@@ -86,8 +86,8 @@ based on a standard Linear Complementarity formulation for rigid body dynamics.
 Projected Gauss-Seidel method is used. Position stabilization is done using Baumgarte technique. 
 
 Slope utilizes temporal coherence to improve PGS convergence. 
-Constraint information is cached for use on the next frame. 
-Note that this is not a full-fledged "Persistence Contact Manifold", 
+Constraint information is cached for use in the next frame. 
+Note that this is not a full-fledged "Persistent Contact Manifold", 
 so stacking is not very stable for complex shapes.
 
 Three contact friction models are supported:
@@ -132,7 +132,7 @@ can be perfectly divided into small islands:
 
 ### Profiling
 
-Slope comes with an embedded [Tracy](https://github.com/wolfpld/tracy) 
+Slope comes with embedded [Tracy](https://github.com/wolfpld/tracy) 
 client version [v0.7.8](https://github.com/wolfpld/tracy/releases/tag/v0.7.8). 
 To enable tracy use cmake option:
 ```bash
