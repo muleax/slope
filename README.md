@@ -3,7 +3,7 @@
 A tiny physics engine focused on rigid body simulation. 
 Work in progress, a lot still needs to be done (see ToDo section).
 
-[![Playground](https://i.imgur.com/9EqwEdo.png)](https://youtu.be/6_ipRQVZeME "Slope playground")
+[![Playground](https://i.imgur.com/9EqwEdo.png)](https://youtu.be/DUjnwRfaWA4 "Slope Playground")
 
 ### Supported OS
 Tested on MacOS and Windows.
@@ -142,8 +142,9 @@ To enable tracy use cmake option:
 ### ToDo
 - Deactivation
 - Better position stabilization technique (e.g. position-based stabilization)
-- Better broadphase (e.g. BVH)
+- Rolling friction
 - More joint types
+- Better broadphase (e.g. BVH)
 - Collision filters and callbacks
 - Raycasts
 - Compound shape
