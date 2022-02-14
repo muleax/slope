@@ -105,7 +105,7 @@ Other types will be added in the future. User can easily implement custom joints
 
 ### Multithreading
 Slope is designed to run in multi-threaded environment.
-Its execution flow can be effectively parallelized with the provided task runner.
+Its execution flow can be effectively parallelized with a provided task runner.
 
 Slope comes with 2 task runners out of the box:
 - SequentialExecutor: a naive single-threaded implementation
