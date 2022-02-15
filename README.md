@@ -64,7 +64,7 @@ From samples/minimal_example:
 ### Collision detection
 CD works with convex shapes. Concave geometries should be modeled via convex composition.
 
-Broadphase is currently done by sweep and prune algorithm.
+Broadphase is currently done using the sweep and prune algorithm.
 
 Narrowphase is broken into two stages: finding an axis of minimal penetration and contact manifold generation.
 The Gilbert-Johnson-Keerthi algorithm (along with the Expanding Polytope algorithm) is used to find the axis for complex convexes.
@@ -83,7 +83,7 @@ Supported shapes: arbitrary convex polyhedron, box, capsule, sphere.
 ### Dynamic simulation
 At the core of the simulation is a constraint solver 
 based on a standard Linear Complementarity formulation for rigid body dynamics. 
-Projected Gauss-Seidel method is used. Position stabilization is done using Baumgarte technique. 
+Projected Gauss-Seidel method is used. Position stabilization is done using the Baumgarte technique. 
 
 Slope utilizes temporal coherence to improve PGS convergence. 
 Constraint information is cached for use in the next frame. 
@@ -104,7 +104,7 @@ Currently, only spherical (ball-socket) joint is supported.
 Other types will be added in the future. User can easily implement custom joints.
 
 ### Multithreading
-Slope is designed to run in multi-threaded environment.
+Slope is designed to run in a multi-threaded environment.
 Its execution flow can be effectively parallelized with a provided task runner.
 
 Slope comes with 2 task runners out of the box:
