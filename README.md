@@ -19,8 +19,8 @@ Tested on MacOS and Windows.
 ```bash
 git submodule init
 git submodule update
-mkdir .build
-cd .build
+mkdir _build
+cd _build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --config Release -j 8
 ```
